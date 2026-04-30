@@ -1,0 +1,22 @@
+# Binaries
+/bin/
+/keysync
+
+# Environment files (never commit secrets)
+.env
+.env.local
+.env.test
+.env.production
+
+# OS secret store index
+~/.config/keysync/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db

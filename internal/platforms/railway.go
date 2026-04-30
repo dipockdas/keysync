@@ -1,0 +1,117 @@
+package platforms
+
+import (
+	"bytes"
+	"encoding/json"
+	"fmt"
+	"io"
+	"net/http"
+	"os"
+)
+
+func init() {
+	Register("railway", newRailwayFromConfig)
+}
+
+// RailwayClient syncs secrets to Railway using the GraphQL API.
+type RailwayClient struct {
+	token       string
+	environment string
+	service     string
+}
+
+// railwayConfig is the JSON config for Railway from .keysync.json.
+type railwayConfig struct {
+	Environment string `json:"environment,omitempty"`
+	Service     string `json:"service,omitempty"`
+}
+
+func newRailwayFromConfig(configJSON string) (Platform, error) {
+	var cfg railwayConfig
+	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
+		return nil, fmt.Errorf("parse railway config: %w", err)
+	}
+	return NewRailwayClient(cfg.Environment, cfg.Service)
+}
+
+// NewRailwayClient creates a Railway client. Requires RAILWAY_TOKEN env var.
+func NewRailwayClient(environment, service string) (*RailwayClient, error) {
+	token := os.Getenv("RAILWAY_TOKEN")
+	if token == "" {
+		return nil, fmt.Errorf("RAILWAY_TOKEN not set")
+	}
+	return &RailwayClient{
+		token:       token,
+		environment: environment,
+		service:     service,
+	}, nil
+}
+
+func (r *RailwayClient) Name() string { return "railway" }
+
+const railwayAPI = "https://backboard.railway.app/graphql/v2"
+
+// Upsert sets an environment variable in Railway.
+func (r *RailwayClient) Upsert(key, value string) error {
+	mutation := `mutation($input: VariableUpsertInput!) {
+		variableUpsert(input: $input) {
+			id
+			name
+		}
+	}`
+
+	vars := map[string]any{
+		"input": map[string]any{
+			"name":        key,
+			"value":       value,
+			"projectId":   r.service,
+			"environment": r.environment,
+		},
+	}
+
+	body := map[string]any{
+		"query":     mutation,
+		"variables": vars,
+	}
+	raw, _ := json.Marshal(body)
+
+	req, err := http.NewRequest("POST", railwayAPI, bytes.NewReader(raw))
+	if err != nil {
+		return fmt.Errorf("create request: %w", err)
+	}
+	req.Header.Set("Authorization", "Bearer "+r.token)
+	req.Header.Set("Content-Type", "application/json")
+
+	resp, err := http.DefaultClient.Do(req)
+	if err != nil {
+		return fmt.Errorf("http request: %w", err)
+	}
+	defer resp.Body.Close()
+
+	respBody, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		return fmt.Errorf("railway API %d: %s", resp.StatusCode, string(respBody))
+	}
+
+	var gqlResponse struct {
+		Errors []struct {
+			Message string `json:"message"`
+		} `json:"errors"`
+	}
+	if err := json.Unmarshal(respBody, &gqlResponse); err == nil && len(gqlResponse.Errors) > 0 {
+		return fmt.Errorf("railway error: %s", gqlResponse.Errors[0].Message)
+	}
+
+	return nil
+}
+
+// BulkUpsert sends multiple env vars to Railway.
+func (r *RailwayClient) BulkUpsert(envs map[string]string) error {
+	for key, value := range envs {
+		if err := r.Upsert(key, value); err != nil {
+			return fmt.Errorf("upsert %s: %w", key, err)
+		}
+	}
+	return nil
+}
