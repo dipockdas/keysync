@@ -37,8 +37,8 @@ func newRootCmd() *cobra.Command {
 local OS secret stores (macOS Keychain, Linux libsecret, Windows Credential Manager),
 and deployment platforms (Vercel, Railway, Supabase).`,
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
-			// Skip init command — it bootstraps the config
-			if cmd.Name() == "init" || cmd.Name() == "help" {
+			// Skip commands that bootstrap the config or don't need it
+			if cmd.Name() == "init" || cmd.Name() == "migrate" || cmd.Name() == "help" {
 				return nil
 			}
 			return initializeRuntime()
@@ -59,6 +59,7 @@ and deployment platforms (Vercel, Railway, Supabase).`,
 	cmd.AddCommand(newRotateCmd())
 	cmd.AddCommand(newDoctorCmd())
 	cmd.AddCommand(newTestSecretsCmd())
+	cmd.AddCommand(newMigrateCmd())
 
 	return cmd
 }
