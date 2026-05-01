@@ -11,7 +11,7 @@ CLI tool for unified secret management. Source of truth is **GitHub Secrets**; s
 | Command | Status | Description |
 |---------|--------|-------------|
 | `init` | Done | Scaffold `.keysync.json` in current directory |
-| `migrate` | Done | Interactive import from `.env` file → OS keychain |
+| `migrate` | Done | Interactive import from `.env` file or `--cloud` platform → OS keychain; `--dry-run` support |
 | `set` | Done | Write to OS keychain + GitHub Secrets |
 | `get` | Done | Read from OS keychain (project scope → global fallback) |
 | `list` | Done | List all managed secrets |
@@ -24,10 +24,7 @@ CLI tool for unified secret management. Source of truth is **GitHub Secrets**; s
 
 ### Not Yet Implemented
 
-- **`--cloud` flag on migrate** — pull live env vars from Vercel/Railway/Supabase CLIs instead of a local `.env` file
-- **`--dry-run` flag on migrate** — preview what migrate would do without side effects
 - **Client-side encryption** — `internal/crypto/crypto.go` exists (NaCl sealed boxes) but is not wired into the GitHub client yet
-- **Linux/Windows store implementations** — `libsecret_linux.go` and `wincred_windows.go` are stubs that return "not yet implemented"
 - **Full test suite** — only manual testing done so far; `MemoryStore` is ready for unit tests
 
 ## Project Structure
@@ -41,8 +38,8 @@ internal/
     store.go                 — Store interface, MemoryStore
     keychain_darwin.go       — macOS Keychain via `security` CLI
     fallback.go              — Encrypted file store (headless Linux fallback)
-    libsecret_linux.go       — Linux stub
-    wincred_windows.go       — Windows stub
+    libsecret_linux.go       — Linux libsecret via `secret-tool` CLI
+    wincred_windows.go       — Windows Credential Manager via `cmdkey` CLI
   github/github.go           — GitHub Secrets client via `gh` CLI
   platforms/                 — Pluggable platform sync system
     platform.go              — Platform interface + registry
@@ -75,6 +72,8 @@ client/                      — Importable Go client library
    keysync/project/my-app/OPENAI_API_KEY → "sk-proj-yyy" (override)
    ```
 
+5. **Key architecture decision — platform CLI integration for cloud pull** — The `--cloud` flag shells out to `vercel env pull`, `railway variables`, or `supabase secrets list` to pull live env vars from deployment platforms. This avoids needing API tokens for read-only migration.
+
 ## Build & Run
 
 ```bash
@@ -93,10 +92,9 @@ Single binary, ~11MB. Cross-compile with `GOOS=linux GOARCH=amd64 go build`.
 
 ## Next Steps
 
-1. **`--cloud` flag on migrate** — shell out to `vercel env pull`, `railway variables`, `supabase secrets list` and pipe into the interactive migrate flow
-2. **`--dry-run` flag on migrate** — preview without side effects
-3. **Encrypt fallback store** — wire `internal/crypto` into `fallback.go` for at-rest encryption of the file store
-4. **Linux/Windows store impls** — implement `libsecret_linux.go` (via `secret-tool`) and `wincred_windows.go` (via `cmdkey`)
-5. **Test suite** — write unit tests using `MemoryStore` and `httptest` for platform clients
-6. **Homebrew tap** — distribute via `brew install steath/keysync`
-7. **Skill packaging** — package as a Claude Code skill for LLM-guided migration
+1. **Encrypt fallback store** — wire `internal/crypto` into `fallback.go` for at-rest encryption of the file store
+2. **Migrate `--cloud-json` flag** — for programmatic consumption of cloud envs (output as JSON without interactive prompts)
+3. **Test suite** — write unit tests using `MemoryStore` and `httptest` for platform clients
+4. **Homebrew tap** — distribute via `brew install steath/keysync`
+5. **Skill packaging** — package as a Claude Code skill for LLM-guided migration
+6. **Windows `Get` implementation** — `cmdkey` doesn't expose password values; wire up fallback store or use CredentialManager PowerShell module for reads

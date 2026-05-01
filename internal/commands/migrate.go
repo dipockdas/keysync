@@ -2,15 +2,125 @@ package commands
 
 import (
 	"bufio"
+	"encoding/json"
 	"fmt"
 	"os"
+	"os/exec"
 	"strings"
 
 	"github.com/dipockdas/keysync/internal/store"
 	"github.com/spf13/cobra"
 )
 
-var migrateFile string
+var (
+	migrateFile   string
+	migrateCloud  string
+	migrateDryRun bool
+)
+
+// pullCloudVars pulls environment variables from a deployment platform CLI.
+func pullCloudVars(platform string) ([]parsedKey, error) {
+	switch strings.ToLower(platform) {
+	case "vercel":
+		return pullVercelVars()
+	case "railway":
+		return pullRailwayVars()
+	case "supabase":
+		return pullSupabaseVars()
+	default:
+		return nil, fmt.Errorf("unsupported cloud platform: %q (supported: vercel, railway, supabase)", platform)
+	}
+}
+
+// pullVercelVars uses `vercel env pull` to a temp file, then parses it as a .env file.
+func pullVercelVars() ([]parsedKey, error) {
+	tmpFile, err := os.CreateTemp("", "keysync-vercel-*.env")
+	if err != nil {
+		return nil, fmt.Errorf("create temp file: %w", err)
+	}
+	tmpPath := tmpFile.Name()
+	tmpFile.Close()
+	defer os.Remove(tmpPath)
+
+	cmd := exec.Command("vercel", "env", "pull", "--yes", tmpPath)
+	if out, err := cmd.CombinedOutput(); err != nil {
+		return nil, fmt.Errorf("vercel env pull: %w\n%s", err, strings.TrimSpace(string(out)))
+	}
+
+	return parseEnvFile(tmpPath)
+}
+
+// pullRailwayVars uses `railway variables` which outputs JSON key-value pairs.
+func pullRailwayVars() ([]parsedKey, error) {
+	cmd := exec.Command("railway", "variables")
+	out, err := cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("railway variables: %w", err)
+	}
+
+	var vars map[string]string
+	if err := json.Unmarshal(out, &vars); err != nil {
+		return nil, fmt.Errorf("parse railway variables (expected JSON): %w", err)
+	}
+
+	var secrets []parsedKey
+	for k, v := range vars {
+		secrets = append(secrets, parsedKey{key: k, value: v})
+	}
+	return secrets, nil
+}
+
+// pullSupabaseVars uses `supabase secrets list` with --json flag, falling back to table parsing.
+func pullSupabaseVars() ([]parsedKey, error) {
+	// Try JSON output first (newer supabase CLI versions)
+	cmd := exec.Command("supabase", "secrets", "list", "--json")
+	out, err := cmd.Output()
+	if err == nil {
+		var entries []struct {
+			Name  string `json:"name"`
+			Value string `json:"value"`
+		}
+		if json.Unmarshal(out, &entries) == nil {
+			var secrets []parsedKey
+			for _, e := range entries {
+				secrets = append(secrets, parsedKey{key: e.Name, value: e.Value})
+			}
+			return secrets, nil
+		}
+	}
+
+	// Fallback: parse table output
+	cmd = exec.Command("supabase", "secrets", "list")
+	out, err = cmd.Output()
+	if err != nil {
+		return nil, fmt.Errorf("supabase secrets list: %w", err)
+	}
+
+	return parseSupabaseTable(string(out))
+}
+
+// parseSupabaseTable parses the table output of `supabase secrets list`.
+func parseSupabaseTable(output string) ([]parsedKey, error) {
+	lines := strings.Split(output, "\n")
+	var secrets []parsedKey
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		// Skip header, separator, and empty lines
+		if line == "" || strings.Contains(line, "Name") || strings.HasPrefix(line, "─") {
+			continue
+		}
+		parts := strings.SplitN(line, "│", 2)
+		if len(parts) < 2 {
+			continue
+		}
+		name := strings.TrimSpace(parts[0])
+		value := strings.TrimSpace(parts[1])
+		if name != "" {
+			secrets = append(secrets, parsedKey{key: name, value: value})
+		}
+	}
+	return secrets, nil
+}
 
 // migratedKey tracks a key that was migrated from .env to keysync.
 type migratedKey struct {
@@ -21,42 +131,67 @@ type migratedKey struct {
 
 func newMigrateCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "migrate [--file .env] [--project name]",
-		Short: "Import secrets from an .env file into keysync",
-		Long: `Reads a .env file and interactively imports each secret into the OS secret store.
+		Use:   "migrate [--file .env] [--cloud vercel|railway|supabase] [--project name]",
+		Short: "Import secrets into keysync from an .env file or cloud platform",
+		Long: `Import secrets into keysync from a local .env file or directly from
+a cloud platform (Vercel, Railway, or Supabase).
+
 For each key, you choose the scope (global or project) and confirm storage.
+Use --dry-run to preview without side effects.
 
 After migration, keysync prints step-by-step instructions for the coding assistant
 to replace direct .env usage with keysync commands.
 
 Usage:
   keysync migrate --file .env.local
-  keysync migrate --project my-app
+  keysync migrate --cloud vercel --project my-app
+  keysync migrate --cloud railway --project my-app
+  keysync migrate --cloud supabase --project my-app --dry-run
   keysync migrate --project my-app --file .env.production`,
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
-			// Determine the file to read
-			filePath := migrateFile
-			if filePath == "" {
-				filePath = ".env"
-			}
+			var secrets []parsedKey
+			var sourceLabel string
 
-			// Check the file exists
-			if _, err := os.Stat(filePath); os.IsNotExist(err) {
-				return fmt.Errorf("file not found: %s", filePath)
-			}
+			// Determine source: --cloud takes precedence over --file
+			if migrateCloud != "" {
+				sourceLabel = fmt.Sprintf("cloud platform: %s", migrateCloud)
+				fmt.Printf("Pulling secrets from %s...\n", sourceLabel)
+				var err error
+				secrets, err = pullCloudVars(migrateCloud)
+				if err != nil {
+					return fmt.Errorf("pull from %s: %w", migrateCloud, err)
+				}
+			} else {
+				// Determine the file to read
+				filePath := migrateFile
+				if filePath == "" {
+					filePath = ".env"
+				}
+				sourceLabel = filePath
 
-			// Parse the .env file
-			secrets, err := parseEnvFile(filePath)
-			if err != nil {
-				return fmt.Errorf("parse env file: %w", err)
+				// Check the file exists
+				if _, err := os.Stat(filePath); os.IsNotExist(err) {
+					return fmt.Errorf("file not found: %s. Use --file to specify a path or --cloud to pull from a deployment platform", filePath)
+				}
+
+				// Parse the .env file
+				var err error
+				secrets, err = parseEnvFile(filePath)
+				if err != nil {
+					return fmt.Errorf("parse env file: %w", err)
+				}
 			}
 
 			if len(secrets) == 0 {
-				fmt.Println("No secrets found in", filePath)
+				fmt.Println("No secrets found in", sourceLabel)
 				return nil
 			}
 
-			fmt.Printf("Found %d secrets in %s\n\n", len(secrets), filePath)
+			fmt.Printf("Found %d secrets in %s\n", len(secrets), sourceLabel)
+			if migrateDryRun {
+				fmt.Println("🔎 DRY RUN — no secrets will be stored.")
+			}
+			fmt.Println()
 
 			// Initialize the store (needed since PersistentPreRunE skips migrate)
 			initStore()
@@ -100,25 +235,30 @@ Usage:
 					}
 				}
 
-				// Store prompt
-				fmt.Printf("    Store in %s? [Y/n]: ", storeLabel())
-				storeChoice := readLine(scanner, "y")
-				if scanner.Err() != nil {
-					return fmt.Errorf("read input: %w", scanner.Err())
+				if migrateDryRun {
+					fmt.Printf("    [DRY RUN] Would store as %s/%s\n", scopeLabel(scope, proj), kv.key)
+				} else {
+					// Store prompt
+					fmt.Printf("    Store in %s? [Y/n]: ", storeLabel())
+					storeChoice := readLine(scanner, "y")
+					if scanner.Err() != nil {
+						return fmt.Errorf("read input: %w", scanner.Err())
+					}
+
+					if strings.EqualFold(storeChoice, "n") || strings.EqualFold(storeChoice, "no") {
+						fmt.Println("    Skipped.")
+						continue
+					}
+
+					// Store the secret
+					if err := secretSt.Set(cobraCmd.Context(), scope, proj, kv.key, kv.value); err != nil {
+						fmt.Fprintf(os.Stderr, "    Error: %v\n", err)
+						continue
+					}
+
+					fmt.Printf("    Stored as %s/%s\n", scopeLabel(scope, proj), kv.key)
 				}
 
-				if strings.EqualFold(storeChoice, "n") || strings.EqualFold(storeChoice, "no") {
-					fmt.Println("    Skipped.")
-					continue
-				}
-
-				// Store the secret
-				if err := secretSt.Set(cobraCmd.Context(), scope, proj, kv.key, kv.value); err != nil {
-					fmt.Fprintf(os.Stderr, "    Error: %v\n", err)
-					continue
-				}
-
-				fmt.Printf("    Stored as %s/%s\n", scopeLabel(scope, proj), kv.key)
 				migratedKeys = append(migratedKeys, migratedKey{
 					Key:     kv.key,
 					Scope:   string(scope),
@@ -127,8 +267,18 @@ Usage:
 			}
 
 			// Summary
-			fmt.Printf("\n=== Migration Complete ===\n")
-			fmt.Printf("%d of %d secrets migrated.\n\n", len(migratedKeys), len(secrets))
+			summaryHeader := "Migration Complete"
+			if migrateDryRun {
+				summaryHeader = "DRY RUN Complete"
+			}
+			fmt.Printf("\n=== %s ===\n", summaryHeader)
+			if migrateDryRun {
+				fmt.Printf("%d of %d secrets would be migrated.\n", len(migratedKeys), len(secrets))
+				fmt.Println("Run without --dry-run to apply.")
+			} else {
+				fmt.Printf("%d of %d secrets migrated.\n", len(migratedKeys), len(secrets))
+			}
+			fmt.Println()
 
 			if len(migratedKeys) == 0 {
 				return nil
@@ -154,6 +304,8 @@ Usage:
 	}
 
 	cmd.Flags().StringVar(&migrateFile, "file", "", "path to .env file (default: .env)")
+	cmd.Flags().StringVar(&migrateCloud, "cloud", "", "pull from cloud platform: vercel, railway, or supabase")
+	cmd.Flags().BoolVar(&migrateDryRun, "dry-run", false, "preview migration without storing secrets")
 	return cmd
 }
 
@@ -268,6 +420,15 @@ func printMigrationInstructions(keys []migratedKey) {
 	fmt.Println()
 	fmt.Println("The following secrets have been migrated from .env to keysync.")
 	fmt.Println("Replace all direct .env access with keysync commands.")
+
+	if migrateDryRun {
+		fmt.Println()
+		fmt.Println("## NOTE: This was a DRY RUN")
+		fmt.Println("No secrets were actually stored. Run the following to apply:")
+		fmt.Println("```bash")
+		fmt.Println("keysync migrate --file .env")
+		fmt.Println("```")
+	}
 
 	if proj == "" {
 		fmt.Println()
