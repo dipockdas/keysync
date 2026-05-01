@@ -5,30 +5,31 @@ package store
 import (
 	"context"
 	"fmt"
-	"os/exec"
 	"strings"
+	"sync"
+
+	"github.com/danieljoos/wincred"
 )
 
-// WincredStore implements Store using Windows Credential Manager via `cmdkey`.
+// WincredStore implements Store using Windows Credential Manager
+// via the Win32 API (github.com/danieljoos/wincred).
 //
-// Note: cmdkey can store and list credentials, but cannot retrieve password values.
-// For read operations, this implementation falls back to PowerShell using the
-// CredentialManager module. If neither works, use the encrypted file fallback.
+// Credentials are stored as generic credentials with:
+//   - TargetName: "keysync_<scope>[_<project>]"  (same format as legacy cmdkey)
+//   - UserName:   "<key>"
+//   - CredentialBlob: "<value>" (UTF-8 encoded)
 type WincredStore struct {
-	index *keyIndex
+	mu    sync.RWMutex
+	cache []SecretEntry // cached list, rebuilt on demand
 }
 
 func NewWincredStore() *WincredStore {
-	ki, err := loadKeyIndex()
-	if err != nil {
-		ki = &keyIndex{path: ""}
-	}
-	ws := &WincredStore{index: ki}
-	ws.rebuildIndex()
+	ws := &WincredStore{}
+	ws.rebuildCache()
 	return ws
 }
 
-// credTarget returns the credential target name for cmdkey.
+// credTarget returns the credential target name.
 // Format: "keysync_<scope>[_<project>]"
 func credTarget(scope Scope, project string) string {
 	if project == "" || scope == ScopeGlobal {
@@ -37,165 +38,124 @@ func credTarget(scope Scope, project string) string {
 	return fmt.Sprintf("keysync_%s_%s", scope, project)
 }
 
-func (w *WincredStore) Get(_ context.Context, scope Scope, project, key string) error {
-	target := credTarget(scope, project)
-	// Use PowerShell to retrieve the credential
-	psCmd := fmt.Sprintf(`
-$cred = cmdkey /list:%s | Select-String "%s" -SimpleMatch
-if (-not $cred) { exit 1 }
-`, target, key)
-
-	cmd := exec.Command("powershell", "-NoProfile", "-Command", psCmd)
-	out, err := cmd.Output()
-	if err != nil {
-		return ErrNotFound
+// parseCredTarget splits a target name back into scope and project.
+// "keysync_global" → (global, "")
+// "keysync_project_my-app" → (project, "my-app")
+func parseCredTarget(target string) (Scope, string) {
+	trimmed := strings.TrimPrefix(target, "keysync_")
+	parts := strings.SplitN(trimmed, "_", 2)
+	if len(parts) == 0 {
+		return ScopeGlobal, ""
 	}
-	_ = out // cmdkey /list only shows metadata, not the password
-	return fmt.Errorf("password retrieval via cmdkey not supported; use fallback store on Windows")
+	scope := Scope(parts[0])
+	if scope != ScopeGlobal && scope != ScopeProject {
+		return ScopeGlobal, ""
+	}
+	if len(parts) < 2 {
+		return scope, ""
+	}
+	return scope, parts[1]
+}
+
+func (w *WincredStore) Get(_ context.Context, scope Scope, project, key string) (string, error) {
+	target := credTarget(scope, project)
+	cred, err := wincred.GetGenericCredential(target)
+	if err != nil {
+		return "", ErrNotFound
+	}
+	// Verify the account name matches (target might match but different key)
+	if cred.UserName != key {
+		return "", ErrNotFound
+	}
+	return string(cred.CredentialBlob), nil
 }
 
 func (w *WincredStore) Set(_ context.Context, scope Scope, project, key, value string) error {
 	target := credTarget(scope, project)
-	cmd := exec.Command("cmdkey", "/add:"+target, "/user:"+accountName(key), "/pass:"+value)
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("cmdkey /add: %w: %s", err, strings.TrimSpace(string(out)))
+
+	// Delete existing first to avoid duplicates
+	existing, err := wincred.GetGenericCredential(target)
+	if err == nil && existing.UserName == key {
+		_ = existing.Delete()
 	}
 
-	if w.index != nil {
-		_ = w.index.add(SecretEntry{Scope: scope, Project: project, Key: key})
+	cred := wincred.NewGenericCredential(target)
+	cred.UserName = key
+	cred.CredentialBlob = []byte(value)
+	cred.Persist = wincred.PersistLocalMachine
+
+	if err := cred.Write(); err != nil {
+		return fmt.Errorf("wincred write: %w", err)
 	}
+
+	// Update cache
+	w.mu.Lock()
+	w.cache = append(w.cache, SecretEntry{Scope: scope, Project: project, Key: key})
+	w.mu.Unlock()
 	return nil
 }
 
 func (w *WincredStore) Delete(_ context.Context, scope Scope, project, key string) error {
 	target := credTarget(scope, project)
-	// cmdkey /delete requires interactive confirmation; pipe 'Y' to it
-	cmd := exec.Command("cmdkey", "/delete:"+target)
-	cmd.Stdin = strings.NewReader("Y\n")
-	if out, err := cmd.CombinedOutput(); err != nil {
-		return fmt.Errorf("cmdkey /delete: %w: %s", err, strings.TrimSpace(string(out)))
-	}
-
-	if w.index != nil {
-		_ = w.index.remove(scope, project, key)
-	}
-	return nil
-}
-
-func (w *WincredStore) List(ctx context.Context, scope Scope, project string) ([]SecretEntry, error) {
-	if w.index == nil {
-		return nil, nil
-	}
-	return w.index.list(scope, project), nil
-}
-
-// rebuildIndex scans Windows Credential Manager for keysync entries.
-func (w *WincredStore) rebuildIndex() {
-	if w.index == nil {
-		return
-	}
-	existing := w.index.list("", "")
-	if len(existing) > 0 {
-		return
-	}
-
-	// cmdkey /list shows all stored credentials
-	cmd := exec.Command("cmdkey", "/list")
-	out, err := cmd.Output()
+	cred, err := wincred.GetGenericCredential(target)
 	if err != nil {
-		return
+		return ErrNotFound
+	}
+	if cred.UserName != key {
+		return ErrNotFound
+	}
+	if err := cred.Delete(); err != nil {
+		return fmt.Errorf("wincred delete: %w", err)
 	}
 
-	lines := strings.Split(string(out), "\n")
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		// Look for lines like: "    Target: keysync_global_LegacyGeneric:target=keysync_global"
-		if !strings.Contains(line, "keysync_") {
-			continue
-		}
-		// Extract the target name
-		if strings.HasPrefix(line, "Target:") {
-			parts := strings.SplitN(line, ":", 2)
-			if len(parts) < 2 {
-				continue
-			}
-			target := strings.TrimSpace(parts[1])
-			// Clean up: "keysync_global_LegacyGeneric:target=keysync_global" -> "keysync_global"
-			if idx := strings.Index(target, "LegacyGeneric"); idx >= 0 {
-				target = strings.TrimSpace(target[:idx])
-				target = strings.TrimSuffix(target, "_")
-			}
-			// Parse target: keysync_global or keysync_project_my-app
-			prefix := "keysync_"
-			target = strings.TrimPrefix(target, "LegacyGeneric:target=")
-			target = strings.TrimPrefix(target, prefix)
-			parts = strings.SplitN(target, "_", 2)
-			scope := Scope(parts[0])
-			proj := ""
-			key := ""
-			if len(parts) > 1 {
-				proj = parts[1]
-				// The "user" field in cmdkey output has the key name
-				// We need to parse the user from the next line
-				_ = proj // resolved below
-			}
-			_ = scope
-			_ = key
-			// Note: full key name parsing requires looking at "User:" line
-			// which appears on the next line in cmdkey output
-		}
-
-		// Look for user field matching keysync entries
-		if strings.HasPrefix(line, "User:") {
-			// The "User" in cmdkey is our account name (key)
-			// This requires multi-line parsing which is complex.
-			// For now, index is built during Set/Delete operations.
-		}
-	}
-}
-
-// keyIndex for Windows — minimal implementation.
-type keyIndex struct {
-	path string
-	keys []SecretEntry
-}
-
-func loadKeyIndex() (*keyIndex, error) {
-	return &keyIndex{}, nil
-}
-
-func (ki *keyIndex) add(entry SecretEntry) error {
-	var filtered []SecretEntry
-	for _, e := range ki.keys {
-		if e.Scope == entry.Scope && e.Project == entry.Project && e.Key == entry.Key {
-			continue
-		}
-		filtered = append(filtered, e)
-	}
-	filtered = append(filtered, entry)
-	ki.keys = filtered
-	return nil
-}
-
-func (ki *keyIndex) remove(scope Scope, project, key string) error {
-	var filtered []SecretEntry
-	for _, e := range ki.keys {
+	// Update cache
+	w.mu.Lock()
+	filtered := make([]SecretEntry, 0, len(w.cache))
+	for _, e := range w.cache {
 		if e.Scope == scope && e.Project == project && e.Key == key {
 			continue
 		}
 		filtered = append(filtered, e)
 	}
-	ki.keys = filtered
+	w.cache = filtered
+	w.mu.Unlock()
 	return nil
 }
 
-func (ki *keyIndex) list(scope Scope, project string) []SecretEntry {
+func (w *WincredStore) List(_ context.Context, scope Scope, project string) ([]SecretEntry, error) {
+	w.mu.RLock()
+	defer w.mu.RUnlock()
+
 	var result []SecretEntry
-	for _, e := range ki.keys {
+	for _, e := range w.cache {
 		if (scope == "" || e.Scope == scope) &&
 			(project == "" || e.Project == project) {
 			result = append(result, e)
 		}
 	}
-	return result
+	return result, nil
+}
+
+// rebuildCache scans Credential Manager for keysync entries and populates the cache.
+func (w *WincredStore) rebuildCache() {
+	all, err := wincred.List()
+	if err != nil {
+		return
+	}
+
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.cache = nil
+
+	for _, cred := range all {
+		if !strings.HasPrefix(cred.TargetName, "keysync_") {
+			continue
+		}
+		scope, project := parseCredTarget(cred.TargetName)
+		w.cache = append(w.cache, SecretEntry{
+			Scope:   scope,
+			Project: project,
+			Key:     cred.UserName,
+		})
+	}
 }

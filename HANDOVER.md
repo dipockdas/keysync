@@ -26,6 +26,7 @@ CLI tool for unified secret management. Source of truth is **GitHub Secrets**; s
 
 - **Client-side encryption** — `internal/crypto/crypto.go` exists (NaCl sealed boxes) but is not wired into the GitHub client yet
 - **Full test suite** — only manual testing done so far; `MemoryStore` is ready for unit tests
+- **macOS/Linux index file persistence** — only macOS has persistent `~/.config/keysync/index.json`; Linux and Windows use in-memory caches rebuilt on startup
 
 ## Project Structure
 
@@ -39,7 +40,7 @@ internal/
     keychain_darwin.go       — macOS Keychain via `security` CLI
     fallback.go              — Encrypted file store (headless Linux fallback)
     libsecret_linux.go       — Linux libsecret via `secret-tool` CLI
-    wincred_windows.go       — Windows Credential Manager via `cmdkey` CLI
+    wincred_windows.go       — Windows Credential Manager via `wincred` library (Win32 API)
   github/github.go           — GitHub Secrets client via `gh` CLI
   platforms/                 — Pluggable platform sync system
     platform.go              — Platform interface + registry
@@ -55,7 +56,7 @@ client/                      — Importable Go client library
 
 ## Key Architecture Decisions
 
-1. **`security` CLI instead of CGo** — macOS Keychain accessed via `security` CLI to avoid CGo cross-compilation issues. Same pattern for other platforms: `secret-tool` (Linux), `cmdkey` (Windows).
+1. **`security` CLI instead of CGo (macOS)** — macOS Keychain accessed via `security` CLI to avoid CGo cross-compilation issues. Linux uses `secret-tool` CLI. **Windows uses the `wincred` Go library** (Win32 API via `golang.org/x/sys/windows`, no CGo) for full read/write access — unlike `cmdkey` which is write-only.
 
 2. **Pluggable platform registry** — New platforms register via `init()`:
    ```go
@@ -97,4 +98,4 @@ Single binary, ~11MB. Cross-compile with `GOOS=linux GOARCH=amd64 go build`.
 3. **Test suite** — write unit tests using `MemoryStore` and `httptest` for platform clients
 4. **Homebrew tap** — distribute via `brew install steath/keysync`
 5. **Skill packaging** — package as a Claude Code skill for LLM-guided migration
-6. **Windows `Get` implementation** — `cmdkey` doesn't expose password values; wire up fallback store or use CredentialManager PowerShell module for reads
+6. **Index file persistence for Linux/Windows** — persist `keyIndex` to `~/.config/keysync/index.json` for faster startup (currently only macOS has this)

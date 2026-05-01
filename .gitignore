@@ -1,6 +1,7 @@
 # Binaries
 /bin/
 /keysync
+*.exe
 
 # Environment files (never commit secrets)
 .env
