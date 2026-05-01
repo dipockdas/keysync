@@ -1,6 +1,6 @@
 # keysync
 
-**Unified secret management CLI** — store, sync, and inject secrets across local OS keychains, GitHub Actions, and deployment platforms (Vercel, Railway, Supabase).
+**Unified secret management CLI** — store and sync secrets across local OS keychains, GitHub Actions, and deployment platforms (Vercel, Railway, Supabase).
 
 Keysync replaces scattered `.env` files and manual secret management with a single workflow: secrets live in your OS keychain locally and are synced to GitHub Secrets and your deployment platforms on push.
 
@@ -10,7 +10,6 @@ Keysync replaces scattered `.env` files and manual secret management with a sing
 - **Two scopes** — global secrets (shared across projects) and project-scoped secrets (override globals)
 - **Platform sync** — push secrets to Vercel, Railway, and Supabase via their APIs
 - **GitHub Actions integration** — auto-sync secrets on push to `main`
-- **`.env` injection** — output secrets as `dotenv` or `export` format for local development
 - **Secret rotation** — generate cryptographically random secrets and update everywhere
 - **Migration** — import from `.env` files or pull from Vercel/Railway/Supabase CLIs
 - **Diagnostics** — `doctor` command to verify config and store are operational
@@ -60,17 +59,7 @@ keysync set GLOBAL_API_KEY=abc123
 keysync set -p my-app DB_URL=postgres://localhost:5432/mydb
 ```
 
-### 3. Use secrets in development
-
-```bash
-# Output as .env format
-keysync inject -p my-app > .env.local
-
-# Or as shell exports
-keysync inject -p my-app --format exports
-```
-
-### 4. Sync to deployment platforms
+### 3. Sync to deployment platforms
 
 Configure platforms in `.keysync.json`:
 
@@ -118,7 +107,6 @@ keysync sync -p my-app
 | `keysync set KEY=value` | Store a secret in the OS keychain |
 | `keysync get KEY` | Retrieve a secret value |
 | `keysync list` | List all stored secrets |
-| `keysync inject` | Output secrets as `.env` or `export` format |
 | `keysync sync` | Push secrets to configured platforms + GitHub |
 | `keysync pull` | Reconcile local secrets with GitHub secret names |
 | `keysync rotate KEY` | Generate a new random secret and update everywhere |
@@ -175,8 +163,8 @@ Keysync uses a `.keysync.json` file, searched for in the current directory and a
 ```
 ┌─────────────────────────────────────────────────────┐
 │                     CLI (cobra)                      │
-│  init │ set │ get │ list │ inject │ sync │ rotate    │
-│  pull │ migrate │ doctor │ test-secrets             │
+│  init │ set │ get │ list │ sync │ rotate    │
+│  pull │ migrate │ doctor │ test-secrets   │
 └──────────┬──────────────────────────────────────────┘
            │
      ┌─────┴─────┐
@@ -192,7 +180,7 @@ Keysync uses a `.keysync.json` file, searched for in the current directory and a
      └────────────────────────┘
 ```
 
-Secrets are stored with a service name like `keysync/global` (for global scope) or `keysync/project/my-app` (for project scope). The account/key name is the secret key itself. When syncing or injecting, project-scoped secrets take precedence over global secrets with the same key.
+Secrets are stored with a service name like `keysync/global` (for global scope) or `keysync/project/my-app` (for project scope). The account/key name is the secret key itself. When syncing, project-scoped secrets take precedence over global secrets with the same key.
 
 ## OS-Specific Setup
 

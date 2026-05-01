@@ -22,8 +22,6 @@ func setupTest(t *testing.T) func() {
 	origProject := project
 	origConfigPath := configPath
 	origRepoFlag := repoFlag
-	origInjectFormat := injectFormat
-	origCIMode := ciMode
 
 	secretSt = store.NewMemoryStore()
 	cfg = &config.Config{
@@ -34,8 +32,6 @@ func setupTest(t *testing.T) func() {
 	project = ""
 	configPath = "/tmp/test/.keysync.json"
 	repoFlag = "test/repo"
-	injectFormat = "dotenv"
-	ciMode = false
 
 	return func() {
 		secretSt = origSecretSt
@@ -43,8 +39,6 @@ func setupTest(t *testing.T) func() {
 		project = origProject
 		configPath = origConfigPath
 		repoFlag = origRepoFlag
-		injectFormat = origInjectFormat
-		ciMode = origCIMode
 	}
 }
 
@@ -274,58 +268,10 @@ func TestListCmd_ProjectFilter(t *testing.T) {
 	}
 }
 
-// ---------------------------------------------------------------------------
-// Inject command tests
-// ---------------------------------------------------------------------------
-
-func TestInjectCmd_Dotenv(t *testing.T) {
-	defer setupTest(t)()
-	project = "test-app"
-	ctx := context.Background()
-	secretSt.Set(ctx, store.ScopeGlobal, "", "GLOBAL_KEY", "global-val")
-	secretSt.Set(ctx, store.ScopeProject, "test-app", "PROJ_KEY", "proj-val")
-
-	cmd := newInjectCmd()
-	stdout, stderr, err := captureCommand(cmd, []string{})
-	if err != nil {
-		t.Fatalf("RunE failed: %v", err)
-	}
-	if stderr != "" {
-		t.Errorf("unexpected stderr: %s", stderr)
-	}
-	if !strings.Contains(stdout, "GLOBAL_KEY=global-val") {
-		t.Errorf("stdout missing GLOBAL_KEY=global-val: %s", stdout)
-	}
-	if !strings.Contains(stdout, "PROJ_KEY=proj-val") {
-		t.Errorf("stdout missing PROJ_KEY=proj-val: %s", stdout)
-	}
-}
-
-func TestInjectCmd_ExportsFormat(t *testing.T) {
-	defer setupTest(t)()
-	project = "test-app"
-	secretSt.Set(context.Background(), store.ScopeGlobal, "", "MY_KEY", "my-val")
-
-	cmd := newInjectCmd()
-	cmd.Flags().Set("format", "exports")
-	stdout, _, err := captureCommand(cmd, []string{})
-	if err != nil {
-		t.Fatalf("RunE failed: %v", err)
-	}
-	if !strings.Contains(stdout, "export MY_KEY=my-val") {
-		t.Errorf("stdout = %q, want 'export MY_KEY=my-val'", stdout)
-	}
-}
-
-func TestInjectCmd_MissingProject(t *testing.T) {
-	defer setupTest(t)()
-
-	cmd := newInjectCmd()
-	_, _, err := captureCommand(cmd, []string{})
-	if err == nil {
-		t.Fatal("expected error for missing --project, got nil")
-	}
-}
+//
+// Inject command tests — disabled (inject command is removed).
+// See inject.go for the preserved source.
+//
 
 // ---------------------------------------------------------------------------
 // Doctor command tests

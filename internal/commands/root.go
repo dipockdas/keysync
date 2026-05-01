@@ -54,7 +54,7 @@ and deployment platforms (Vercel, Railway, Supabase).`,
 	cmd.AddCommand(newGetCmd())
 	cmd.AddCommand(newListCmd())
 	cmd.AddCommand(newPullCmd())
-	cmd.AddCommand(newInjectCmd())
+	// cmd.AddCommand(newInjectCmd()) // disabled: see inject.go
 	cmd.AddCommand(newSyncCmd())
 	cmd.AddCommand(newRotateCmd())
 	cmd.AddCommand(newDoctorCmd())
