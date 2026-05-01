@@ -246,25 +246,6 @@ func (k *KeychainStore) List(ctx context.Context, scope Scope, project string) (
 	return k.index.list(scope, project), nil
 }
 
-// parseServiceName splits a service name into scope and project.
-// "keysync/global" → (global, "")
-// "keysync/project/my-app" → (project, "my-app")
-func parseServiceName(svc string) (Scope, string) {
-	trimmed := strings.TrimPrefix(svc, "keysync/")
-	parts := strings.SplitN(trimmed, "/", 2)
-	if len(parts) == 0 {
-		return ScopeGlobal, ""
-	}
-	scope := Scope(parts[0])
-	if scope != ScopeGlobal && scope != ScopeProject {
-		return ScopeGlobal, ""
-	}
-	if len(parts) < 2 {
-		return scope, ""
-	}
-	return scope, parts[1]
-}
-
 // isNotFound checks if the error is a "not found" from the security CLI.
 func isNotFound(err error) bool {
 	if exitErr, ok := err.(*exec.ExitError); ok {

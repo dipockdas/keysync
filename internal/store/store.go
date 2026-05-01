@@ -54,6 +54,25 @@ func accountName(key string) string {
 	return key
 }
 
+// parseServiceName splits a service name into scope and project.
+// "keysync/global" → (global, "")
+// "keysync/project/my-app" → (project, "my-app")
+func parseServiceName(svc string) (Scope, string) {
+	trimmed := strings.TrimPrefix(svc, "keysync/")
+	parts := strings.SplitN(trimmed, "/", 2)
+	if len(parts) == 0 {
+		return ScopeGlobal, ""
+	}
+	scope := Scope(parts[0])
+	if scope != ScopeGlobal && scope != ScopeProject {
+		return ScopeGlobal, ""
+	}
+	if len(parts) < 2 {
+		return scope, ""
+	}
+	return scope, parts[1]
+}
+
 // MemoryStore is an in-memory implementation of Store for testing.
 type MemoryStore struct {
 	mu   sync.RWMutex
