@@ -29,10 +29,9 @@ func NewSealedBox(publicKey, secretKey *[32]byte) *SealedBox {
 
 // NewSealedBoxFromSecret creates a SealedBox from a secret key seed.
 // The secret key is used to derive both keys (for symmetric usage).
+// Note: For symmetric self-encryption, pass the same 32-byte value for both
+// public and secret roles. For key-pair based encryption, use NewSealedBox.
 func NewSealedBoxFromSecret(secret *[32]byte) *SealedBox {
-	// For symmetric encryption, we derive the public key from the secret key.
-	// In a sealed box setup, the recipient's key pair is used.
-	// For our use case (self-encryption), we use the same key pair.
 	publicKey := &[32]byte{}
 	secretKey := &[32]byte{}
 	copy(publicKey[:], secret[:])

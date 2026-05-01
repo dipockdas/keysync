@@ -30,7 +30,12 @@ func NewFallbackStore() (*FallbackStore, error) {
 	if err := os.MkdirAll(dir, 0700); err != nil {
 		return nil, fmt.Errorf("create config dir: %w", err)
 	}
-	fp := filepath.Join(dir, "store.json")
+	return newFallbackStore(filepath.Join(dir, "store.json"))
+}
+
+// newFallbackStore creates a FallbackStore at the given file path.
+// This is exposed for testing; use NewFallbackStore for production.
+func newFallbackStore(fp string) (*FallbackStore, error) {
 	s := &FallbackStore{
 		filePath: fp,
 		data:     make(map[string]string),
@@ -90,21 +95,23 @@ func (f *FallbackStore) Delete(_ context.Context, scope Scope, project, key stri
 func (f *FallbackStore) List(_ context.Context, scope Scope, project string) ([]SecretEntry, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	prefix := memKey(scope, project, "")
 	var entries []SecretEntry
 	for k := range f.data {
-		if !strings.HasPrefix(k, prefix) {
-			continue
-		}
 		parts := strings.SplitN(k, "/", 3)
 		if len(parts) < 3 {
 			continue
 		}
-		entries = append(entries, SecretEntry{
-			Scope:   Scope(parts[0]),
-			Project: parts[1],
-			Key:     parts[2],
-		})
+		entryScope := Scope(parts[0])
+		entryProject := parts[1]
+		entryKey := parts[2]
+		if (scope == "" || entryScope == scope) &&
+			(project == "" || entryProject == project) {
+			entries = append(entries, SecretEntry{
+				Scope:   entryScope,
+				Project: entryProject,
+				Key:     entryKey,
+			})
+		}
 	}
 	sort.Slice(entries, func(i, j int) bool {
 		if entries[i].Scope != entries[j].Scope {

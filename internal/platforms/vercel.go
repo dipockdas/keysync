@@ -18,6 +18,8 @@ type VercelClient struct {
 	token     string
 	projectID string
 	targets   []string
+	client    HTTPClient
+	baseURL   string // default: https://api.vercel.com
 }
 
 // vercelConfig is the JSON config for Vercel from .keysync.json.
@@ -47,6 +49,8 @@ func NewVercelClient(projectID string, targets []string) (*VercelClient, error) 
 		token:     token,
 		projectID: projectID,
 		targets:   targets,
+		client:    http.DefaultClient,
+		baseURL:   "https://api.vercel.com",
 	}, nil
 }
 
@@ -70,7 +74,7 @@ func (v *VercelClient) Upsert(key, value string) error {
 	}
 	raw, _ := json.Marshal(body)
 
-	url := fmt.Sprintf("https://api.vercel.com/v9/projects/%s/env", v.projectID)
+	url := fmt.Sprintf("%s/v9/projects/%s/env", v.baseURL, v.projectID)
 	req, err := http.NewRequest("POST", url, bytes.NewReader(raw))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
@@ -78,7 +82,7 @@ func (v *VercelClient) Upsert(key, value string) error {
 	req.Header.Set("Authorization", "Bearer "+v.token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := v.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("http request: %w", err)
 	}

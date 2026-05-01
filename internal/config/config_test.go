@@ -1,0 +1,168 @@
+package config
+
+import (
+	"os"
+	"path/filepath"
+	"testing"
+)
+
+func TestDefaultConfig(t *testing.T) {
+	cfg := DefaultConfig()
+	if cfg == nil {
+		t.Fatal("DefaultConfig returned nil")
+	}
+	if cfg.Projects == nil {
+		t.Fatal("DefaultConfig.Projects is nil")
+	}
+	if len(cfg.Projects) != 0 {
+		t.Errorf("DefaultConfig.Projects has %d entries, want 0", len(cfg.Projects))
+	}
+}
+
+func TestLoadSaveConfig(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".keysync.json")
+
+	// Create a config with a project
+	cfg := &Config{
+		Projects: map[string]ProjectConfig{
+			"my-app": {
+				Platforms: PlatformConfig{
+					Vercel: &VercelConfig{
+						ProjectID: "vercel-proj-123",
+						Target:    []string{"production"},
+					},
+					Railway: &RailwayConfig{
+						Environment: "production",
+						Service:     "my-service",
+					},
+					Supabase: &SupabaseConfig{
+						Ref: "supabase-ref-456",
+					},
+				},
+			},
+		},
+	}
+
+	if err := SaveConfig(cfg, path); err != nil {
+		t.Fatalf("SaveConfig failed: %v", err)
+	}
+
+	// Verify file exists
+	if _, err := os.Stat(path); os.IsNotExist(err) {
+		t.Fatal("SaveConfig did not create file")
+	}
+
+	// Load it back
+	loaded, loadedPath, err := LoadConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+	if loadedPath != path {
+		t.Errorf("LoadConfig returned path %q, want %q", loadedPath, path)
+	}
+
+	// Verify contents
+	proj, ok := loaded.Projects["my-app"]
+	if !ok {
+		t.Fatal("loaded config missing project 'my-app'")
+	}
+	if proj.Platforms.Vercel == nil || proj.Platforms.Vercel.ProjectID != "vercel-proj-123" {
+		t.Errorf("Vercel config mismatch: %+v", proj.Platforms.Vercel)
+	}
+	if proj.Platforms.Supabase == nil || proj.Platforms.Supabase.Ref != "supabase-ref-456" {
+		t.Errorf("Supabase config mismatch: %+v", proj.Platforms.Supabase)
+	}
+}
+
+func TestLoadConfig_NotFound(t *testing.T) {
+	dir := t.TempDir() // no .keysync.json here
+
+	cfg, path, err := LoadConfig(dir)
+	if err != nil {
+		t.Fatalf("LoadConfig failed: %v", err)
+	}
+	if path != "" {
+		t.Errorf("expected empty path, got %q", path)
+	}
+	if cfg == nil {
+		t.Fatal("expected default config, got nil")
+	}
+	if len(cfg.Projects) != 0 {
+		t.Errorf("expected empty projects, got %d", len(cfg.Projects))
+	}
+}
+
+func TestLoadConfig_InvalidJSON(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".keysync.json")
+	os.WriteFile(path, []byte("{invalid json"), 0644)
+
+	_, _, err := LoadConfig(dir)
+	if err == nil {
+		t.Fatal("expected error for invalid JSON, got nil")
+	}
+}
+
+func TestFindConfig_CurrentDir(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".keysync.json")
+	os.WriteFile(path, []byte("{}"), 0644)
+
+	found, err := findConfig(dir)
+	if err != nil {
+		t.Fatalf("findConfig failed: %v", err)
+	}
+	if found != path {
+		t.Errorf("findConfig returned %q, want %q", found, path)
+	}
+}
+
+func TestFindConfig_ParentDir(t *testing.T) {
+	parent := t.TempDir()
+	child := filepath.Join(parent, "sub", "nested")
+	os.MkdirAll(child, 0755)
+
+	// Create config in parent
+	configPath := filepath.Join(parent, ".keysync.json")
+	os.WriteFile(configPath, []byte("{}"), 0644)
+
+	found, err := findConfig(child)
+	if err != nil {
+		t.Fatalf("findConfig failed: %v", err)
+	}
+	if found != configPath {
+		t.Errorf("findConfig returned %q, want %q", found, configPath)
+	}
+}
+
+func TestFindConfig_NotFound(t *testing.T) {
+	dir := t.TempDir()
+
+	found, err := findConfig(dir)
+	if err != nil {
+		t.Fatalf("findConfig failed: %v", err)
+	}
+	if found != "" {
+		t.Errorf("findConfig returned %q, want empty", found)
+	}
+}
+
+func TestDefaultConfigPath(t *testing.T) {
+	got := DefaultConfigPath("/some/dir")
+	want := "/some/dir/.keysync.json"
+	if got != want {
+		t.Errorf("DefaultConfigPath = %q, want %q", got, want)
+	}
+}
+
+func TestLoadConfig_EmptyFile(t *testing.T) {
+	dir := t.TempDir()
+	path := filepath.Join(dir, ".keysync.json")
+	os.WriteFile(path, []byte{}, 0644)
+
+	_, _, err := LoadConfig(dir)
+	if err == nil {
+		t.Fatal("expected error for empty file, got nil")
+	}
+}

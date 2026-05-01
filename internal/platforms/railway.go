@@ -18,6 +18,8 @@ type RailwayClient struct {
 	token       string
 	environment string
 	service     string
+	client      HTTPClient
+	baseURL     string // default: https://backboard.railway.app/graphql/v2
 }
 
 // railwayConfig is the JSON config for Railway from .keysync.json.
@@ -44,12 +46,12 @@ func NewRailwayClient(environment, service string) (*RailwayClient, error) {
 		token:       token,
 		environment: environment,
 		service:     service,
+		client:      http.DefaultClient,
+		baseURL:     "https://backboard.railway.app/graphql/v2",
 	}, nil
 }
 
 func (r *RailwayClient) Name() string { return "railway" }
-
-const railwayAPI = "https://backboard.railway.app/graphql/v2"
 
 // Upsert sets an environment variable in Railway.
 func (r *RailwayClient) Upsert(key, value string) error {
@@ -75,14 +77,14 @@ func (r *RailwayClient) Upsert(key, value string) error {
 	}
 	raw, _ := json.Marshal(body)
 
-	req, err := http.NewRequest("POST", railwayAPI, bytes.NewReader(raw))
+	req, err := http.NewRequest("POST", r.baseURL, bytes.NewReader(raw))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
 	req.Header.Set("Authorization", "Bearer "+r.token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := r.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("http request: %w", err)
 	}

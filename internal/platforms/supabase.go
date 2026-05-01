@@ -15,8 +15,10 @@ func init() {
 
 // SupabaseClient syncs secrets to Supabase using the Management API.
 type SupabaseClient struct {
-	token string
-	ref   string
+	token   string
+	ref     string
+	client  HTTPClient
+	baseURL string // default: https://api.supabase.com
 }
 
 // supabaseConfig is the JSON config for Supabase from .keysync.json.
@@ -39,8 +41,10 @@ func NewSupabaseClient(ref string) (*SupabaseClient, error) {
 		return nil, fmt.Errorf("SUPABASE_TOKEN not set")
 	}
 	return &SupabaseClient{
-		token: token,
-		ref:   ref,
+		token:   token,
+		ref:     ref,
+		client:  http.DefaultClient,
+		baseURL: "https://api.supabase.com",
 	}, nil
 }
 
@@ -60,7 +64,7 @@ func (s *SupabaseClient) Upsert(key, value string) error {
 func (s *SupabaseClient) BulkUpsert(secrets []supabaseSecret) error {
 	raw, _ := json.Marshal(secrets)
 
-	url := fmt.Sprintf("https://api.supabase.com/v1/projects/%s/secrets", s.ref)
+	url := fmt.Sprintf("%s/v1/projects/%s/secrets", s.baseURL, s.ref)
 	req, err := http.NewRequest("POST", url, bytes.NewReader(raw))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
@@ -68,7 +72,7 @@ func (s *SupabaseClient) BulkUpsert(secrets []supabaseSecret) error {
 	req.Header.Set("Authorization", "Bearer "+s.token)
 	req.Header.Set("Content-Type", "application/json")
 
-	resp, err := http.DefaultClient.Do(req)
+	resp, err := s.client.Do(req)
 	if err != nil {
 		return fmt.Errorf("http request: %w", err)
 	}

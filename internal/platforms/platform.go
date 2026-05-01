@@ -1,6 +1,16 @@
 package platforms
 
-import "fmt"
+import (
+	"fmt"
+	"net/http"
+)
+
+// HTTPClient is an interface for making HTTP requests.
+// It matches *http.Client so the real client can be used in production,
+// and *httptest.Server.Client() can be used in tests.
+type HTTPClient interface {
+	Do(req *http.Request) (*http.Response, error)
+}
 
 // Platform defines the interface for syncing secrets to a deployment platform.
 // Each platform (Vercel, Railway, Supabase, etc.) implements this interface.

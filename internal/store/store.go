@@ -118,12 +118,8 @@ func (m *MemoryStore) Delete(_ context.Context, scope Scope, project, key string
 func (m *MemoryStore) List(_ context.Context, scope Scope, project string) ([]SecretEntry, error) {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
-	prefix := memKey(scope, project, "")
 	var entries []SecretEntry
 	for k := range m.data {
-		if !strings.HasPrefix(k, prefix) {
-			continue
-		}
 		parts := strings.SplitN(k, "/", 3)
 		if len(parts) < 3 {
 			continue
