@@ -85,6 +85,8 @@ func TestGetCmd_ProjectScope(t *testing.T) {
 	secretSt.Set(context.Background(), store.ScopeProject, "test-app", "MY_KEY", "my-value")
 
 	cmd := newGetCmd()
+	getUnmask = true  // must set after newGetCmd, as pflag resets the variable
+	defer func() { getUnmask = false }()
 	stdout, stderr, err := captureCommand(cmd, []string{"MY_KEY"})
 	if err != nil {
 		t.Fatalf("RunE failed: %v", err)
@@ -92,8 +94,8 @@ func TestGetCmd_ProjectScope(t *testing.T) {
 	if stderr != "" {
 		t.Errorf("unexpected stderr: %s", stderr)
 	}
-	if stdout != "my-value" {
-		t.Errorf("stdout = %q, want %q", stdout, "my-value")
+	if stdout != "MY_KEY=my-value" {
+		t.Errorf("stdout = %q, want %q", stdout, "MY_KEY=my-value")
 	}
 }
 
@@ -102,6 +104,8 @@ func TestGetCmd_GlobalScope(t *testing.T) {
 	secretSt.Set(context.Background(), store.ScopeGlobal, "", "MY_KEY", "global-val")
 
 	cmd := newGetCmd()
+	getUnmask = true  // must set after newGetCmd, as pflag resets the variable
+	defer func() { getUnmask = false }()
 	stdout, stderr, err := captureCommand(cmd, []string{"MY_KEY"})
 	if err != nil {
 		t.Fatalf("RunE failed: %v", err)
@@ -109,8 +113,8 @@ func TestGetCmd_GlobalScope(t *testing.T) {
 	if stderr != "" {
 		t.Errorf("unexpected stderr: %s", stderr)
 	}
-	if stdout != "global-val" {
-		t.Errorf("stdout = %q, want %q", stdout, "global-val")
+	if stdout != "MY_KEY=global-val" {
+		t.Errorf("stdout = %q, want %q", stdout, "MY_KEY=global-val")
 	}
 }
 
@@ -121,6 +125,8 @@ func TestGetCmd_ProjectFallbackToGlobal(t *testing.T) {
 	secretSt.Set(context.Background(), store.ScopeGlobal, "", "MY_KEY", "global-val")
 
 	cmd := newGetCmd()
+	getUnmask = true  // must set after newGetCmd, as pflag resets the variable
+	defer func() { getUnmask = false }()
 	stdout, stderr, err := captureCommand(cmd, []string{"MY_KEY"})
 	if err != nil {
 		t.Fatalf("RunE failed: %v", err)
@@ -128,8 +134,8 @@ func TestGetCmd_ProjectFallbackToGlobal(t *testing.T) {
 	if stderr != "" {
 		t.Errorf("unexpected stderr: %s", stderr)
 	}
-	if stdout != "global-val" {
-		t.Errorf("stdout = %q, want %q", stdout, "global-val")
+	if stdout != "MY_KEY=global-val" {
+		t.Errorf("stdout = %q, want %q", stdout, "MY_KEY=global-val")
 	}
 }
 

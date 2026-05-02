@@ -14,7 +14,7 @@ import (
 //  1. Project-scoped secret (if project is non-empty)
 //  2. Global secret (fallback)
 func GetSecret(project, key string) (string, error) {
-	args := []string{"get", key}
+	args := []string{"get", key, "--unmask"}
 	if project != "" {
 		args = append(args, "--project", project)
 	}
@@ -28,11 +28,15 @@ func GetSecret(project, key string) (string, error) {
 		return "", fmt.Errorf("keysync get: %w", err)
 	}
 
-	val := strings.TrimSpace(string(out))
-	if val == "" {
+	raw := strings.TrimSpace(string(out))
+	if raw == "" {
 		return "", ErrNotFound
 	}
-	return val, nil
+	// Output format is KEY=VALUE, extract just the value
+	if _, after, ok := strings.Cut(raw, "="); ok {
+		return after, nil
+	}
+	return raw, nil
 }
 
 // GetSecretContext is context-aware version of GetSecret.
