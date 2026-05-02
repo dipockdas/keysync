@@ -8,7 +8,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var listValues bool
+var listUnmask bool
 
 func newListCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -19,12 +19,12 @@ func newListCmd() *cobra.Command {
 If --project is provided, only secrets for that project are shown.
 Global secrets are always included.
 
-Use --values to also display secret values (for verification purposes).
+Use --unmask to also display secret values (for verification purposes).
 
 Usage:
   keysync list
   keysync list --project my-app
-  keysync list --values`,
+  keysync list --unmask`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
@@ -50,7 +50,7 @@ Usage:
 			}
 
 			w := tabwriter.NewWriter(cmd.OutOrStdout(), 0, 0, 2, ' ', 0)
-			if listValues {
+			if listUnmask {
 				fmt.Fprintln(w, "SCOPE\tKEY\tVALUE")
 				for _, e := range all {
 					label := string(e.Scope)
@@ -79,6 +79,6 @@ Usage:
 		},
 	}
 
-	cmd.Flags().BoolVar(&listValues, "values", false, "show secret values alongside key names")
+	cmd.Flags().BoolVar(&listUnmask, "unmask", false, "show secret values alongside key names")
 	return cmd
 }
