@@ -60,6 +60,7 @@ and deployment platforms (Vercel, Railway, Supabase).`,
 	cmd.AddCommand(newDoctorCmd())
 	cmd.AddCommand(newTestSecretsCmd())
 	cmd.AddCommand(newMigrateCmd())
+	cmd.AddCommand(newExportCmd())
 
 	return cmd
 }

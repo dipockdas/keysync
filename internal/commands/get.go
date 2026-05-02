@@ -8,8 +8,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
+var getUnmask bool
+
 func newGetCmd() *cobra.Command {
-	return &cobra.Command{
+	cmd := &cobra.Command{
 		Use:   "get KEY [--project name]",
 		Short: "Retrieve a secret from the local OS secret store",
 		Long: `Reads a secret from the local OS secret store.
@@ -18,9 +20,13 @@ Resolution order:
   1. Project-scoped secret (if --project is provided)
   2. Global secret (fallback)
 
+Use --unmask to display the key name alongside the value (KEY=VALUE format)
+for human-readable verification.
+
 Usage:
   keysync get DATABASE_URL
-  keysync get STRIPE_KEY --project my-app`,
+  keysync get STRIPE_KEY --project my-app
+  keysync get DATABASE_URL --unmask`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
@@ -30,7 +36,11 @@ Usage:
 			if project != "" {
 				val, err := secretSt.Get(ctx, store.ScopeProject, project, key)
 				if err == nil {
-					fmt.Print(val)
+					if getUnmask {
+						fmt.Printf("%s=%s", key, val)
+					} else {
+						fmt.Print(val)
+					}
 					return nil
 				}
 				if err != store.ErrNotFound {
@@ -48,8 +58,15 @@ Usage:
 			if err != nil {
 				return fmt.Errorf("get secret: %w", err)
 			}
-			fmt.Print(val)
+			if getUnmask {
+				fmt.Printf("%s=%s", key, val)
+			} else {
+				fmt.Print(val)
+			}
 			return nil
 		},
 	}
+
+	cmd.Flags().BoolVar(&getUnmask, "unmask", false, "show key=value format (for human verification)")
+	return cmd
 }
