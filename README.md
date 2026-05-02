@@ -326,15 +326,43 @@ keysync migrate --cloud supabase
 
 Use `--dry-run` to preview without storing.
 
-## Go Client Library
+## Client Libraries
 
-Keysync exposes an importable Go client:
+Retrieve secrets at runtime in your application using native OS keychain
+access — no dependency on the `keysync` binary.
+
+| Language | Location | Status |
+|----------|----------|--------|
+| **Go** | `clients/go/` | Ready |
+| **Python** | `clients/python/` | Ready |
+| **TypeScript** | `clients/node/` | Ready (macOS/Linux) |
+| **Swift** | `clients/swift/` | Ready (macOS/Linux) |
 
 ```go
-import "github.com/dipockdas/keysync/client"
-
-val, err := client.GetSecret("my-project", "DATABASE_URL")
+// Go
+import "github.com/dipockdas/keysync/clients/go"
+dbURL, err := keysync.GetSecret("DATABASE_URL", "my-api")
 ```
+
+```python
+# Python
+from keysync import get_secret
+db_url = get_secret("DATABASE_URL", project="my-api")
+```
+
+```typescript
+// TypeScript
+import { getSecret } from "@dipockdas/keysync";
+const dbUrl = await getSecret("DATABASE_URL", "my-api");
+```
+
+```swift
+// Swift
+import KeySync
+let dbURL = try KeySync.getSecret("DATABASE_URL", project: "my-api")
+```
+
+See [clients/](clients/) for full documentation and per-library README files.
 
 ## Development
 
@@ -351,6 +379,12 @@ make test-platform
 # Clean build artifacts
 make clean
 ```
+
+## Agent instructions
+
+- [AGENTS.md](AGENTS.md) — general AI agent instructions for the whole project
+- [CLAUDE.md](CLAUDE.md) — Claude Code instructions for this repository
+- Each client library also has its own `AGENTS.md` and `CLAUDE.md`
 
 ## Project Status
 
