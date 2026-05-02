@@ -99,14 +99,34 @@ Then sync:
 keysync sync -p my-app
 ```
 
+### 4. Retrieve a secret
+
+```bash
+# Copies the value to your clipboard
+keysync get DATABASE_URL
+# Output: Key DATABASE_URL copied to clipboard
+
+# Print to stdout instead (for scripting)
+keysync get DATABASE_URL --unmask
+keysync get DATABASE_URL -u
+```
+
+### 5. Export all secrets as environment variables
+
+```bash
+eval $(keysync export --project my-app)
+source <(keysync export --project my-app)
+```
+
 ## Commands
 
 | Command | Description |
 |---------|-------------|
 | `keysync init` | Scaffold `.keysync.json` in the current directory |
 | `keysync set KEY=value` | Store a secret in the OS keychain |
-| `keysync get KEY` | Retrieve a secret value |
-| `keysync list` | List all stored secrets |
+| `keysync get KEY` | Copy a secret to the clipboard (use `-u`/`--unmask` to print to stdout) |
+| `keysync list` | List all stored secrets (use `--unmask` to show values) |
+| `keysync export` | Print secrets as `export KEY=VALUE` lines for shell eval |
 | `keysync sync` | Push secrets to configured platforms + GitHub |
 | `keysync pull` | Reconcile local secrets with GitHub secret names |
 | `keysync rotate KEY` | Generate a new random secret and update everywhere |
@@ -163,8 +183,9 @@ Keysync uses a `.keysync.json` file, searched for in the current directory and a
 ```
 ┌─────────────────────────────────────────────────────┐
 │                     CLI (cobra)                      │
-│  init │ set │ get │ list │ sync │ rotate    │
-│  pull │ migrate │ doctor │ test-secrets   │
+│  init │ set │ get │ list │ export │ sync  │
+│  rotate │ pull │ migrate │ doctor          │
+│  test-secrets                             │
 └──────────┬──────────────────────────────────────────┘
            │
      ┌─────┴─────┐
