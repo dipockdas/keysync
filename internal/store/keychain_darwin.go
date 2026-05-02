@@ -205,9 +205,9 @@ func (k *KeychainStore) Set(_ context.Context, scope Scope, project, key, value 
 	cmd := exec.Command("security", "add-generic-password",
 		"-s", svc,
 		"-a", accountName(key),
-		"-w", value,
 		"-U", // allow update (though we already deleted)
 	)
+	cmd.Stdin = strings.NewReader(value + "\n")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("security add-generic-password: %w: %s", err, strings.TrimSpace(string(out)))
 	}

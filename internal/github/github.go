@@ -58,8 +58,8 @@ func detectRepo() (string, error) {
 func (c *Client) Set(name, value string) error {
 	cmd := exec.Command("gh", "secret", "set", name,
 		"--repo", c.repo,
-		"--body", value,
 	)
+	cmd.Stdin = strings.NewReader(value)
 	var stderr bytes.Buffer
 	cmd.Stderr = &stderr
 	if err := cmd.Run(); err != nil {

@@ -81,7 +81,7 @@ func (s *SupabaseClient) BulkUpsert(secrets []supabaseSecret) error {
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("supabase API %d: %s", resp.StatusCode, string(respBody))
+		return fmt.Errorf("supabase API %d: %s", resp.StatusCode, sanitizeResponseBody(respBody))
 	}
 
 	return nil

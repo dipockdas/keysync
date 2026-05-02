@@ -53,8 +53,8 @@ Usage:
 			}
 
 			if len(names) > 0 {
-				fmt.Println("\nTo load in dotenv format:")
-				fmt.Printf("  keysync inject --project %s > .env.test\n", project)
+				fmt.Println("\nTo retrieve a test secret:")
+				fmt.Printf("  keysync get TEST_SECRET_1 --project %s\n", project)
 			}
 
 			return nil

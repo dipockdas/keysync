@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 
+	"golang.org/x/crypto/curve25519"
 	"golang.org/x/crypto/nacl/box"
 )
 
@@ -27,17 +28,24 @@ func NewSealedBox(publicKey, secretKey *[32]byte) *SealedBox {
 	}
 }
 
-// NewSealedBoxFromSecret creates a SealedBox from a secret key seed.
-// The secret key is used to derive both keys (for symmetric usage).
-// Note: For symmetric self-encryption, pass the same 32-byte value for both
-// public and secret roles. For key-pair based encryption, use NewSealedBox.
+// NewSealedBoxFromSecret creates a SealedBox from a secret key seed for symmetric self-encryption.
+// The secret key is used to derive a valid Curve25519 key pair, so that SealAnonymous/OpenAnonymous
+// work correctly (the public key is computed as privateKey * Basepoint).
+// For key-pair based encryption, use NewSealedBox.
 func NewSealedBoxFromSecret(secret *[32]byte) *SealedBox {
+	// Properly derive a valid Curve25519 key pair from the secret seed.
+	// We cannot use the same bytes for both public and secret roles in Curve25519
+	// because Diffie-Hellman requires public = private * G.
+	privateKey := &[32]byte{}
+	copy(privateKey[:], secret[:])
+
+	// Derive the corresponding public key via scalar multiplication with the base point.
+	// ScalarBaseMult handles Curve25519 clamping internally.
 	publicKey := &[32]byte{}
-	secretKey := &[32]byte{}
-	copy(publicKey[:], secret[:])
-	copy(secretKey[:], secret[:])
+	curve25519.ScalarBaseMult(publicKey, privateKey)
+
 	return &SealedBox{
-		secretKey: secretKey,
+		secretKey: privateKey,
 		publicKey: publicKey,
 	}
 }

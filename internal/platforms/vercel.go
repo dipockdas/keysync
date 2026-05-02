@@ -91,7 +91,7 @@ func (v *VercelClient) Upsert(key, value string) error {
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
-		return fmt.Errorf("vercel API %d: %s", resp.StatusCode, string(respBody))
+		return fmt.Errorf("vercel API %d: %s", resp.StatusCode, sanitizeResponseBody(respBody))
 	}
 
 	var result struct {

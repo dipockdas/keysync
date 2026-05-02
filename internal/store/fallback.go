@@ -9,15 +9,19 @@ import (
 	"sort"
 	"strings"
 	"sync"
+
+	"github.com/dipockdas/keysync/internal/crypto"
 )
 
 // FallbackStore stores secrets in an encrypted JSON file at ~/.config/keysync/store.json.
 // Used on headless Linux or when D-Bus is unavailable.
-// NOTE: Encryption (via crypto package) will be added in Phase 2.
-// For now, the file is permission-guarded (0600).
+// The file is encrypted using NaCl box (Curve25519 + XSalsa20-Poly1305).
+// The encryption key is stored alongside at ~/.config/keysync/key (0600 permissions).
 type FallbackStore struct {
 	mu       sync.RWMutex
 	filePath string
+	keyPath  string
+	box      *crypto.SealedBox
 	data     map[string]string // key = "scope/project/key"
 }
 
@@ -36,10 +40,21 @@ func NewFallbackStore() (*FallbackStore, error) {
 // newFallbackStore creates a FallbackStore at the given file path.
 // This is exposed for testing; use NewFallbackStore for production.
 func newFallbackStore(fp string) (*FallbackStore, error) {
+	keyPath := filepath.Join(filepath.Dir(fp), "key")
+
+	// Load or generate encryption key
+	box, err := loadOrGenerateKey(keyPath)
+	if err != nil {
+		return nil, fmt.Errorf("encryption key: %w", err)
+	}
+
 	s := &FallbackStore{
 		filePath: fp,
+		keyPath:  keyPath,
+		box:      box,
 		data:     make(map[string]string),
 	}
+
 	// Load existing data
 	if _, err := os.Stat(fp); err == nil {
 		raw, err := os.ReadFile(fp)
@@ -47,7 +62,23 @@ func newFallbackStore(fp string) (*FallbackStore, error) {
 			return nil, fmt.Errorf("read store: %w", err)
 		}
 		if len(raw) > 0 {
-			if err := json.Unmarshal(raw, &s.data); err != nil {
+			// Try to decrypt first
+			decrypted, err := box.Decrypt(raw)
+			if err != nil {
+				// Maybe it's plaintext JSON from a previous version — migrate
+				if raw[0] == '{' {
+					if err := json.Unmarshal(raw, &s.data); err != nil {
+						return nil, fmt.Errorf("parse store: %w", err)
+					}
+					// Re-save encrypted to migrate
+					if err := s.save(); err != nil {
+						return nil, fmt.Errorf("migrate to encrypted: %w", err)
+					}
+					return s, nil
+				}
+				return nil, fmt.Errorf("decrypt store: %w", err)
+			}
+			if err := json.Unmarshal(decrypted, &s.data); err != nil {
 				return nil, fmt.Errorf("parse store: %w", err)
 			}
 		}
@@ -55,12 +86,44 @@ func newFallbackStore(fp string) (*FallbackStore, error) {
 	return s, nil
 }
 
+// loadOrGenerateKey loads an existing encryption key or generates a new one.
+func loadOrGenerateKey(keyPath string) (*crypto.SealedBox, error) {
+	raw, err := os.ReadFile(keyPath)
+	if err == nil {
+		key, err := crypto.BytesToKey(raw)
+		if err != nil {
+			return nil, err
+		}
+		return crypto.NewSealedBoxFromSecret(key), nil
+	}
+
+	if !os.IsNotExist(err) {
+		return nil, err
+	}
+
+	// Generate a new key
+	key, err := crypto.GenerateRandomKey()
+	if err != nil {
+		return nil, err
+	}
+
+	if err := os.WriteFile(keyPath, crypto.KeyToBytes(key), 0600); err != nil {
+		return nil, err
+	}
+
+	return crypto.NewSealedBoxFromSecret(key), nil
+}
+
 func (f *FallbackStore) save() error {
 	raw, err := json.MarshalIndent(f.data, "", "  ")
 	if err != nil {
 		return fmt.Errorf("marshal store: %w", err)
 	}
-	return os.WriteFile(f.filePath, raw, 0600)
+	encrypted, err := f.box.Encrypt(raw)
+	if err != nil {
+		return fmt.Errorf("encrypt store: %w", err)
+	}
+	return os.WriteFile(f.filePath, encrypted, 0600)
 }
 
 func (f *FallbackStore) Get(_ context.Context, scope Scope, project, key string) (string, error) {

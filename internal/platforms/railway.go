@@ -93,7 +93,7 @@ func (r *RailwayClient) Upsert(key, value string) error {
 	respBody, _ := io.ReadAll(resp.Body)
 
 	if resp.StatusCode != http.StatusOK {
-		return fmt.Errorf("railway API %d: %s", resp.StatusCode, string(respBody))
+		return fmt.Errorf("railway API %d: %s", resp.StatusCode, sanitizeResponseBody(respBody))
 	}
 
 	var gqlResponse struct {

@@ -201,11 +201,7 @@ Usage:
 			var migratedKeys []migratedKey
 
 			for _, kv := range secrets {
-				prompt := fmt.Sprintf("  %s=%s", kv.key, kv.value)
-				if len(prompt) > 80 {
-					prompt = prompt[:77] + "..."
-				}
-				fmt.Println(prompt)
+				fmt.Printf("  %s=***\n", kv.key)
 
 				// Scope prompt
 				defaultScope := "g"
