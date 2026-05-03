@@ -1,21 +1,71 @@
 # keysync
 
-**Unified secret management CLI** — store and sync secrets across local OS keychains, GitHub Actions, and deployment platforms (Vercel, Railway, Supabase).
+**Unified secret management CLI** — store and sync secrets across local OS keychains, GitHub Secrets, and deployment platforms (Vercel, Railway, Supabase).
 
 Keysync replaces scattered `.env` files and manual secret management with a single workflow: secrets live in your OS keychain locally and are synced to GitHub Secrets and your deployment platforms on push.
 
 ## Features
 
 - **OS-native secret storage** — macOS Keychain, Linux libsecret, Windows Credential Manager
-- **Three scope levels** — global secrets (shared across projects), project-scoped secrets (override globals), and environment-scoped secrets (override project, e.g. `production`, `staging`)
+- **Three scope levels** — global, project-scoped, and environment-scoped secrets with automatic fallback
 - **Platform sync** — push secrets to Vercel, Railway, and Supabase via their APIs
-- **Platform tokens in keychain** — API tokens are stored as global secrets in your OS keychain, not in plaintext files
+- **Platform tokens in keychain** — API tokens stored as global secrets, never in plaintext files
 - **GitHub Actions integration** — auto-sync secrets on push to `main`
 - **Secret rotation** — generate cryptographically random secrets and update everywhere
 - **Migration** — import from `.env` files or pull from Vercel/Railway/Supabase CLIs
-- **Diagnostics** — `doctor` command to verify config and store are operational
-- **Go client library** — importable `client` package for programmatic access
+- **Client libraries** — Go, Python, TypeScript, Swift (read secrets at runtime without the keysync binary)
 - **Cross-platform** — macOS, Linux, Windows
+
+## For AI coding assistants
+
+If you are an AI coding assistant helping a user set up or work with keysync, start here:
+
+- [AGENTS.md](AGENTS.md) — project overview, architecture, and client library writing instructions for AI agents
+- [CLAUDE.md](CLAUDE.md) — build commands, directory structure, and code conventions
+- Client libraries each have their own `AGENTS.md` and `CLAUDE.md` with language-specific instructions (see [clients/](clients/))
+- [Client library recipe](docs/new-client-library-recipe.md) — how to implement a keysync client in any language
+- [Tutorials](#tutorials) — step-by-step guides for common setups
+
+---
+
+## How it works
+
+Keysync has two layers: a **CLI** for managing secrets and a set of **client libraries** for reading them at runtime.
+
+### What goes where
+
+| Layer | Holds | Example |
+|-------|-------|---------|
+| **`.keysync.json`** | Non-secret project metadata | Platform project IDs, service names, deployment targets |
+| **OS keychain** | All secret values | API tokens, database URLs, encryption keys |
+| **Environment variables** | Fallback for platform tokens (CI/CD) | `VERCEL_TOKEN`, `RAILWAY_TOKEN`, `SUPABASE_TOKEN` |
+
+The `.keysync.json` file tells keysync *which platforms* each project deploys to. The actual secret values — including platform API tokens — live in your OS keychain. This means checking `.keysync.json` into version control is safe: it contains no secrets.
+
+### Three scope levels
+
+Secrets are organized by scope, with higher-precedence scopes overriding lower ones:
+
+```
+Highest:  Environment-scoped (project + environment match)
+              ↓
+          Project-scoped (project match only)
+              ↓
+Lowest:   Global (no project, no environment)
+```
+
+- **Global** secrets are available to all projects on this machine
+- **Project** secrets override globals with the same key for a specific project
+- **Environment** secrets override project secrets for a specific environment (e.g. `production`, `staging`)
+
+### Sync pipeline
+
+When you run `keysync sync`, secrets are collected at all three scope levels (with higher precedence overriding lower) and pushed to:
+
+1. **GitHub Secrets** — via the `gh` CLI
+2. **Deployment platforms** — via their REST/GraphQL APIs (Vercel, Railway, Supabase)
+
+---
 
 ## Installation
 
@@ -33,15 +83,17 @@ cd keysync
 make build
 ```
 
-The binary is produced at `./bin/keysync`. Add it to your `PATH` or copy it to a directory in your `PATH`:
+The binary is produced at `./bin/keysync`. Add it to your `PATH`:
 
 ```bash
 cp ./bin/keysync /usr/local/bin/keysync
 ```
 
+---
+
 ## Quick Start
 
-### 1. Initialize a config
+### 1. Initialize a project
 
 ```bash
 cd your-project
@@ -50,46 +102,24 @@ keysync init --project my-app
 
 This creates `.keysync.json` in the current directory.
 
-### 2. Store a secret
+### 2. Store secrets
 
 ```bash
-# Store a global secret (available to all projects)
+# Global secret (available to all projects on this machine)
 keysync set GLOBAL_API_KEY=abc123
 
-# Store a project-scoped secret (overrides global for this project)
-keysync set -p my-app DB_URL=postgres://localhost:5432/mydb
+# Project-scoped secret (overrides global for this project)
+keysync set -p my-app DATABASE_URL=postgres://localhost:5432/mydb
 
-# Store an environment-scoped secret (overrides project for this environment)
-keysync set -p my-app DB_URL=postgres://prod-host/proddb --env production
+# Environment-scoped secret (overrides project for staging)
+keysync set -p my-app DATABASE_URL=postgres://staging-host:5432/stagingdb --env staging
 ```
 
-### 3. Sync to deployment platforms
+Each `set` command also pushes the secret to GitHub Secrets if `gh` is authenticated.
 
-Configure platforms in `.keysync.json`:
+### 3. Store platform API tokens
 
-```json
-{
-  "projects": {
-    "my-app": {
-      "platforms": {
-        "vercel": {
-          "projectId": "prj_xxxxx",
-          "target": ["production", "preview"]
-        },
-        "railway": {
-          "environment": "production",
-          "service": "abc123"
-        },
-        "supabase": {
-          "ref": "abcdefghijklmnopqrst"
-        }
-      }
-    }
-  }
-}
-```
-
-Store API tokens as global secrets in your OS keychain:
+API tokens for deployment platforms are stored as global secrets in your keychain — never in `.keysync.json`:
 
 ```bash
 keysync set VERCEL_TOKEN=...
@@ -97,50 +127,74 @@ keysync set RAILWAY_TOKEN=...
 keysync set SUPABASE_TOKEN=...
 ```
 
-Tokens can also be set via environment variables (`VERCEL_TOKEN`, `RAILWAY_TOKEN`, `SUPABASE_TOKEN`) as a fallback — the keychain is checked first.
+Tokens can also be set via environment variables (`VERCEL_TOKEN`, `RAILWAY_TOKEN`, `SUPABASE_TOKEN`) as a fallback for CI/CD environments where the keychain is unavailable.
 
-Then sync:
+### 4. Configure platforms
+
+Edit `.keysync.json` to tell keysync which platforms your project deploys to:
+
+```json
+{
+  "projects": {
+    "my-app": {
+      "platforms": {
+        "vercel": { "projectId": "prj_xxxxx", "target": ["production", "preview"] },
+        "railway": { "environment": "production", "service": "abc123" },
+        "supabase": { "ref": "abcdefghijklmnopqrst" }
+      }
+    }
+  }
+}
+```
+
+See [Configuration](#configuration) for all available fields.
+
+### 5. Sync to GitHub and deployment platforms
 
 ```bash
 keysync sync -p my-app
 ```
 
-### 4. Retrieve a secret
+This reads secrets from the keychain at all three scope levels and pushes them to GitHub Secrets, Vercel, Railway, and Supabase.
+
+### 6. Retrieve a secret
 
 ```bash
 # Copies the value to your clipboard
 keysync get DATABASE_URL
-# Output: Key DATABASE_URL copied to clipboard
 
-# Print to stdout instead (for scripting)
+# Print to stdout (for scripting)
 keysync get DATABASE_URL --unmask
-keysync get DATABASE_URL -u
 ```
 
-### 5. Export all secrets as environment variables
+Resolution order when `--project` is provided: environment-scoped → project-scoped → global.
+
+### 7. Export as environment variables
 
 ```bash
 eval $(keysync export --project my-app)
 source <(keysync export --project my-app)
 ```
 
+---
+
 ## Commands
 
 | Command | Description |
 |---------|-------------|
 | `keysync init` | Scaffold `.keysync.json` in the current directory |
-| `keysync set KEY=value` | Store a secret in the OS keychain (+ pushes to GitHub). Use `-e`/`--env` to set environment scope |
-| `keysync get KEY` | Copy a secret to the clipboard (use `-u`/`--unmask` to print to stdout). Resolves project+env → project → global |
-| `keysync list` | List all stored secrets (use `--unmask` to show values) |
-| `keysync export` | Print secrets as `export KEY=VALUE` lines for shell eval. Merges all three scope levels |
-| `keysync sync` | Push secrets to configured platforms + GitHub (use `--platforms` to select specific ones) |
+| `keysync set KEY=value` | Store a secret in the OS keychain and push to GitHub |
+| `keysync get KEY` | Copy a secret to the clipboard (`-u`/`--unmask` to print to stdout) |
+| `keysync list` | List stored secrets (`--unmask` to show values) |
+| `keysync export` | Print secrets as `export KEY=VALUE` lines |
+| `keysync sync` | Push secrets to configured platforms + GitHub (`--platforms` to select specific ones) |
 | `keysync pull` | Reconcile local secrets with GitHub secret names |
 | `keysync rotate KEY` | Generate a new random secret and update everywhere |
-| `keysync migrate` | Import secrets from `.env` or cloud platform (use `--dry-run` to preview) |
-| `keysync doctor` | Run diagnostics (checks config, store, and OS keychain) |
-| `keysync test-secrets` | Generate ephemeral test secrets (use `--count`/`-c` to set number) |
+| `keysync migrate` | Import secrets from `.env` or cloud platform CLI (`--dry-run` to preview) |
+| `keysync doctor` | Run diagnostics (config, keychain, and store checks) |
+| `keysync test-secrets` | Generate ephemeral test secrets (`-c`/`--count` to set number) |
 
-### Global Flags
+### Global flags
 
 | Flag | Description |
 |------|-------------|
@@ -149,11 +203,13 @@ source <(keysync export --project my-app)
 | `-e, --env` | Environment name (default `production`). Used for environment-scoped secrets |
 | `--repo` | GitHub repository (`owner/repo`), auto-detected if not set |
 
+---
+
 ## Configuration
 
-Keysync uses a `.keysync.json` file, searched for in the current directory and all parent directories. If none is found, a default (empty) config is used.
+The `.keysync.json` file maps projects to their deployment platforms. It is searched for in the current directory and all parent directories. If none is found, a default (empty) config is used.
 
-### Full config structure
+### Full schema
 
 ```json
 {
@@ -177,11 +233,19 @@ Keysync uses a `.keysync.json` file, searched for in the current directory and a
 }
 ```
 
+### Platform fields
+
+| Platform | Field | Required | Description |
+|----------|-------|----------|-------------|
+| Vercel | `projectId` | Yes | Vercel project ID (`prj_xxxxx`) |
+| Vercel | `target` | No | Environments: `production`, `preview`, `development` |
+| Railway | `environment` | No | Railway deployment environment name |
+| Railway | `service` | No | Railway project/service ID |
+| Supabase | `ref` | Yes | Supabase project reference ID |
+
 ### Platform tokens
 
-API tokens are stored as **global secrets in your OS keychain** (not in `.keysync.json`). Environment variables are used as a fallback if no keychain entry exists.
-
-Store them with:
+API tokens are stored as global secrets in your OS keychain, not in `.keysync.json`:
 
 ```bash
 keysync set VERCEL_TOKEN=...
@@ -189,7 +253,7 @@ keysync set RAILWAY_TOKEN=...
 keysync set SUPABASE_TOKEN=...
 ```
 
-Fallback environment variables:
+Environment variable fallbacks (for CI/CD):
 
 | Variable | Platform |
 |----------|----------|
@@ -197,120 +261,130 @@ Fallback environment variables:
 | `RAILWAY_TOKEN` | Railway API token |
 | `SUPABASE_TOKEN` | Supabase Management API token |
 
+---
+
 ## Architecture
 
 ```
-┌─────────────────────────────────────────────────────┐
-│                     CLI (cobra)                      │
-│  init │ set │ get │ list │ export │ sync  │
-│  rotate │ pull │ migrate │ doctor          │
-│  test-secrets                             │
-└──────────┬──────────────────────────────────────────┘
+┌──────────────────────────────────────────────────────────┐
+│                  CLI (cobra commands)                     │
+│  init │ set │ get │ list │ export │ sync  │ pull        │
+│  rotate │ migrate │ doctor │ test-secrets               │
+└──────────┬───────────────────────────────────────────────┘
            │
      ┌─────┴─────┐
-     │   Store   │────────── OS Keychain / Fallback file
-     └─────┬─────┘
+     │   Store   │──OS Keychain (macOS Keychain / Linux libsecret / Windows Credential Manager)
+     └─────┬─────┘            └── Fallback: encrypted file (~/.config/keysync/store.json)
            │
      ┌─────┴──────────┐
-     │   GitHub Sync   │── gh secret set
+     │  GitHub Sync    │── gh secret set (source of truth)
      └─────┬──────────┘
            │
      ┌─────┴──────────────────┐
-     │   Platform Sync         │── Vercel / Railway / Supabase
+     │  Platform Sync          │── Vercel / Railway / Supabase APIs
      └────────────────────────┘
 ```
 
-Secrets are stored with a service name like `keysync/global` (for global scope), `keysync/project/my-app` (for project scope), or `keysync/project/my-app/env/production` (for environment scope). The account/key name is the secret key itself. When syncing, secrets are resolved with three-level precedence: environment-scoped (highest) → project-scoped → global (lowest).
+Secrets in the keychain are identified by a **service name** and an **account name**:
 
-## OS-Specific Setup
+| Scope | Service Name | Account Name |
+|-------|-------------|--------------|
+| Global | `keysync/global` | Secret key (e.g. `DATABASE_URL`) |
+| Project | `keysync/project/<name>` | Secret key |
+| Project + Environment | `keysync/project/<name>/env/<env>` | Secret key |
+
+Windows uses underscores: `keysync_global`, `keysync_project_<name>`, `keysync_project_<name>_<env>`.
+
+When syncing, secrets are merged with three-level precedence: environment-scoped (highest) → project-scoped → global (lowest).
+
+---
+
+## Client Libraries
+
+Retrieve secrets at runtime in your application using native OS keychain access — no dependency on the `keysync` binary.
+
+| Language | Location | macOS | Linux | Windows | Status |
+|----------|----------|-------|-------|---------|--------|
+| **Go** | `clients/go/` | security CLI | secret-tool CLI | wincred library | Ready |
+| **Python** | `clients/python/` | security CLI | secret-tool CLI | ctypes Win32 API | Ready |
+| **TypeScript** | `clients/node/` | security CLI | secret-tool CLI | — | Ready (macOS/Linux) |
+| **Swift** | `clients/swift/` | Security.framework | secret-tool CLI | — | Ready (macOS/Linux) |
+
+```go
+// Go
+import "github.com/dipockdas/keysync/clients/go"
+dbURL, err := keysync.GetSecret("DATABASE_URL", "my-api")
+```
+
+```python
+# Python
+from keysync import get_secret
+db_url = get_secret("DATABASE_URL", project="my-api")
+```
+
+```typescript
+// TypeScript
+import { getSecret } from "@dipockdas/keysync";
+const dbUrl = await getSecret("DATABASE_URL", "my-api");
+```
+
+```swift
+// Swift
+import KeySync
+let dbURL = try KeySync.getSecret("DATABASE_URL", project: "my-api")
+```
+
+See [clients/](clients/) for full documentation and per-library README files.
+
+---
+
+## Platform setup
+
+Each OS keychain is accessed automatically — no manual configuration is usually needed. The notes below cover edge cases and troubleshooting.
 
 ### macOS
 
-Keysync uses the **macOS Keychain** via the `security` CLI (no CGo required, no cross-compilation issues).
-
-**Requirements:**
-- macOS (tested on Ventura / Sonoma)
-- `security` CLI (built-in)
-
-**How it works:**
-- Secrets are stored as generic passwords in the default Keychain
-- Service names: `keysync/global` (global), `keysync/project/<name>` (project), or `keysync/project/<name>/env/<env>` (environment)
-- Account names: the secret key (e.g., `DATABASE_URL`)
-- An index file at `~/.config/keysync/index.json` tracks stored secret names for fast listing
-
-**Keychain locations:**
-- Config directory: `~/.config/keysync/`
-- Index file: `~/.config/keysync/index.json`
-
-**Notes:**
-- The first time a secret is accessed, macOS may prompt for Keychain access
-- Add the terminal app to Keychain Access > "Always Allow" to suppress prompts
-- To view stored keysync secrets: open `Keychain Access.app` > search for "keysync"
-- No additional setup or installation required
+- Uses the built-in `security` CLI — no additional software required
+- Secrets stored as generic passwords in the default Keychain
+- Index file at `~/.config/keysync/index.json` tracks stored secret names for fast listing
+- First access may prompt for Keychain permission; add your terminal app to *Keychain Access > Always Allow* to suppress future prompts
+- View stored secrets: open `Keychain Access.app` > search for "keysync"
 
 ### Linux
 
-Keysync uses **libsecret** via the `secret-tool` CLI (no D-Bus C bindings required).
+- Uses `secret-tool` (part of `libsecret`):
 
-**Requirements:**
-- `libsecret` package (`secret-tool` CLI)
-- A running D-Bus session and a secret service daemon (GNOME Keyring, KDE Wallet, or KeePassXC)
+  ```bash
+  # Debian / Ubuntu
+  sudo apt-get install libsecret-tools
 
-**Installation:**
+  # Fedora
+  sudo dnf install libsecret
 
-```bash
-# Debian / Ubuntu
-sudo apt-get install libsecret-tools
+  # Arch Linux
+  sudo pacman -S libsecret
+  ```
 
-# Fedora
-sudo dnf install libsecret
+- Requires a running D-Bus session and an unlocked keyring (GNOME Keyring, KDE Wallet, or KeePassXC)
+- On headless servers, start a D-Bus session manually:
 
-# Arch Linux
-sudo pacman -S libsecret
-```
+  ```bash
+  sudo apt-get install libsecret-tools gnome-keyring dbus-x11
+  export $(dbus-launch)
+  echo -n "" | gnome-keyring-daemon --unlock --daemonize --components=secrets
+  ```
 
-**How it works:**
-- Secrets are stored in libsecret with attributes: `service=<serviceName>` and `account=<key>`
-- Service names: `keysync/global` (global), `keysync/project/<name>` (project), or `keysync/project/<name>/env/<env>` (environment)
-- An in-memory name cache is rebuilt on startup by searching for `service=keysync` entries
-
-**Notes:**
-- Requires an unlocked keyring (GNOME Keyring auto-unlocks on desktop login)
-- On headless servers, set up a D-Bus session with `dbus-run-session` and start `gnome-keyring-daemon`
-- If the keyring is locked, `secret-tool` operations will fail — use `make test` after login to verify
-- **Fallback**: If `secret-tool` is unavailable or D-Bus is not running, keysync falls back to the encrypted file store at `~/.config/keysync/store.json`
-
-**Headless server setup:**
-
-```bash
-# Install dependencies
-sudo apt-get install libsecret-tools gnome-keyring dbus-x11
-
-# Start a D-Bus session with an unlocked keyring
-export $(dbus-launch)
-echo -n "" | gnome-keyring-daemon --unlock --daemonize --components=secrets
-```
+- **Fallback**: If `secret-tool` is unavailable or D-Bus is not running, keysync falls back to an encrypted file store at `~/.config/keysync/store.json` (encrypted with NaCl: Curve25519 + XSalsa20-Poly1305)
 
 ### Windows
 
-Keysync uses the **Windows Credential Manager** via the `wincred` Go library (Win32 API, no CGo).
+- Uses Windows Credential Manager (Win32 API via `wincred` library) — no additional software required
+- Works on Windows 10+, desktop and server editions
+- Credentials are stored in "Windows Credentials" (not "Web Credentials")
+- View via: Control Panel > Credential Manager > Windows Credentials
+- Manage via command line: `cmdkey /list`, `cmdkey /delete`
 
-**Requirements:**
-- Windows 10 or later
-- No additional software required — uses built-in Credential Manager
-
-**How it works:**
-- Secrets are stored as Generic Credentials in the Windows Credential Manager
-- Target names: `keysync_global` (global), `keysync_project_<name>` (project), or `keysync_project_<name>_<env>` (environment)
-- Credential attributes: `UserName` = secret key, `CredentialBlob` = secret value, persisted to `LocalMachine`
-- An in-memory name cache is rebuilt on startup by scanning for `keysync_` prefixed credentials
-
-**Notes:**
-- Credentials are stored in the "Windows Credentials" section (not "Web Credentials")
-- To view stored credentials: Control Panel > Credential Manager > Windows Credentials
-- To manage via command line: `cmdkey /list` (enumerate), `cmdkey /delete` (remove individual)
-- No additional setup or installation required
-- Works on both desktop and server editions of Windows
+---
 
 ## GitHub Actions Integration
 
@@ -343,7 +417,9 @@ jobs:
           SUPABASE_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
 ```
 
-Add the platform API tokens as repository secrets in your GitHub repo settings for this to work.
+Add the platform API tokens as repository secrets in your GitHub repo settings for this to work. In CI, the tokens are passed as environment variables since the OS keychain is not available.
+
+---
 
 ## Migration
 
@@ -357,8 +433,9 @@ Interactively imports each secret, prompting for scope (global/project) and conf
 
 ### From a cloud platform
 
+Requires the platform CLI to be installed and authenticated:
+
 ```bash
-# Requires the platform CLI to be installed and authenticated
 keysync migrate --cloud vercel
 keysync migrate --cloud railway
 keysync migrate --cloud supabase
@@ -366,43 +443,16 @@ keysync migrate --cloud supabase
 
 Use `--dry-run` to preview without storing.
 
-## Client Libraries
+---
 
-Retrieve secrets at runtime in your application using native OS keychain
-access — no dependency on the `keysync` binary.
+## Tutorials
 
-| Language | Location | Status |
-|----------|----------|--------|
-| **Go** | `clients/go/` | Ready |
-| **Python** | `clients/python/` | Ready |
-| **TypeScript** | `clients/node/` | Ready (macOS/Linux) |
-| **Swift** | `clients/swift/` | Ready (macOS/Linux) |
+- [Go Project Setup](docs/tutorial-go-project.md) — Using keysync with an existing Go project
+- [Python Flask App](docs/tutorial-python-flask-app.md) — Retrieving secrets at runtime in a Flask application using the Python client
+- [Windows Setup](docs/tutorial-windows-setup.md) — Building, configuring, and using keysync on Windows
+- [Client Library Recipe](docs/new-client-library-recipe.md) — How to write a keysync client library in any language using an AI coding assistant
 
-```go
-// Go
-import "github.com/dipockdas/keysync/clients/go"
-dbURL, err := keysync.GetSecret("DATABASE_URL", "my-api")
-```
-
-```python
-# Python
-from keysync import get_secret
-db_url = get_secret("DATABASE_URL", project="my-api")
-```
-
-```typescript
-// TypeScript
-import { getSecret } from "@dipockdas/keysync";
-const dbUrl = await getSecret("DATABASE_URL", "my-api");
-```
-
-```swift
-// Swift
-import KeySync
-let dbURL = try KeySync.getSecret("DATABASE_URL", project: "my-api")
-```
-
-See [clients/](clients/) for full documentation and per-library README files.
+---
 
 ## Development
 
@@ -413,25 +463,14 @@ make build
 # Run tests
 make test
 
-# Run platform tests (requires no external dependencies)
+# Run platform tests (no external dependencies required)
 make test-platform
 
 # Clean build artifacts
 make clean
 ```
 
-## Tutorials
-
-- [Go Project Setup](docs/tutorial-go-project.md) — Using keysync with an existing Go project (CLI + Go client library)
-- [Python Flask App](docs/tutorial-python-flask-app.md) — Retrieving secrets at runtime in a Python Flask application
-- [Windows Setup](docs/tutorial-windows-setup.md) — Building, configuring, and using keysync on Windows
-- [New Client Library Recipe](docs/new-client-library-recipe.md) — How to write a keysync client library in any language using an AI coding assistant
-
-## Agent instructions
-
-- [AGENTS.md](AGENTS.md) — general AI agent instructions for the whole project
-- [CLAUDE.md](CLAUDE.md) — Claude Code instructions for this repository
-- Each client library also has its own `AGENTS.md` and `CLAUDE.md`
+---
 
 ## Project Status
 
