@@ -42,10 +42,10 @@ Usage:
 				// Try a write/read cycle
 				ctx := cmd.Context()
 				testKey := "__keysync_doctor_test__"
-				if err := secretSt.Set(ctx, store.ScopeGlobal, "", testKey, "ok"); err != nil {
+				if err := secretSt.Set(ctx, store.ScopeGlobal, "", "", testKey, "ok"); err != nil {
 					fmt.Printf("  ✗ Store: write failed: %v\n", err)
 				} else {
-					secretSt.Delete(ctx, store.ScopeGlobal, "", testKey)
+					secretSt.Delete(ctx, store.ScopeGlobal, "", "", testKey)
 					fmt.Println("  ✓ Store: operational")
 				}
 			}

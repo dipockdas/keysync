@@ -2,11 +2,13 @@ package platforms
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
+
+	"github.com/dipockdas/keysync/internal/store"
 )
 
 func init() {
@@ -28,19 +30,20 @@ type vercelConfig struct {
 	Target    []string `json:"target,omitempty"`
 }
 
-func newVercelFromConfig(configJSON string) (Platform, error) {
+func newVercelFromConfig(ctx context.Context, configJSON string, secretSt store.Store) (Platform, error) {
 	var cfg vercelConfig
 	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
 		return nil, fmt.Errorf("parse vercel config: %w", err)
 	}
-	return NewVercelClient(cfg.ProjectID, cfg.Target)
+	return NewVercelClient(ctx, cfg.ProjectID, cfg.Target, secretSt)
 }
 
-// NewVercelClient creates a Vercel client. Requires VERCEL_TOKEN env var.
-func NewVercelClient(projectID string, targets []string) (*VercelClient, error) {
-	token := os.Getenv("VERCEL_TOKEN")
+// NewVercelClient creates a Vercel client. The token is read from the secret store
+// (global scope, key "VERCEL_TOKEN"), falling back to the VERCEL_TOKEN env var.
+func NewVercelClient(ctx context.Context, projectID string, targets []string, secretSt store.Store) (*VercelClient, error) {
+	token := lookupToken(ctx, secretSt, "vercel")
 	if token == "" {
-		return nil, fmt.Errorf("VERCEL_TOKEN not set")
+		return nil, fmt.Errorf("VERCEL_TOKEN not set (store it with: keysync set VERCEL_TOKEN=...)")
 	}
 	if len(targets) == 0 {
 		targets = []string{"production", "preview"}

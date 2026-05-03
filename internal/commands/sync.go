@@ -17,19 +17,19 @@ var syncPlatforms string
 
 func newSyncCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "sync [--project name] [--platforms vercel,railway,supabase]",
+		Use:   "sync --project name [--env name] [--platforms vercel,railway,supabase]",
 		Short: "Push secrets to deployment platforms",
 		Long: `Pushes secrets from the local store to deployment platforms.
 
 The --platforms flag filters which platforms to sync. By default, all configured platforms are synced.
-Platform tokens must be set as environment variables:
-  VERCEL_TOKEN, RAILWAY_TOKEN, SUPABASE_TOKEN
+Platform tokens are read from the OS secret store (global scope), falling back to environment variables.
 
 To add a new platform, implement the Platform interface and register it.
 
 Usage:
   keysync sync --project my-app
-  keysync sync --project my-app --platforms vercel,railway`,
+  keysync sync --project my-app --env production
+  keysync sync --project my-app --env staging --platforms vercel,railway`,
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			ctx := cobraCmd.Context()
 
@@ -44,7 +44,7 @@ Usage:
 			}
 
 			// Read secrets from local store
-			secrets, err := collectSecrets(ctx, project)
+			secrets, err := collectSecrets(ctx, project, envFlag)
 			if err != nil {
 				return fmt.Errorf("collect secrets: %w", err)
 			}
@@ -53,7 +53,7 @@ Usage:
 				return nil
 			}
 
-			fmt.Printf("Syncing %d secrets for project %q\n", len(secrets), project)
+			fmt.Printf("Syncing %d secrets for project %q (env: %s)\n", len(secrets), project, envFlag)
 
 			// Determine which platforms to sync
 			var platformNames []string
@@ -83,7 +83,7 @@ Usage:
 					continue
 				}
 
-				p, err := platforms.Get(name, platformCfg)
+				p, err := platforms.Get(ctx, name, platformCfg, secretSt)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "  SKIP: %s (%v)\n", name, err)
 					syncErrors++
@@ -115,31 +115,46 @@ Usage:
 	return cmd
 }
 
-// collectSecrets merges global and project-scoped secrets into one map.
-func collectSecrets(ctx context.Context, project string) (map[string]string, error) {
+// collectSecrets merges global, project, and environment-scoped secrets into one map.
+// Precedence: global < project < project+env
+func collectSecrets(ctx context.Context, project, env string) (map[string]string, error) {
 	secrets := make(map[string]string)
 
-	// Global secrets
-	globalEntries, err := secretSt.List(ctx, store.ScopeGlobal, "")
+	// Global secrets (lowest precedence)
+	globalEntries, err := secretSt.List(ctx, store.ScopeGlobal, "", "")
 	if err != nil {
 		return nil, fmt.Errorf("list global secrets: %w", err)
 	}
 	for _, e := range globalEntries {
-		val, err := secretSt.Get(ctx, store.ScopeGlobal, "", e.Key)
+		val, err := secretSt.Get(ctx, store.ScopeGlobal, "", "", e.Key)
 		if err == nil {
 			secrets[e.Key] = val
 		}
 	}
 
-	// Project secrets (override global)
-	projectEntries, err := secretSt.List(ctx, store.ScopeProject, project)
+	// Project secrets (no specific environment)
+	projectEntries, err := secretSt.List(ctx, store.ScopeProject, project, "")
 	if err != nil {
 		return nil, fmt.Errorf("list project secrets: %w", err)
 	}
 	for _, e := range projectEntries {
-		val, err := secretSt.Get(ctx, store.ScopeProject, project, e.Key)
+		val, err := secretSt.Get(ctx, store.ScopeProject, project, "", e.Key)
 		if err == nil {
 			secrets[e.Key] = val
+		}
+	}
+
+	// Project + environment secrets (highest precedence)
+	if env != "" {
+		envEntries, err := secretSt.List(ctx, store.ScopeProject, project, env)
+		if err != nil {
+			return nil, fmt.Errorf("list environment secrets: %w", err)
+		}
+		for _, e := range envEntries {
+			val, err := secretSt.Get(ctx, store.ScopeProject, project, env, e.Key)
+			if err == nil {
+				secrets[e.Key] = val
+			}
 		}
 	}
 

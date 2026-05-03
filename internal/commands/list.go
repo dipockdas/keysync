@@ -12,11 +12,12 @@ var listUnmask bool
 
 func newListCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "list [--project name]",
+		Use:   "list [--project name] [--env name]",
 		Short: "List all managed secrets",
 		Long: `Lists all secrets in the local OS secret store.
 
 If --project is provided, only secrets for that project are shown.
+If --env is also provided, only secrets for that environment are shown.
 Global secrets are always included.
 
 Use --unmask to also display secret values (for verification purposes).
@@ -24,12 +25,13 @@ Use --unmask to also display secret values (for verification purposes).
 Usage:
   keysync list
   keysync list --project my-app
+  keysync list --project my-app --env production
   keysync list --unmask`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
 			// Always list global secrets
-			globalEntries, err := secretSt.List(ctx, store.ScopeGlobal, "")
+			globalEntries, err := secretSt.List(ctx, store.ScopeGlobal, "", "")
 			if err != nil {
 				return fmt.Errorf("list global secrets: %w", err)
 			}
@@ -37,7 +39,7 @@ Usage:
 			// List project secrets
 			var projectEntries []store.SecretEntry
 			if project != "" {
-				projectEntries, err = secretSt.List(ctx, store.ScopeProject, project)
+				projectEntries, err = secretSt.List(ctx, store.ScopeProject, project, envFlag)
 				if err != nil {
 					return fmt.Errorf("list project secrets: %w", err)
 				}
@@ -53,11 +55,8 @@ Usage:
 			if listUnmask {
 				fmt.Fprintln(w, "SCOPE\tKEY\tVALUE")
 				for _, e := range all {
-					label := string(e.Scope)
-					if e.Project != "" {
-						label = fmt.Sprintf("%s/%s", e.Scope, e.Project)
-					}
-					val, err := secretSt.Get(ctx, e.Scope, e.Project, e.Key)
+					label := scopeDisplayLabel(e)
+					val, err := secretSt.Get(ctx, e.Scope, e.Project, e.Environment, e.Key)
 					displayVal := "***"
 					if err == nil {
 						displayVal = val
@@ -67,10 +66,7 @@ Usage:
 			} else {
 				fmt.Fprintln(w, "SCOPE\tKEY")
 				for _, e := range all {
-					label := string(e.Scope)
-					if e.Project != "" {
-						label = fmt.Sprintf("%s/%s", e.Scope, e.Project)
-					}
+					label := scopeDisplayLabel(e)
 					fmt.Fprintf(w, "%s\t%s\n", label, e.Key)
 				}
 			}
@@ -81,4 +77,16 @@ Usage:
 
 	cmd.Flags().BoolVar(&listUnmask, "unmask", false, "show secret values alongside key names")
 	return cmd
+}
+
+// scopeDisplayLabel returns a human-readable scope label for a SecretEntry.
+func scopeDisplayLabel(e store.SecretEntry) string {
+	label := string(e.Scope)
+	if e.Project != "" {
+		label = fmt.Sprintf("%s/%s", e.Scope, e.Project)
+	}
+	if e.Environment != "" {
+		label = fmt.Sprintf("%s/%s", label, e.Environment)
+	}
+	return label
 }

@@ -14,6 +14,7 @@ import (
 var (
 	cfgFile    string
 	project    string
+	envFlag    string
 	repoFlag   string
 	cfg        *config.Config
 	secretSt   store.Store
@@ -47,6 +48,7 @@ and deployment platforms (Vercel, Railway, Supabase).`,
 
 	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "path to .keysync.json (searches parents by default)")
 	cmd.PersistentFlags().StringVarP(&project, "project", "p", "", "project name (from .keysync.json)")
+	cmd.PersistentFlags().StringVarP(&envFlag, "env", "e", "production", "environment name (e.g. production, staging)")
 	cmd.PersistentFlags().StringVar(&repoFlag, "repo", "", "GitHub repository (owner/repo). Auto-detected if not set.")
 
 	cmd.AddCommand(newInitCmd())

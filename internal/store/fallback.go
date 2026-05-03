@@ -22,7 +22,7 @@ type FallbackStore struct {
 	filePath string
 	keyPath  string
 	box      *crypto.SealedBox
-	data     map[string]string // key = "scope/project/key"
+	data     map[string]string // key = "scope/project/env/key"
 }
 
 func NewFallbackStore() (*FallbackStore, error) {
@@ -126,10 +126,10 @@ func (f *FallbackStore) save() error {
 	return os.WriteFile(f.filePath, encrypted, 0600)
 }
 
-func (f *FallbackStore) Get(_ context.Context, scope Scope, project, key string) (string, error) {
+func (f *FallbackStore) Get(_ context.Context, scope Scope, project, environment, key string) (string, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
-	k := memKey(scope, project, key)
+	k := memKey(scope, project, environment, key)
 	v, ok := f.data[k]
 	if !ok {
 		return "", ErrNotFound
@@ -137,17 +137,17 @@ func (f *FallbackStore) Get(_ context.Context, scope Scope, project, key string)
 	return v, nil
 }
 
-func (f *FallbackStore) Set(_ context.Context, scope Scope, project, key, value string) error {
+func (f *FallbackStore) Set(_ context.Context, scope Scope, project, environment, key, value string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	f.data[memKey(scope, project, key)] = value
+	f.data[memKey(scope, project, environment, key)] = value
 	return f.save()
 }
 
-func (f *FallbackStore) Delete(_ context.Context, scope Scope, project, key string) error {
+func (f *FallbackStore) Delete(_ context.Context, scope Scope, project, environment, key string) error {
 	f.mu.Lock()
 	defer f.mu.Unlock()
-	k := memKey(scope, project, key)
+	k := memKey(scope, project, environment, key)
 	if _, ok := f.data[k]; !ok {
 		return ErrNotFound
 	}
@@ -155,24 +155,27 @@ func (f *FallbackStore) Delete(_ context.Context, scope Scope, project, key stri
 	return f.save()
 }
 
-func (f *FallbackStore) List(_ context.Context, scope Scope, project string) ([]SecretEntry, error) {
+func (f *FallbackStore) List(_ context.Context, scope Scope, project, environment string) ([]SecretEntry, error) {
 	f.mu.RLock()
 	defer f.mu.RUnlock()
 	var entries []SecretEntry
 	for k := range f.data {
-		parts := strings.SplitN(k, "/", 3)
-		if len(parts) < 3 {
+		parts := strings.SplitN(k, "/", 4)
+		if len(parts) < 4 {
 			continue
 		}
 		entryScope := Scope(parts[0])
 		entryProject := parts[1]
-		entryKey := parts[2]
+		entryEnv := parts[2]
+		entryKey := parts[3]
 		if (scope == "" || entryScope == scope) &&
-			(project == "" || entryProject == project) {
+			(project == "" || entryProject == project) &&
+			(environment == "" || entryEnv == environment) {
 			entries = append(entries, SecretEntry{
-				Scope:   entryScope,
-				Project: entryProject,
-				Key:     entryKey,
+				Scope:       entryScope,
+				Project:     entryProject,
+				Environment: entryEnv,
+				Key:         entryKey,
 			})
 		}
 	}
@@ -182,6 +185,9 @@ func (f *FallbackStore) List(_ context.Context, scope Scope, project string) ([]
 		}
 		if entries[i].Project != entries[j].Project {
 			return entries[i].Project < entries[j].Project
+		}
+		if entries[i].Environment != entries[j].Environment {
+			return entries[i].Environment < entries[j].Environment
 		}
 		return entries[i].Key < entries[j].Key
 	})

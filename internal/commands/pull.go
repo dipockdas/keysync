@@ -11,7 +11,7 @@ import (
 
 func newPullCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "pull [--project name]",
+		Use:   "pull [--project name] [--env name]",
 		Short: "Reconcile local secrets with GitHub Secret names",
 		Long: `Lists all secrets in GitHub and checks whether they exist in the local
 OS secret store. Secrets that exist on GitHub but are missing locally are reported.
@@ -47,16 +47,27 @@ Usage:
 			var missing int
 			for _, name := range secretNames {
 				// Check local store for this secret
-				_, err := secretSt.Get(ctx, store.ScopeGlobal, "", name)
+				_, err := secretSt.Get(ctx, store.ScopeGlobal, "", "", name)
 				if err == store.ErrNotFound {
 					// Also check project scope if specified
 					if project != "" {
-						_, err = secretSt.Get(ctx, store.ScopeProject, project, name)
+						_, err = secretSt.Get(ctx, store.ScopeProject, project, "", name)
 						if err == store.ErrNotFound {
-							fmt.Printf("  MISSING: %s (not found locally)\n", name)
-							missing++
+							// Check project + env scope
+							if envFlag != "" {
+								_, err = secretSt.Get(ctx, store.ScopeProject, project, envFlag, name)
+								if err == store.ErrNotFound {
+									fmt.Printf("  MISSING: %s (not found locally)\n", name)
+									missing++
+								} else if err == nil {
+									fmt.Printf("  OK:      %s (project/%s/%s scope)\n", name, project, envFlag)
+								}
+							} else {
+								fmt.Printf("  MISSING: %s (not found locally)\n", name)
+								missing++
+							}
 						} else if err == nil {
-							fmt.Printf("  OK:      %s (project scope)\n", name)
+							fmt.Printf("  OK:      %s (project/%s scope)\n", name, project)
 						}
 					} else {
 						fmt.Printf("  MISSING: %s (not found locally)\n", name)

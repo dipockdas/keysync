@@ -12,16 +12,18 @@ import (
 
 func newSetCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "set KEY=value [--project name]",
+		Use:   "set KEY=value [--project name] [--env name]",
 		Short: "Store a secret in the local OS secret store",
 		Long: `Stores a secret in the local OS secret store (macOS Keychain, Linux libsecret, etc.).
 
 If --project is provided, the secret is scoped to that project.
+If --env is also provided, the secret is scoped to that project+environment.
 Otherwise, it is stored as a global secret (available to all projects).
 
 Usage:
   keysync set DATABASE_URL=postgres://user:pass@host/db    # global scope
-  keysync set STRIPE_KEY=sk_live_xxx --project my-app      # project scope`,
+  keysync set STRIPE_KEY=sk_live_xxx --project my-app      # project scope
+  keysync set DB_URL=prod-url --project my-app --env production  # project+env scope`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			kv := args[0]
@@ -37,17 +39,18 @@ Usage:
 			}
 
 			scope := store.ScopeGlobal
-			proj := project
+			proj := ""
+			env := ""
 			if project != "" {
 				scope = store.ScopeProject
-			} else {
-				proj = ""
+				proj = project
+				env = envFlag
 			}
 
 			ctx := cmd.Context()
 
 			// Write to local OS secret store
-			if err := secretSt.Set(ctx, scope, proj, key, value); err != nil {
+			if err := secretSt.Set(ctx, scope, proj, env, key, value); err != nil {
 				return fmt.Errorf("set secret: %w", err)
 			}
 			fmt.Printf("Set %s/%s\n", scopeLabel(scope, proj), key)

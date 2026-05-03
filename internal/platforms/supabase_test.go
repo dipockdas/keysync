@@ -1,6 +1,7 @@
 package platforms
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -72,7 +73,7 @@ func TestSupabaseUpsert_APIError(t *testing.T) {
 func TestSupabaseNewClient_MissingToken(t *testing.T) {
 	t.Setenv("SUPABASE_TOKEN", "")
 
-	_, err := NewSupabaseClient("abc123")
+	_, err := NewSupabaseClient(context.Background(), "abc123", nil)
 	if err == nil {
 		t.Fatal("expected error for missing SUPABASE_TOKEN, got nil")
 	}

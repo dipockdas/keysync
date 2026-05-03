@@ -1,6 +1,7 @@
 package platforms
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -95,7 +96,7 @@ func TestVercelUpsert_ErrorInResponseBody(t *testing.T) {
 func TestVercelNewClient_MissingToken(t *testing.T) {
 	t.Setenv("VERCEL_TOKEN", "")
 
-	_, err := NewVercelClient("proj_abc", nil)
+	_, err := NewVercelClient(context.Background(), "proj_abc", nil, nil)
 	if err == nil {
 		t.Fatal("expected error for missing VERCEL_TOKEN, got nil")
 	}

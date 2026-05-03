@@ -11,8 +11,8 @@ import (
 
 // serviceAttrValue returns the service attribute for secret-tool.
 // secret-tool uses "service" and "account" as the lookup attributes.
-func serviceAttrValue(scope Scope, project string) string {
-	return serviceName(scope, project)
+func serviceAttrValue(scope Scope, project, environment string) string {
+	return serviceName(scope, project, environment)
 }
 
 // LibsecretStore implements Store using Linux libsecret (`secret-tool` CLI).
@@ -30,8 +30,8 @@ func NewLibsecretStore() *LibsecretStore {
 	return ls
 }
 
-func (l *LibsecretStore) Get(_ context.Context, scope Scope, project, key string) (string, error) {
-	svc := serviceAttrValue(scope, project)
+func (l *LibsecretStore) Get(_ context.Context, scope Scope, project, environment, key string) (string, error) {
+	svc := serviceAttrValue(scope, project, environment)
 	cmd := exec.Command("secret-tool", "lookup", "service", svc, "account", accountName(key))
 	out, err := cmd.Output()
 	if err != nil {
@@ -43,8 +43,8 @@ func (l *LibsecretStore) Get(_ context.Context, scope Scope, project, key string
 	return strings.TrimSpace(string(out)), nil
 }
 
-func (l *LibsecretStore) Set(_ context.Context, scope Scope, project, key, value string) error {
-	svc := serviceAttrValue(scope, project)
+func (l *LibsecretStore) Set(_ context.Context, scope Scope, project, environment, key, value string) error {
+	svc := serviceAttrValue(scope, project, environment)
 	cmd := exec.Command("secret-tool", "store",
 		"--label="+svc,
 		"service", svc,
@@ -56,29 +56,29 @@ func (l *LibsecretStore) Set(_ context.Context, scope Scope, project, key, value
 	}
 
 	if l.index != nil {
-		_ = l.index.add(SecretEntry{Scope: scope, Project: project, Key: key})
+		_ = l.index.add(SecretEntry{Scope: scope, Project: project, Environment: environment, Key: key})
 	}
 	return nil
 }
 
-func (l *LibsecretStore) Delete(_ context.Context, scope Scope, project, key string) error {
-	svc := serviceAttrValue(scope, project)
+func (l *LibsecretStore) Delete(_ context.Context, scope Scope, project, environment, key string) error {
+	svc := serviceAttrValue(scope, project, environment)
 	cmd := exec.Command("secret-tool", "clear", "service", svc, "account", accountName(key))
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("secret-tool clear: %w: %s", err, strings.TrimSpace(string(out)))
 	}
 
 	if l.index != nil {
-		_ = l.index.remove(scope, project, key)
+		_ = l.index.remove(scope, project, environment, key)
 	}
 	return nil
 }
 
-func (l *LibsecretStore) List(ctx context.Context, scope Scope, project string) ([]SecretEntry, error) {
+func (l *LibsecretStore) List(ctx context.Context, scope Scope, project, environment string) ([]SecretEntry, error) {
 	if l.index == nil {
 		return nil, nil
 	}
-	return l.index.list(scope, project), nil
+	return l.index.list(scope, project, environment), nil
 }
 
 // rebuildIndex scans libsecret for keysync entries and populates the index.
@@ -87,7 +87,7 @@ func (l *LibsecretStore) rebuildIndex() {
 	if l.index == nil {
 		return
 	}
-	existing := l.index.list("", "")
+	existing := l.index.list("", "", "")
 	if len(existing) > 0 {
 		return
 	}
@@ -110,8 +110,8 @@ func (l *LibsecretStore) rebuildIndex() {
 		if line == "" {
 			// Blank line = end of entry
 			if currentSvc != "" && currentAcct != "" && strings.HasPrefix(currentSvc, "keysync/") {
-				scope, project := parseServiceName(currentSvc)
-				_ = l.index.add(SecretEntry{Scope: scope, Project: project, Key: currentAcct})
+				scope, project, env := parseServiceName(currentSvc)
+				_ = l.index.add(SecretEntry{Scope: scope, Project: project, Environment: env, Key: currentAcct})
 			}
 			currentSvc = ""
 			currentAcct = ""
@@ -131,8 +131,8 @@ func (l *LibsecretStore) rebuildIndex() {
 	}
 	// Handle last entry if no trailing blank line
 	if currentSvc != "" && currentAcct != "" && strings.HasPrefix(currentSvc, "keysync/") {
-		scope, project := parseServiceName(currentSvc)
-		_ = l.index.add(SecretEntry{Scope: scope, Project: project, Key: currentAcct})
+		scope, project, env := parseServiceName(currentSvc)
+		_ = l.index.add(SecretEntry{Scope: scope, Project: project, Environment: env, Key: currentAcct})
 	}
 }
 
@@ -146,10 +146,6 @@ func isSecretToolNotFound(err error) bool {
 
 // Ensure keyIndex methods compile on Linux (types defined in keychain_darwin.go).
 // On Linux, these types need to be defined here too or in a shared file.
-//
-// keyIndex is defined per-platform since it's used by both darwin and linux stores.
-// It uses build-tagged files, so it's not available here unless shared.
-// We use a local implementation instead.
 
 // keyIndex tracks which keys exist in the store for fast listing.
 type keyIndex struct {
@@ -173,7 +169,7 @@ func (ki *keyIndex) add(entry SecretEntry) error {
 	// Deduplicate
 	var filtered []SecretEntry
 	for _, e := range ki.keys {
-		if e.Scope == entry.Scope && e.Project == entry.Project && e.Key == entry.Key {
+		if e.Scope == entry.Scope && e.Project == entry.Project && e.Environment == entry.Environment && e.Key == entry.Key {
 			continue
 		}
 		filtered = append(filtered, e)
@@ -183,10 +179,10 @@ func (ki *keyIndex) add(entry SecretEntry) error {
 	return nil
 }
 
-func (ki *keyIndex) remove(scope Scope, project, key string) error {
+func (ki *keyIndex) remove(scope Scope, project, environment, key string) error {
 	var filtered []SecretEntry
 	for _, e := range ki.keys {
-		if e.Scope == scope && e.Project == project && e.Key == key {
+		if e.Scope == scope && e.Project == project && e.Environment == environment && e.Key == key {
 			continue
 		}
 		filtered = append(filtered, e)
@@ -195,11 +191,12 @@ func (ki *keyIndex) remove(scope Scope, project, key string) error {
 	return nil
 }
 
-func (ki *keyIndex) list(scope Scope, project string) []SecretEntry {
+func (ki *keyIndex) list(scope Scope, project, environment string) []SecretEntry {
 	var result []SecretEntry
 	for _, e := range ki.keys {
 		if (scope == "" || e.Scope == scope) &&
-			(project == "" || e.Project == project) {
+			(project == "" || e.Project == project) &&
+			(environment == "" || e.Environment == environment) {
 			result = append(result, e)
 		}
 	}

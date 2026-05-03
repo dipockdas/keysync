@@ -15,7 +15,7 @@ import (
 // via the Win32 API (github.com/danieljoos/wincred).
 //
 // Credentials are stored as generic credentials with:
-//   - TargetName: "keysync_<scope>[_<project>]"  (same format as legacy cmdkey)
+//   - TargetName: "keysync_<scope>[_<project>[_<environment>]]"
 //   - UserName:   "<key>"
 //   - CredentialBlob: "<value>" (UTF-8 encoded)
 type WincredStore struct {
@@ -30,35 +30,48 @@ func NewWincredStore() *WincredStore {
 }
 
 // credTarget returns the credential target name.
-// Format: "keysync_<scope>[_<project>]"
-func credTarget(scope Scope, project string) string {
-	if project == "" || scope == ScopeGlobal {
+// Format: "keysync_<scope>[_<project>[_<environment>]]"
+func credTarget(scope Scope, project, environment string) string {
+	if scope == ScopeGlobal {
 		return fmt.Sprintf("keysync_%s", scope)
 	}
-	return fmt.Sprintf("keysync_%s_%s", scope, project)
+	base := fmt.Sprintf("keysync_%s_%s", scope, project)
+	if environment != "" {
+		base += "_" + environment
+	}
+	return base
 }
 
-// parseCredTarget splits a target name back into scope and project.
-// "keysync_global" → (global, "")
-// "keysync_project_my-app" → (project, "my-app")
-func parseCredTarget(target string) (Scope, string) {
+// parseCredTarget splits a target name back into scope, project, and environment.
+// "keysync_global" → (global, "", "")
+// "keysync_project_my-app" → (project, "my-app", "")
+// "keysync_project_my-app_production" → (project, "my-app", "production")
+func parseCredTarget(target string) (Scope, string, string) {
 	trimmed := strings.TrimPrefix(target, "keysync_")
-	parts := strings.SplitN(trimmed, "_", 2)
+	parts := strings.SplitN(trimmed, "_", 3)
 	if len(parts) == 0 {
-		return ScopeGlobal, ""
+		return ScopeGlobal, "", ""
 	}
 	scope := Scope(parts[0])
 	if scope != ScopeGlobal && scope != ScopeProject {
-		return ScopeGlobal, ""
+		return ScopeGlobal, "", ""
+	}
+	if scope == ScopeGlobal {
+		return scope, "", ""
 	}
 	if len(parts) < 2 {
-		return scope, ""
+		return scope, "", ""
 	}
-	return scope, parts[1]
+	project := parts[1]
+	env := ""
+	if len(parts) >= 3 {
+		env = parts[2]
+	}
+	return scope, project, env
 }
 
-func (w *WincredStore) Get(_ context.Context, scope Scope, project, key string) (string, error) {
-	target := credTarget(scope, project)
+func (w *WincredStore) Get(_ context.Context, scope Scope, project, environment, key string) (string, error) {
+	target := credTarget(scope, project, environment)
 	cred, err := wincred.GetGenericCredential(target)
 	if err != nil {
 		return "", ErrNotFound
@@ -70,8 +83,8 @@ func (w *WincredStore) Get(_ context.Context, scope Scope, project, key string) 
 	return string(cred.CredentialBlob), nil
 }
 
-func (w *WincredStore) Set(_ context.Context, scope Scope, project, key, value string) error {
-	target := credTarget(scope, project)
+func (w *WincredStore) Set(_ context.Context, scope Scope, project, environment, key, value string) error {
+	target := credTarget(scope, project, environment)
 
 	// Delete existing first to avoid duplicates
 	existing, err := wincred.GetGenericCredential(target)
@@ -90,13 +103,13 @@ func (w *WincredStore) Set(_ context.Context, scope Scope, project, key, value s
 
 	// Update cache
 	w.mu.Lock()
-	w.cache = append(w.cache, SecretEntry{Scope: scope, Project: project, Key: key})
+	w.cache = append(w.cache, SecretEntry{Scope: scope, Project: project, Environment: environment, Key: key})
 	w.mu.Unlock()
 	return nil
 }
 
-func (w *WincredStore) Delete(_ context.Context, scope Scope, project, key string) error {
-	target := credTarget(scope, project)
+func (w *WincredStore) Delete(_ context.Context, scope Scope, project, environment, key string) error {
+	target := credTarget(scope, project, environment)
 	cred, err := wincred.GetGenericCredential(target)
 	if err != nil {
 		return ErrNotFound
@@ -112,7 +125,7 @@ func (w *WincredStore) Delete(_ context.Context, scope Scope, project, key strin
 	w.mu.Lock()
 	filtered := make([]SecretEntry, 0, len(w.cache))
 	for _, e := range w.cache {
-		if e.Scope == scope && e.Project == project && e.Key == key {
+		if e.Scope == scope && e.Project == project && e.Environment == environment && e.Key == key {
 			continue
 		}
 		filtered = append(filtered, e)
@@ -122,14 +135,15 @@ func (w *WincredStore) Delete(_ context.Context, scope Scope, project, key strin
 	return nil
 }
 
-func (w *WincredStore) List(_ context.Context, scope Scope, project string) ([]SecretEntry, error) {
+func (w *WincredStore) List(_ context.Context, scope Scope, project, environment string) ([]SecretEntry, error) {
 	w.mu.RLock()
 	defer w.mu.RUnlock()
 
 	var result []SecretEntry
 	for _, e := range w.cache {
 		if (scope == "" || e.Scope == scope) &&
-			(project == "" || e.Project == project) {
+			(project == "" || e.Project == project) &&
+			(environment == "" || e.Environment == environment) {
 			result = append(result, e)
 		}
 	}
@@ -151,11 +165,12 @@ func (w *WincredStore) rebuildCache() {
 		if !strings.HasPrefix(cred.TargetName, "keysync_") {
 			continue
 		}
-		scope, project := parseCredTarget(cred.TargetName)
+		scope, project, env := parseCredTarget(cred.TargetName)
 		w.cache = append(w.cache, SecretEntry{
-			Scope:   scope,
-			Project: project,
-			Key:     cred.UserName,
+			Scope:       scope,
+			Project:     project,
+			Environment: env,
+			Key:         cred.UserName,
 		})
 	}
 }

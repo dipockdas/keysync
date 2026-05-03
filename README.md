@@ -7,8 +7,9 @@ Keysync replaces scattered `.env` files and manual secret management with a sing
 ## Features
 
 - **OS-native secret storage** — macOS Keychain, Linux libsecret, Windows Credential Manager
-- **Two scopes** — global secrets (shared across projects) and project-scoped secrets (override globals)
+- **Three scope levels** — global secrets (shared across projects), project-scoped secrets (override globals), and environment-scoped secrets (override project, e.g. `production`, `staging`)
 - **Platform sync** — push secrets to Vercel, Railway, and Supabase via their APIs
+- **Platform tokens in keychain** — API tokens are stored as global secrets in your OS keychain, not in plaintext files
 - **GitHub Actions integration** — auto-sync secrets on push to `main`
 - **Secret rotation** — generate cryptographically random secrets and update everywhere
 - **Migration** — import from `.env` files or pull from Vercel/Railway/Supabase CLIs
@@ -57,6 +58,9 @@ keysync set GLOBAL_API_KEY=abc123
 
 # Store a project-scoped secret (overrides global for this project)
 keysync set -p my-app DB_URL=postgres://localhost:5432/mydb
+
+# Store an environment-scoped secret (overrides project for this environment)
+keysync set -p my-app DB_URL=postgres://prod-host/proddb --env production
 ```
 
 ### 3. Sync to deployment platforms
@@ -85,13 +89,15 @@ Configure platforms in `.keysync.json`:
 }
 ```
 
-Set API tokens as environment variables:
+Store API tokens as global secrets in your OS keychain:
 
 ```bash
-export VERCEL_TOKEN=...
-export RAILWAY_TOKEN=...
-export SUPABASE_TOKEN=...
+keysync set VERCEL_TOKEN=...
+keysync set RAILWAY_TOKEN=...
+keysync set SUPABASE_TOKEN=...
 ```
+
+Tokens can also be set via environment variables (`VERCEL_TOKEN`, `RAILWAY_TOKEN`, `SUPABASE_TOKEN`) as a fallback — the keychain is checked first.
 
 Then sync:
 
@@ -123,16 +129,16 @@ source <(keysync export --project my-app)
 | Command | Description |
 |---------|-------------|
 | `keysync init` | Scaffold `.keysync.json` in the current directory |
-| `keysync set KEY=value` | Store a secret in the OS keychain |
-| `keysync get KEY` | Copy a secret to the clipboard (use `-u`/`--unmask` to print to stdout) |
+| `keysync set KEY=value` | Store a secret in the OS keychain (+ pushes to GitHub). Use `-e`/`--env` to set environment scope |
+| `keysync get KEY` | Copy a secret to the clipboard (use `-u`/`--unmask` to print to stdout). Resolves project+env → project → global |
 | `keysync list` | List all stored secrets (use `--unmask` to show values) |
-| `keysync export` | Print secrets as `export KEY=VALUE` lines for shell eval |
-| `keysync sync` | Push secrets to configured platforms + GitHub |
+| `keysync export` | Print secrets as `export KEY=VALUE` lines for shell eval. Merges all three scope levels |
+| `keysync sync` | Push secrets to configured platforms + GitHub (use `--platforms` to select specific ones) |
 | `keysync pull` | Reconcile local secrets with GitHub secret names |
 | `keysync rotate KEY` | Generate a new random secret and update everywhere |
-| `keysync migrate` | Import secrets from `.env` file or cloud platform |
-| `keysync doctor` | Run diagnostics |
-| `keysync test-secrets` | Generate ephemeral test secrets |
+| `keysync migrate` | Import secrets from `.env` or cloud platform (use `--dry-run` to preview) |
+| `keysync doctor` | Run diagnostics (checks config, store, and OS keychain) |
+| `keysync test-secrets` | Generate ephemeral test secrets (use `--count`/`-c` to set number) |
 
 ### Global Flags
 
@@ -140,6 +146,7 @@ source <(keysync export --project my-app)
 |------|-------------|
 | `--config` | Path to `.keysync.json` (auto-searches parent directories) |
 | `-p, --project` | Project name (from `.keysync.json`) |
+| `-e, --env` | Environment name (default `production`). Used for environment-scoped secrets |
 | `--repo` | GitHub repository (`owner/repo`), auto-detected if not set |
 
 ## Configuration
@@ -170,7 +177,19 @@ Keysync uses a `.keysync.json` file, searched for in the current directory and a
 }
 ```
 
-### Platform tokens (environment variables)
+### Platform tokens
+
+API tokens are stored as **global secrets in your OS keychain** (not in `.keysync.json`). Environment variables are used as a fallback if no keychain entry exists.
+
+Store them with:
+
+```bash
+keysync set VERCEL_TOKEN=...
+keysync set RAILWAY_TOKEN=...
+keysync set SUPABASE_TOKEN=...
+```
+
+Fallback environment variables:
 
 | Variable | Platform |
 |----------|----------|
@@ -201,7 +220,7 @@ Keysync uses a `.keysync.json` file, searched for in the current directory and a
      └────────────────────────┘
 ```
 
-Secrets are stored with a service name like `keysync/global` (for global scope) or `keysync/project/my-app` (for project scope). The account/key name is the secret key itself. When syncing, project-scoped secrets take precedence over global secrets with the same key.
+Secrets are stored with a service name like `keysync/global` (for global scope), `keysync/project/my-app` (for project scope), or `keysync/project/my-app/env/production` (for environment scope). The account/key name is the secret key itself. When syncing, secrets are resolved with three-level precedence: environment-scoped (highest) → project-scoped → global (lowest).
 
 ## OS-Specific Setup
 
@@ -215,7 +234,7 @@ Keysync uses the **macOS Keychain** via the `security` CLI (no CGo required, no 
 
 **How it works:**
 - Secrets are stored as generic passwords in the default Keychain
-- Service names: `keysync/global` or `keysync/project/<name>`
+- Service names: `keysync/global` (global), `keysync/project/<name>` (project), or `keysync/project/<name>/env/<env>` (environment)
 - Account names: the secret key (e.g., `DATABASE_URL`)
 - An index file at `~/.config/keysync/index.json` tracks stored secret names for fast listing
 
@@ -252,7 +271,7 @@ sudo pacman -S libsecret
 
 **How it works:**
 - Secrets are stored in libsecret with attributes: `service=<serviceName>` and `account=<key>`
-- Service names: `keysync/global` or `keysync/project/<name>`
+- Service names: `keysync/global` (global), `keysync/project/<name>` (project), or `keysync/project/<name>/env/<env>` (environment)
 - An in-memory name cache is rebuilt on startup by searching for `service=keysync` entries
 
 **Notes:**
@@ -282,7 +301,7 @@ Keysync uses the **Windows Credential Manager** via the `wincred` Go library (Wi
 
 **How it works:**
 - Secrets are stored as Generic Credentials in the Windows Credential Manager
-- Target names: `keysync_global` or `keysync_project_<name>`
+- Target names: `keysync_global` (global), `keysync_project_<name>` (project), or `keysync_project_<name>_<env>` (environment)
 - Credential attributes: `UserName` = secret key, `CredentialBlob` = secret value, persisted to `LocalMachine`
 - An in-memory name cache is rebuilt on startup by scanning for `keysync_` prefixed credentials
 
@@ -400,6 +419,13 @@ make test-platform
 # Clean build artifacts
 make clean
 ```
+
+## Tutorials
+
+- [Go Project Setup](docs/tutorial-go-project.md) — Using keysync with an existing Go project (CLI + Go client library)
+- [Python Flask App](docs/tutorial-python-flask-app.md) — Retrieving secrets at runtime in a Python Flask application
+- [Windows Setup](docs/tutorial-windows-setup.md) — Building, configuring, and using keysync on Windows
+- [New Client Library Recipe](docs/new-client-library-recipe.md) — How to write a keysync client library in any language using an AI coding assistant
 
 ## Agent instructions
 

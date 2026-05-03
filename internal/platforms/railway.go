@@ -2,11 +2,13 @@ package platforms
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
+
+	"github.com/dipockdas/keysync/internal/store"
 )
 
 func init() {
@@ -28,19 +30,20 @@ type railwayConfig struct {
 	Service     string `json:"service,omitempty"`
 }
 
-func newRailwayFromConfig(configJSON string) (Platform, error) {
+func newRailwayFromConfig(ctx context.Context, configJSON string, secretSt store.Store) (Platform, error) {
 	var cfg railwayConfig
 	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
 		return nil, fmt.Errorf("parse railway config: %w", err)
 	}
-	return NewRailwayClient(cfg.Environment, cfg.Service)
+	return NewRailwayClient(ctx, cfg.Environment, cfg.Service, secretSt)
 }
 
-// NewRailwayClient creates a Railway client. Requires RAILWAY_TOKEN env var.
-func NewRailwayClient(environment, service string) (*RailwayClient, error) {
-	token := os.Getenv("RAILWAY_TOKEN")
+// NewRailwayClient creates a Railway client. The token is read from the secret store
+// (global scope, key "RAILWAY_TOKEN"), falling back to the RAILWAY_TOKEN env var.
+func NewRailwayClient(ctx context.Context, environment, service string, secretSt store.Store) (*RailwayClient, error) {
+	token := lookupToken(ctx, secretSt, "railway")
 	if token == "" {
-		return nil, fmt.Errorf("RAILWAY_TOKEN not set")
+		return nil, fmt.Errorf("RAILWAY_TOKEN not set (store it with: keysync set RAILWAY_TOKEN=...)")
 	}
 	return &RailwayClient{
 		token:       token,

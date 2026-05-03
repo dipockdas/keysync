@@ -20,6 +20,7 @@ func setupTest(t *testing.T) func() {
 	origSecretSt := secretSt
 	origCfg := cfg
 	origProject := project
+	origEnv := envFlag
 	origConfigPath := configPath
 	origRepoFlag := repoFlag
 
@@ -30,6 +31,7 @@ func setupTest(t *testing.T) func() {
 		},
 	}
 	project = ""
+	envFlag = "production"
 	configPath = "/tmp/test/.keysync.json"
 	repoFlag = "test/repo"
 
@@ -37,6 +39,7 @@ func setupTest(t *testing.T) func() {
 		secretSt = origSecretSt
 		cfg = origCfg
 		project = origProject
+		envFlag = origEnv
 		configPath = origConfigPath
 		repoFlag = origRepoFlag
 	}
@@ -82,10 +85,11 @@ func captureCommand(cmd *cobra.Command, args []string) (stdout, stderr string, e
 func TestGetCmd_ProjectScope(t *testing.T) {
 	defer setupTest(t)()
 	project = "test-app"
-	secretSt.Set(context.Background(), store.ScopeProject, "test-app", "MY_KEY", "my-value")
+	secretSt.Set(context.Background(), store.ScopeProject, "test-app", "production", "MY_KEY", "my-value")
 
 	cmd := newGetCmd()
-	getUnmask = true  // must set after newGetCmd, as pflag resets the variable
+	// pflag resets the variable when binding — set after newGetCmd
+	getUnmask = true
 	defer func() { getUnmask = false }()
 	stdout, stderr, err := captureCommand(cmd, []string{"MY_KEY"})
 	if err != nil {
@@ -101,10 +105,10 @@ func TestGetCmd_ProjectScope(t *testing.T) {
 
 func TestGetCmd_GlobalScope(t *testing.T) {
 	defer setupTest(t)()
-	secretSt.Set(context.Background(), store.ScopeGlobal, "", "MY_KEY", "global-val")
+	secretSt.Set(context.Background(), store.ScopeGlobal, "", "", "MY_KEY", "global-val")
 
 	cmd := newGetCmd()
-	getUnmask = true  // must set after newGetCmd, as pflag resets the variable
+	getUnmask = true
 	defer func() { getUnmask = false }()
 	stdout, stderr, err := captureCommand(cmd, []string{"MY_KEY"})
 	if err != nil {
@@ -122,10 +126,10 @@ func TestGetCmd_ProjectFallbackToGlobal(t *testing.T) {
 	defer setupTest(t)()
 	project = "test-app"
 	// Only set global — no project-scoped value
-	secretSt.Set(context.Background(), store.ScopeGlobal, "", "MY_KEY", "global-val")
+	secretSt.Set(context.Background(), store.ScopeGlobal, "", "", "MY_KEY", "global-val")
 
 	cmd := newGetCmd()
-	getUnmask = true  // must set after newGetCmd, as pflag resets the variable
+	getUnmask = true
 	defer func() { getUnmask = false }()
 	stdout, stderr, err := captureCommand(cmd, []string{"MY_KEY"})
 	if err != nil {
@@ -136,6 +140,29 @@ func TestGetCmd_ProjectFallbackToGlobal(t *testing.T) {
 	}
 	if stdout != "MY_KEY=global-val" {
 		t.Errorf("stdout = %q, want %q", stdout, "MY_KEY=global-val")
+	}
+}
+
+func TestGetCmd_EnvFallbackToProject(t *testing.T) {
+	defer setupTest(t)()
+	project = "test-app"
+	envFlag = "staging"
+	// Set project-level (no env) but not staging
+	secretSt.Set(context.Background(), store.ScopeProject, "test-app", "", "MY_KEY", "proj-val")
+
+	cmd := newGetCmd()
+	getUnmask = true
+	defer func() { getUnmask = false }()
+	stdout, stderr, err := captureCommand(cmd, []string{"MY_KEY"})
+	if err != nil {
+		t.Fatalf("RunE failed: %v", err)
+	}
+	if stderr != "" {
+		t.Errorf("unexpected stderr: %s", stderr)
+	}
+	// Should fall back to project-level (no env)
+	if stdout != "MY_KEY=proj-val" {
+		t.Errorf("stdout = %q, want %q", stdout, "MY_KEY=proj-val")
 	}
 }
 
@@ -160,7 +187,7 @@ func TestSetCmd_Global(t *testing.T) {
 	}
 
 	// Verify value in store
-	val, err := secretSt.Get(context.Background(), store.ScopeGlobal, "", "MY_KEY")
+	val, err := secretSt.Get(context.Background(), store.ScopeGlobal, "", "", "MY_KEY")
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -182,7 +209,7 @@ func TestSetCmd_ProjectScope(t *testing.T) {
 		t.Errorf("stdout = %q, want 'Set project/test-app/PROJ_KEY'", stdout)
 	}
 
-	val, err := secretSt.Get(context.Background(), store.ScopeProject, "test-app", "PROJ_KEY")
+	val, err := secretSt.Get(context.Background(), store.ScopeProject, "test-app", "production", "PROJ_KEY")
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -234,8 +261,8 @@ func TestListCmd_Empty(t *testing.T) {
 func TestListCmd_WithSecrets(t *testing.T) {
 	defer setupTest(t)()
 	ctx := context.Background()
-	secretSt.Set(ctx, store.ScopeGlobal, "", "GLOBAL_KEY", "gv")
-	secretSt.Set(ctx, store.ScopeProject, "test-app", "PROJ_KEY", "pv")
+	secretSt.Set(ctx, store.ScopeGlobal, "", "", "GLOBAL_KEY", "gv")
+	secretSt.Set(ctx, store.ScopeProject, "test-app", "production", "PROJ_KEY", "pv")
 
 	cmd := newListCmd()
 	stdout, _, err := captureCommand(cmd, []string{})
@@ -254,9 +281,9 @@ func TestListCmd_ProjectFilter(t *testing.T) {
 	defer setupTest(t)()
 	project = "test-app"
 	ctx := context.Background()
-	secretSt.Set(ctx, store.ScopeGlobal, "", "G_KEY", "gv")
-	secretSt.Set(ctx, store.ScopeProject, "test-app", "P_KEY", "pv")
-	secretSt.Set(ctx, store.ScopeProject, "other-app", "O_KEY", "ov")
+	secretSt.Set(ctx, store.ScopeGlobal, "", "", "G_KEY", "gv")
+	secretSt.Set(ctx, store.ScopeProject, "test-app", "production", "P_KEY", "pv")
+	secretSt.Set(ctx, store.ScopeProject, "other-app", "production", "O_KEY", "ov")
 
 	cmd := newListCmd()
 	stdout, _, err := captureCommand(cmd, []string{})
@@ -273,11 +300,6 @@ func TestListCmd_ProjectFilter(t *testing.T) {
 		t.Errorf("stdout should not contain O_KEY (different project): %s", stdout)
 	}
 }
-
-//
-// Inject command tests — disabled (inject command is removed).
-// See inject.go for the preserved source.
-//
 
 // ---------------------------------------------------------------------------
 // Doctor command tests
@@ -322,7 +344,7 @@ func TestDoctorCmd_NilConfig(t *testing.T) {
 
 func TestRotateCmd(t *testing.T) {
 	defer setupTest(t)()
-	secretSt.Set(context.Background(), store.ScopeGlobal, "", "ROTATE_KEY", "old-value")
+	secretSt.Set(context.Background(), store.ScopeGlobal, "", "", "ROTATE_KEY", "old-value")
 
 	cmd := newRotateCmd()
 	stdout, stderr, err := captureCommand(cmd, []string{"ROTATE_KEY"})
@@ -338,7 +360,7 @@ func TestRotateCmd(t *testing.T) {
 	}
 
 	// Verify value changed
-	val, err := secretSt.Get(context.Background(), store.ScopeGlobal, "", "ROTATE_KEY")
+	val, err := secretSt.Get(context.Background(), store.ScopeGlobal, "", "", "ROTATE_KEY")
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}

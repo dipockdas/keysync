@@ -1,6 +1,7 @@
 package platforms
 
 import (
+	"context"
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
@@ -93,7 +94,7 @@ func TestRailwayUpsert_GraphQLError(t *testing.T) {
 func TestRailwayNewClient_MissingToken(t *testing.T) {
 	t.Setenv("RAILWAY_TOKEN", "")
 
-	_, err := NewRailwayClient("production", "svc_abc")
+	_, err := NewRailwayClient(context.Background(), "production", "svc_abc", nil)
 	if err == nil {
 		t.Fatal("expected error for missing RAILWAY_TOKEN, got nil")
 	}

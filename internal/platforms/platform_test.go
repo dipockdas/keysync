@@ -1,20 +1,23 @@
 package platforms
 
 import (
+	"context"
 	"testing"
+
+	"github.com/dipockdas/keysync/internal/store"
 )
 
 func TestRegisterAndGet(t *testing.T) {
 	// Save and restore registry
 	saved := registry
-	registry = map[string]func(configJSON string) (Platform, error){}
+	registry = map[string]func(ctx context.Context, configJSON string, secretSt store.Store) (Platform, error){}
 	defer func() { registry = saved }()
 
-	Register("test", func(configJSON string) (Platform, error) {
+	Register("test", func(ctx context.Context, configJSON string, secretSt store.Store) (Platform, error) {
 		return &testPlatform{name: configJSON}, nil
 	})
 
-	p, err := Get("test", "my-config")
+	p, err := Get(context.Background(), "test", "my-config", nil)
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -24,7 +27,7 @@ func TestRegisterAndGet(t *testing.T) {
 }
 
 func TestGet_Unknown(t *testing.T) {
-	_, err := Get("nonexistent", "")
+	_, err := Get(context.Background(), "nonexistent", "", nil)
 	if err == nil {
 		t.Fatal("expected error for unknown platform, got nil")
 	}
@@ -33,11 +36,11 @@ func TestGet_Unknown(t *testing.T) {
 func TestList(t *testing.T) {
 	// Save and restore registry
 	saved := registry
-	registry = map[string]func(configJSON string) (Platform, error){}
+	registry = map[string]func(ctx context.Context, configJSON string, secretSt store.Store) (Platform, error){}
 	defer func() { registry = saved }()
 
-	Register("a", func(string) (Platform, error) { return &testPlatform{}, nil })
-	Register("b", func(string) (Platform, error) { return &testPlatform{}, nil })
+	Register("a", func(context.Context, string, store.Store) (Platform, error) { return &testPlatform{}, nil })
+	Register("b", func(context.Context, string, store.Store) (Platform, error) { return &testPlatform{}, nil })
 
 	names := List()
 	if len(names) != 2 {

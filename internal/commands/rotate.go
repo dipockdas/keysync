@@ -12,7 +12,7 @@ import (
 
 func newRotateCmd() *cobra.Command {
 	return &cobra.Command{
-		Use:   "rotate KEY [--project name]",
+		Use:   "rotate KEY [--project name] [--env name]",
 		Short: "Generate a new random value for a secret and update everywhere",
 		Long: `Generates a cryptographically random value and updates the secret in
 the local OS secret store, GitHub Secrets, and all deployment platforms.
@@ -29,8 +29,10 @@ Usage:
 
 			scope := store.ScopeGlobal
 			proj := project
+			env := ""
 			if project != "" {
 				scope = store.ScopeProject
+				env = envFlag
 			} else {
 				proj = ""
 			}
@@ -43,7 +45,7 @@ Usage:
 			fmt.Printf("Generated new value for %s\n", key)
 
 			// Update local store
-			if err := secretSt.Set(ctx, scope, proj, key, newValue); err != nil {
+			if err := secretSt.Set(ctx, scope, proj, env, key, newValue); err != nil {
 				return fmt.Errorf("set local secret: %w", err)
 			}
 			fmt.Printf("  ✓ local store (%s)\n", scopeLabel(scope, proj))

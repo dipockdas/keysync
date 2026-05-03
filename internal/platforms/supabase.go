@@ -2,11 +2,13 @@ package platforms
 
 import (
 	"bytes"
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
 	"net/http"
-	"os"
+
+	"github.com/dipockdas/keysync/internal/store"
 )
 
 func init() {
@@ -26,19 +28,20 @@ type supabaseConfig struct {
 	Ref string `json:"ref"`
 }
 
-func newSupabaseFromConfig(configJSON string) (Platform, error) {
+func newSupabaseFromConfig(ctx context.Context, configJSON string, secretSt store.Store) (Platform, error) {
 	var cfg supabaseConfig
 	if err := json.Unmarshal([]byte(configJSON), &cfg); err != nil {
 		return nil, fmt.Errorf("parse supabase config: %w", err)
 	}
-	return NewSupabaseClient(cfg.Ref)
+	return NewSupabaseClient(ctx, cfg.Ref, secretSt)
 }
 
-// NewSupabaseClient creates a Supabase client. Requires SUPABASE_TOKEN env var.
-func NewSupabaseClient(ref string) (*SupabaseClient, error) {
-	token := os.Getenv("SUPABASE_TOKEN")
+// NewSupabaseClient creates a Supabase client. The token is read from the secret store
+// (global scope, key "SUPABASE_TOKEN"), falling back to the SUPABASE_TOKEN env var.
+func NewSupabaseClient(ctx context.Context, ref string, secretSt store.Store) (*SupabaseClient, error) {
+	token := lookupToken(ctx, secretSt, "supabase")
 	if token == "" {
-		return nil, fmt.Errorf("SUPABASE_TOKEN not set")
+		return nil, fmt.Errorf("SUPABASE_TOKEN not set (store it with: keysync set SUPABASE_TOKEN=...)")
 	}
 	return &SupabaseClient{
 		token:   token,

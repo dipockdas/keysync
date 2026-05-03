@@ -136,7 +136,7 @@ func newMigrateCmd() *cobra.Command {
 		Long: `Import secrets into keysync from a local .env file or directly from
 a cloud platform (Vercel, Railway, or Supabase).
 
-For each key, you choose the scope (global or project) and confirm storage.
+For each key, you choose the scope (global, project, or project+env) and confirm storage.
 Use --dry-run to preview without side effects.
 
 After migration, keysync prints step-by-step instructions for the coding assistant
@@ -218,6 +218,7 @@ Usage:
 
 				scope := store.ScopeGlobal
 				proj := ""
+				env := ""
 				if strings.EqualFold(scopeChoice, "p") || strings.EqualFold(scopeChoice, "project") {
 					scope = store.ScopeProject
 					proj = project
@@ -229,10 +230,12 @@ Usage:
 							continue
 						}
 					}
+					// Use default env (production) for project-scoped migration
+					env = envFlag
 				}
 
 				if migrateDryRun {
-					fmt.Printf("    [DRY RUN] Would store as %s/%s\n", scopeLabel(scope, proj), kv.key)
+					fmt.Printf("    [DRY RUN] Would store as %s/%s%s\n", scopeLabel(scope, proj), kv.key, envLabel(env))
 				} else {
 					// Store prompt
 					fmt.Printf("    Store in %s? [Y/n]: ", storeLabel())
@@ -247,12 +250,12 @@ Usage:
 					}
 
 					// Store the secret
-					if err := secretSt.Set(cobraCmd.Context(), scope, proj, kv.key, kv.value); err != nil {
+					if err := secretSt.Set(cobraCmd.Context(), scope, proj, env, kv.key, kv.value); err != nil {
 						fmt.Fprintf(os.Stderr, "    Error: %v\n", err)
 						continue
 					}
 
-					fmt.Printf("    Stored as %s/%s\n", scopeLabel(scope, proj), kv.key)
+					fmt.Printf("    Stored as %s/%s%s\n", scopeLabel(scope, proj), kv.key, envLabel(env))
 				}
 
 				migratedKeys = append(migratedKeys, migratedKey{
@@ -303,6 +306,14 @@ Usage:
 	cmd.Flags().StringVar(&migrateCloud, "cloud", "", "pull from cloud platform: vercel, railway, or supabase")
 	cmd.Flags().BoolVar(&migrateDryRun, "dry-run", false, "preview migration without storing secrets")
 	return cmd
+}
+
+// envLabel returns a human-readable environment suffix.
+func envLabel(env string) string {
+	if env != "" {
+		return fmt.Sprintf(" (env: %s)", env)
+	}
+	return ""
 }
 
 // parsedKey holds a single parsed key=value from the env file.
@@ -461,7 +472,6 @@ func printMigrationInstructions(keys []migratedKey) {
 	fmt.Println("```")
 	fmt.Println("import \"github.com/dipockdas/keysync/client\"")
 	fmt.Println()
-	fmt.Println("// REPLACE os.Getenv(\"KEY\") with:")
 	fmt.Printf("val, err := client.GetSecret(%q, \"KEY\")\n", proj)
 	fmt.Println("```")
 

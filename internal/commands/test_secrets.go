@@ -14,7 +14,7 @@ func newTestSecretsCmd() *cobra.Command {
 	var testCount int
 
 	cmd := &cobra.Command{
-		Use:   "test-secrets [--project name] [--count N]",
+		Use:   "test-secrets --project name [--count N] [--env name]",
 		Short: "Generate ephemeral test secrets for CI/local test runs",
 		Long: `Generates temporary, prefixed secrets for use in CI test runs or local
 development testing. These are stored in the local OS secret store with a
@@ -40,14 +40,14 @@ Usage:
 					return fmt.Errorf("generate value: %w", err)
 				}
 
-				if err := secretSt.Set(ctx, scope, project, key, value); err != nil {
+				if err := secretSt.Set(ctx, scope, project, envFlag, key, value); err != nil {
 					return fmt.Errorf("set %s: %w", key, err)
 				}
 				names = append(names, key)
 			}
 
 			sort.Strings(names)
-			fmt.Printf("Created %d test secrets for project %q:\n", testCount, project)
+			fmt.Printf("Created %d test secrets for project %q (env: %s):\n", testCount, project, envFlag)
 			for _, name := range names {
 				fmt.Printf("  %s\n", name)
 			}

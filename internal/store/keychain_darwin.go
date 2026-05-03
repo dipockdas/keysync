@@ -53,10 +53,10 @@ func loadKeyIndex() (*keyIndex, error) {
 func (ki *keyIndex) add(entry SecretEntry) error {
 	ki.mu.Lock()
 	defer ki.mu.Unlock()
-	// Deduplicate: remove existing entry with same scope/project/key
+	// Deduplicate: remove existing entry with same scope/project/environment/key
 	filtered := make([]SecretEntry, 0, len(ki.keys))
 	for _, e := range ki.keys {
-		if e.Scope == entry.Scope && e.Project == entry.Project && e.Key == entry.Key {
+		if e.Scope == entry.Scope && e.Project == entry.Project && e.Environment == entry.Environment && e.Key == entry.Key {
 			continue
 		}
 		filtered = append(filtered, e)
@@ -66,12 +66,12 @@ func (ki *keyIndex) add(entry SecretEntry) error {
 	return ki.save()
 }
 
-func (ki *keyIndex) remove(scope Scope, project, key string) error {
+func (ki *keyIndex) remove(scope Scope, project, environment, key string) error {
 	ki.mu.Lock()
 	defer ki.mu.Unlock()
 	filtered := make([]SecretEntry, 0, len(ki.keys))
 	for _, e := range ki.keys {
-		if e.Scope == scope && e.Project == project && e.Key == key {
+		if e.Scope == scope && e.Project == project && e.Environment == environment && e.Key == key {
 			continue
 		}
 		filtered = append(filtered, e)
@@ -80,13 +80,14 @@ func (ki *keyIndex) remove(scope Scope, project, key string) error {
 	return ki.save()
 }
 
-func (ki *keyIndex) list(scope Scope, project string) []SecretEntry {
+func (ki *keyIndex) list(scope Scope, project, environment string) []SecretEntry {
 	ki.mu.RLock()
 	defer ki.mu.RUnlock()
 	var result []SecretEntry
 	for _, e := range ki.keys {
 		if (scope == "" || e.Scope == scope) &&
-			(project == "" || e.Project == project) {
+			(project == "" || e.Project == project) &&
+			(environment == "" || e.Environment == environment) {
 			result = append(result, e)
 		}
 	}
@@ -122,7 +123,7 @@ func (k *KeychainStore) rebuildIndex() {
 	if k.index == nil {
 		return
 	}
-	existing := k.index.list("", "")
+	existing := k.index.list("", "", "")
 	if len(existing) > 0 {
 		return // index already populated
 	}
@@ -143,10 +144,10 @@ func (k *KeychainStore) rebuildIndex() {
 		if !strings.HasPrefix(svc, "keysync/") {
 			continue
 		}
-		scope, project := parseServiceName(svc)
+		scope, project, env := parseServiceName(svc)
 		acct := findAttrValue(rec, "acct")
 		if acct != "" {
-			_ = k.index.add(SecretEntry{Scope: scope, Project: project, Key: acct})
+			_ = k.index.add(SecretEntry{Scope: scope, Project: project, Environment: env, Key: acct})
 		}
 	}
 }
@@ -176,8 +177,8 @@ func findAttrValue(record, attrName string) string {
 	return strings.Trim(val, `"`)
 }
 
-func (k *KeychainStore) Get(_ context.Context, scope Scope, project, key string) (string, error) {
-	svc := serviceName(scope, project)
+func (k *KeychainStore) Get(_ context.Context, scope Scope, project, environment, key string) (string, error) {
+	svc := serviceName(scope, project, environment)
 	cmd := exec.Command("security", "find-generic-password",
 		"-s", svc,
 		"-a", accountName(key),
@@ -193,8 +194,8 @@ func (k *KeychainStore) Get(_ context.Context, scope Scope, project, key string)
 	return strings.TrimSpace(string(out)), nil
 }
 
-func (k *KeychainStore) Set(_ context.Context, scope Scope, project, key, value string) error {
-	svc := serviceName(scope, project)
+func (k *KeychainStore) Set(_ context.Context, scope Scope, project, environment, key, value string) error {
+	svc := serviceName(scope, project, environment)
 
 	// Delete existing first to avoid duplicates
 	_ = exec.Command("security", "delete-generic-password",
@@ -214,13 +215,13 @@ func (k *KeychainStore) Set(_ context.Context, scope Scope, project, key, value 
 
 	// Update index
 	if k.index != nil {
-		_ = k.index.add(SecretEntry{Scope: scope, Project: project, Key: key})
+		_ = k.index.add(SecretEntry{Scope: scope, Project: project, Environment: environment, Key: key})
 	}
 	return nil
 }
 
-func (k *KeychainStore) Delete(_ context.Context, scope Scope, project, key string) error {
-	svc := serviceName(scope, project)
+func (k *KeychainStore) Delete(_ context.Context, scope Scope, project, environment, key string) error {
+	svc := serviceName(scope, project, environment)
 	cmd := exec.Command("security", "delete-generic-password",
 		"-s", svc,
 		"-a", accountName(key),
@@ -234,16 +235,16 @@ func (k *KeychainStore) Delete(_ context.Context, scope Scope, project, key stri
 
 	// Update index
 	if k.index != nil {
-		_ = k.index.remove(scope, project, key)
+		_ = k.index.remove(scope, project, environment, key)
 	}
 	return nil
 }
 
-func (k *KeychainStore) List(ctx context.Context, scope Scope, project string) ([]SecretEntry, error) {
+func (k *KeychainStore) List(ctx context.Context, scope Scope, project, environment string) ([]SecretEntry, error) {
 	if k.index == nil {
 		return nil, nil
 	}
-	return k.index.list(scope, project), nil
+	return k.index.list(scope, project, environment), nil
 }
 
 // isNotFound checks if the error is a "not found" from the security CLI.

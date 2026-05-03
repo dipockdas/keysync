@@ -17,11 +17,11 @@ func TestFallbackStore_SetAndGet(t *testing.T) {
 		t.Fatalf("newFallbackStore failed: %v", err)
 	}
 
-	if err := s.Set(ctx, ScopeGlobal, "", "TEST_KEY", "test-val"); err != nil {
+	if err := s.Set(ctx, ScopeGlobal, "", "", "TEST_KEY", "test-val"); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
 
-	val, err := s.Get(ctx, ScopeGlobal, "", "TEST_KEY")
+	val, err := s.Get(ctx, ScopeGlobal, "", "", "TEST_KEY")
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -40,7 +40,7 @@ func TestFallbackStore_Persistence(t *testing.T) {
 	if err != nil {
 		t.Fatalf("newFallbackStore failed: %v", err)
 	}
-	if err := s1.Set(ctx, ScopeGlobal, "", "PERSIST_KEY", "persist-val"); err != nil {
+	if err := s1.Set(ctx, ScopeGlobal, "", "", "PERSIST_KEY", "persist-val"); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
 
@@ -55,7 +55,7 @@ func TestFallbackStore_Persistence(t *testing.T) {
 		t.Fatalf("newFallbackStore failed: %v", err)
 	}
 
-	val, err := s2.Get(ctx, ScopeGlobal, "", "PERSIST_KEY")
+	val, err := s2.Get(ctx, ScopeGlobal, "", "", "PERSIST_KEY")
 	if err != nil {
 		t.Fatalf("Get from reopened store failed: %v", err)
 	}
@@ -74,7 +74,7 @@ func TestFallbackStore_DeleteNotFound(t *testing.T) {
 		t.Fatalf("newFallbackStore failed: %v", err)
 	}
 
-	err = s.Delete(ctx, ScopeGlobal, "", "NONEXISTENT")
+	err = s.Delete(ctx, ScopeGlobal, "", "", "NONEXISTENT")
 	if err != ErrNotFound {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
@@ -90,7 +90,7 @@ func TestFallbackStore_GetNotFound(t *testing.T) {
 		t.Fatalf("newFallbackStore failed: %v", err)
 	}
 
-	_, err = s.Get(ctx, ScopeGlobal, "", "NONEXISTENT")
+	_, err = s.Get(ctx, ScopeGlobal, "", "", "NONEXISTENT")
 	if err != ErrNotFound {
 		t.Errorf("expected ErrNotFound, got %v", err)
 	}
@@ -106,10 +106,10 @@ func TestFallbackStore_List(t *testing.T) {
 		t.Fatalf("newFallbackStore failed: %v", err)
 	}
 
-	s.Set(ctx, ScopeGlobal, "", "G_KEY", "gv")
-	s.Set(ctx, ScopeProject, "app", "P_KEY", "pv")
+	s.Set(ctx, ScopeGlobal, "", "", "G_KEY", "gv")
+	s.Set(ctx, ScopeProject, "app", "", "P_KEY", "pv")
 
-	entries, err := s.List(ctx, "", "")
+	entries, err := s.List(ctx, "", "", "")
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -118,7 +118,7 @@ func TestFallbackStore_List(t *testing.T) {
 	}
 
 	// Filter by project
-	entries, err = s.List(ctx, ScopeProject, "app")
+	entries, err = s.List(ctx, ScopeProject, "app", "")
 	if err != nil {
 		t.Fatalf("List failed: %v", err)
 	}
@@ -140,18 +140,18 @@ func TestFallbackStore_Concurrency(t *testing.T) {
 	// Concurrent writes
 	done := make(chan struct{})
 	go func() {
-		s.Set(ctx, ScopeGlobal, "", "CONCUR_A", "a")
+		s.Set(ctx, ScopeGlobal, "", "", "CONCUR_A", "a")
 		close(done)
 	}()
 	go func() {
-		s.Set(ctx, ScopeGlobal, "", "CONCUR_B", "b")
+		s.Set(ctx, ScopeGlobal, "", "", "CONCUR_B", "b")
 	}()
 	go func() {
-		s.Get(ctx, ScopeGlobal, "", "CONCUR_A")
+		s.Get(ctx, ScopeGlobal, "", "", "CONCUR_A")
 	}()
 	<-done
 
-	val, err := s.Get(ctx, ScopeGlobal, "", "CONCUR_A")
+	val, err := s.Get(ctx, ScopeGlobal, "", "", "CONCUR_A")
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -170,8 +170,8 @@ func TestFallbackStore_Delete(t *testing.T) {
 		t.Fatalf("newFallbackStore failed: %v", err)
 	}
 
-	s.Set(ctx, ScopeGlobal, "", "DEL_ME", "val")
-	if err := s.Delete(ctx, ScopeGlobal, "", "DEL_ME"); err != nil {
+	s.Set(ctx, ScopeGlobal, "", "", "DEL_ME", "val")
+	if err := s.Delete(ctx, ScopeGlobal, "", "", "DEL_ME"); err != nil {
 		t.Fatalf("Delete failed: %v", err)
 	}
 
@@ -180,7 +180,7 @@ func TestFallbackStore_Delete(t *testing.T) {
 		t.Fatal("store file should still exist after delete")
 	}
 
-	_, err = s.Get(ctx, ScopeGlobal, "", "DEL_ME")
+	_, err = s.Get(ctx, ScopeGlobal, "", "", "DEL_ME")
 	if err != ErrNotFound {
 		t.Errorf("expected ErrNotFound after delete, got %v", err)
 	}
