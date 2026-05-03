@@ -54,16 +54,36 @@ Highest:  Environment-scoped (project + environment match)
 Lowest:   Global (no project, no environment)
 ```
 
-- **Global** secrets are available to all projects on this machine
-- **Project** secrets override globals with the same key for a specific project
-- **Environment** secrets override project secrets for a specific environment (e.g. `production`, `staging`)
+**Global** — a secret available to all projects on this machine.
+
+| Example | Use case |
+|---------|----------|
+| `keysync set MY_API_KEY=abc123` | A single API key shared across every project. Centralised config where all projects use the same credential — no need to repeat it per project. |
+
+**Project** — a secret scoped to a specific project, overriding any global secret with the same key.
+
+| Example | Use case |
+|---------|----------|
+| `keysync set -p my-api MY_API_KEY=def456` | Each project has its own API key. Isolation between projects while keeping environments consistent within a project. |
+
+**Environment** — a secret scoped to a specific project *and* environment (e.g. `production`, `staging`, `development`).
+
+| Example | Use case |
+|---------|----------|
+| `keysync set -p my-api DB_URL=postgres://prod-host/db --env production` | Different database URLs for production vs staging vs development. Environment-specific credentials for security and separation of concerns. |
+| `keysync set -p my-api DB_URL=postgres://staging-host/db --env staging` | |
+| `keysync set -p my-api DB_URL=postgres://dev-host/db --env development` | |
 
 ### Sync pipeline
 
 When you run `keysync sync`, secrets are collected at all three scope levels (with higher precedence overriding lower) and pushed to:
 
 1. **GitHub Secrets** — via the `gh` CLI
-2. **Deployment platforms** — via their REST/GraphQL APIs (Vercel, Railway, Supabase)
+2. **Deployment platforms** — via their REST/GraphQL APIs
+
+**Built-in platforms**: Vercel, Railway, and Supabase are supported out of the box — add their project IDs to `.keysync.json` and store the API tokens as global secrets.
+
+**Custom platforms**: The `Platform` interface (`internal/platforms/platform.go`) is extensible — just implement `Name()` and `Upsert(key, value)` and register via `platforms.Register()`. If you use an AI coding assistant, it can help you write the integration: open `internal/platforms/` and ask it to implement a new platform following the existing patterns.
 
 ---
 
@@ -274,7 +294,7 @@ Environment variable fallbacks (for CI/CD):
            │
      ┌─────┴─────┐
      │   Store   │──OS Keychain (macOS Keychain / Linux libsecret / Windows Credential Manager)
-     └─────┬─────┘            └── Fallback: encrypted file (~/.config/keysync/store.json)
+     └─────┬─────┘            └── Fallback: NaCl-encrypted file (~/.config/keysync/store.json)
            │
      ┌─────┴──────────┐
      │  GitHub Sync    │── gh secret set (source of truth)
