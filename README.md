@@ -155,8 +155,10 @@ Edit `.keysync.json` to tell keysync which platforms your project deploys to:
 
 ```json
 {
-  "projects": {
-    "my-app": {
+  "repos": {
+    "myorg/my-app": {
+      "project": "my-app",
+      "globals": ["STRIPE_KEY"],
       "platforms": {
         "vercel": { "projectId": "prj_xxxxx", "target": ["production", "preview"] },
         "railway": { "environment": "production", "service": "abc123" },
@@ -221,20 +223,22 @@ source <(keysync export --project my-app)
 | `--config` | Path to `.keysync.json` (auto-searches parent directories) |
 | `-p, --project` | Project name (from `.keysync.json`) |
 | `-e, --env` | Environment name (default `production`). Used for environment-scoped secrets |
-| `--repo` | GitHub repository (`owner/repo`), auto-detected if not set |
+| `--repo` | GitHub repository (`owner/repo`), used with `sync` as an alternative to `--project` |
 
 ---
 
 ## Configuration
 
-The `.keysync.json` file maps projects to their deployment platforms. It is searched for in the current directory and all parent directories. If none is found, a default (empty) config is used.
+The `.keysync.json` file maps GitHub repos to their project names, allowed global secrets, and deployment platforms. It is searched for in the current directory and all parent directories. If none is found, a default (empty) config is used.
 
 ### Full schema
 
 ```json
 {
-  "projects": {
-    "my-app": {
+  "repos": {
+    "myorg/my-app": {
+      "project": "my-app",
+      "globals": ["STRIPE_KEY"],
       "platforms": {
         "vercel": {
           "projectId": "prj_xxxxx",
@@ -252,6 +256,14 @@ The `.keysync.json` file maps projects to their deployment platforms. It is sear
   }
 }
 ```
+
+### Repo fields
+
+| Field | Required | Description |
+|-------|----------|-------------|
+| `project` | Yes | Project name used for scoping secrets in the keychain |
+| `globals` | No | List of global keys to include when syncing this repo |
+| `platforms` | No | Deployment platform configurations |
 
 ### Platform fields
 

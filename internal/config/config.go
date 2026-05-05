@@ -9,11 +9,13 @@ import (
 
 // Config represents the .keysync.json configuration file.
 type Config struct {
-	Projects map[string]ProjectConfig `json:"projects"`
+	Repos map[string]RepoConfig `json:"repos"`
 }
 
-// ProjectConfig maps a project to its deployment platform targets.
-type ProjectConfig struct {
+// RepoConfig maps a GitHub repo to its project name, global keys, and platforms.
+type RepoConfig struct {
+	Project   string         `json:"project"`
+	Globals   []string       `json:"globals,omitempty"`
 	Platforms PlatformConfig `json:"platforms"`
 }
 
@@ -44,7 +46,7 @@ type SupabaseConfig struct {
 // DefaultConfig returns a minimal default configuration scaffold.
 func DefaultConfig() *Config {
 	return &Config{
-		Projects: make(map[string]ProjectConfig),
+		Repos: make(map[string]RepoConfig),
 	}
 }
 
@@ -76,6 +78,17 @@ func SaveConfig(cfg *Config, path string) error {
 		return fmt.Errorf("marshal config: %w", err)
 	}
 	return os.WriteFile(path, raw, 0644)
+}
+
+// FindRepoByProject finds the repo key that contains the given project name.
+// Returns the repo key, the config, and whether it was found.
+func FindRepoByProject(cfg *Config, project string) (string, *RepoConfig, bool) {
+	for repoKey, rc := range cfg.Repos {
+		if rc.Project == project {
+			return repoKey, &rc, true
+		}
+	}
+	return "", nil, false
 }
 
 // findConfig searches for .keysync.json in dir and parent directories.

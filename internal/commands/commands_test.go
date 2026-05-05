@@ -26,8 +26,10 @@ func setupTest(t *testing.T) func() {
 
 	secretSt = store.NewMemoryStore()
 	cfg = &config.Config{
-		Projects: map[string]config.ProjectConfig{
-			"test-app": {},
+		Repos: map[string]config.RepoConfig{
+			"test/repo": {
+				Project: "test-app",
+			},
 		},
 	}
 	project = ""
@@ -181,9 +183,8 @@ func TestSetCmd_Global(t *testing.T) {
 	if !strings.Contains(stdout, "Set global/MY_KEY") {
 		t.Errorf("stdout = %q, want 'Set global/MY_KEY'", stdout)
 	}
-	// GitHub call will fail — expect warning on stderr
-	if !strings.Contains(stderr, "warning: failed to write to GitHub") {
-		t.Errorf("expected GitHub warning on stderr, got: %s", stderr)
+	if stderr != "" {
+		t.Errorf("expected empty stderr, got: %s", stderr)
 	}
 
 	// Verify value in store

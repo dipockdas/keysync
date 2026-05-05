@@ -6,6 +6,7 @@ require (
 	github.com/danieljoos/wincred v1.2.3
 	github.com/spf13/cobra v1.8.1
 	golang.org/x/crypto v0.50.0
+	golang.org/x/term v0.42.0
 )
 
 require (

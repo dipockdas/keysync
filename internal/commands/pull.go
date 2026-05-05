@@ -13,17 +13,23 @@ func newPullCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "pull [--project name] [--env name]",
 		Short: "Reconcile local secrets with GitHub Secret names",
-		Long: `Lists all secrets in GitHub and checks whether they exist in the local
+		Long: F(`Lists all secrets in GitHub and checks whether they exist in the local
 OS secret store. Secrets that exist on GitHub but are missing locally are reported.
 
 Note: GitHub's API does not expose secret values. This command reconciles
-secret names only. To populate missing secrets, use 'keysync set KEY=value'.
+secret names only. To populate missing secrets, use {c}keysync set KEY=value{/c}.
 
-If --project is provided, only secrets for that project scope are checked.
+If {c}--project{/c} is provided, the check includes project and environment scopes.
+If {c}--env{/c} is also provided, environment-scoped secrets are checked too.
 
-Usage:
-  keysync pull
-  keysync pull --project my-app`,
+{b}Examples:{/b}
+  {c}keysync pull{/c}
+  {c}keysync pull --project my-app{/c}
+  {c}keysync pull --project my-app --env staging{/c}
+
+{b}See also:{/b}
+  {c}keysync set --help{/c}
+  {c}keysync sync --help{/c}`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 

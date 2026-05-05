@@ -14,19 +14,23 @@ func newListCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "list [--project name] [--env name]",
 		Short: "List all managed secrets",
-		Long: `Lists all secrets in the local OS secret store.
+		Long: F(`Lists all secrets in the local OS secret store.
 
-If --project is provided, only secrets for that project are shown.
-If --env is also provided, only secrets for that environment are shown.
-Global secrets are always included.
+If {c}--project{/c} is provided, only secrets for that project are shown (alongside
+global secrets). If {c}--env{/c} is also provided, only secrets for that environment are shown.
+Global secrets are included in all listings.
 
-Use --unmask to also display secret values (for verification purposes).
+Use {c}--unmask{/c} to also display secret values (for verification purposes).
 
-Usage:
-  keysync list
-  keysync list --project my-app
-  keysync list --project my-app --env production
-  keysync list --unmask`,
+{b}Examples:{/b}
+  {c}keysync list{/c}                                    # all secrets
+  {c}keysync list --project my-app{/c}                   # project + global
+  {c}keysync list --project my-app --env production{/c}  # env + project + global
+  {c}keysync list --unmask{/c}                           # show values
+
+{b}See also:{/b}
+  {c}keysync get --help{/c}
+  Tutorial: {u}https://github.com/dipockdas/keysync#quick-start{/u}`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 

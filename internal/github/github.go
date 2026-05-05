@@ -25,7 +25,7 @@ func NewClient(repo string) (*Client, error) {
 		var err error
 		repo, err = detectRepo()
 		if err != nil {
-			return nil, fmt.Errorf("detect repo: %w", err)
+			return nil, err
 		}
 	}
 	return &Client{repo: repo}, nil
@@ -35,21 +35,21 @@ func NewClient(repo string) (*Client, error) {
 func detectRepo() (string, error) {
 	// First check we're in a git repo
 	if err := exec.Command("git", "rev-parse", "--git-dir").Run(); err != nil {
-		return "", fmt.Errorf("not in a git repository (and no --repo flag provided)")
+		return "", fmt.Errorf("could not detect repo: not inside a git repository. Run from your project directory or use --repo owner/name")
 	}
 	cmd := exec.Command("gh", "repo", "view", "--json", "nameWithOwner")
 	out, err := cmd.Output()
 	if err != nil {
-		return "", fmt.Errorf("gh repo view: %w (is gh installed and authenticated?)", err)
+		return "", fmt.Errorf("could not detect repo: 'gh repo view' failed — is gh installed and authenticated? Use --repo owner/name to set it explicitly")
 	}
 	var result struct {
 		NameWithOwner string `json:"nameWithOwner"`
 	}
 	if err := json.Unmarshal(out, &result); err != nil {
-		return "", fmt.Errorf("parse gh output: %w", err)
+		return "", fmt.Errorf("could not detect repo: failed to parse 'gh repo view' output: %w", err)
 	}
 	if result.NameWithOwner == "" {
-		return "", fmt.Errorf("could not determine GitHub repo")
+		return "", fmt.Errorf("could not detect repo: 'gh repo view' returned empty. Use --repo owner/name to set it explicitly")
 	}
 	return result.NameWithOwner, nil
 }

@@ -11,13 +11,22 @@ func newDoctorCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "doctor",
 		Short: "Verify configuration, store, and platform connectivity",
-		Long: `Runs diagnostics to verify:
-  - .keysync.json is valid
-  - OS secret store is operational
-  - Platform API tokens are configured
+		Long: F(`Runs diagnostics to verify your keysync setup.
 
-Usage:
-  keysync doctor`,
+{b}Checks:{/b}
+  - {c}.keysync.json{/c} is valid and parseable
+  - OS secret store is operational (write/read cycle)
+  - Project configurations are present
+  - Platform API tokens are configured (global scope)
+
+Run this first if you encounter errors with other commands.
+
+{b}Examples:{/b}
+  {c}keysync doctor{/c}
+  {c}keysync doctor --config /path/to/.keysync.json{/c}
+
+{b}See also:{/b}
+  Tutorial: {u}https://github.com/dipockdas/keysync#quick-start{/u}`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			fmt.Println("Running diagnostics...")
 
@@ -26,11 +35,14 @@ Usage:
 				fmt.Println("  ✗ Config: not loaded")
 			} else {
 				fmt.Printf("  ✓ Config: %s\n", configPath)
-				if len(cfg.Projects) == 0 {
-					fmt.Println("    (no projects configured)")
+				if len(cfg.Repos) == 0 {
+					fmt.Println("    (no repos configured)")
 				} else {
-					for name := range cfg.Projects {
-						fmt.Printf("    - project: %s\n", name)
+					for repo, rc := range cfg.Repos {
+						fmt.Printf("    - repo: %s → project: %s\n", repo, rc.Project)
+						if len(rc.Globals) > 0 {
+							fmt.Printf("      globals: %v\n", rc.Globals)
+						}
 					}
 				}
 			}

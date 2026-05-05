@@ -16,22 +16,27 @@ func newGetCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "get KEY [--project name] [--env name]",
 		Short: "Retrieve a secret from the local OS secret store",
-		Long: `Reads a secret from the local OS secret store and copies it to the clipboard.
+		Long: F(`Reads a secret from the local OS secret store and copies it to the clipboard.
 
 By default the value is copied to your clipboard and the key name is displayed.
-Use --unmask (-u) to print the value to stdout instead (for scripting or piping).
+Use {c}--unmask{/c} ({c}-u{/c}) to print the value to stdout instead (for scripting or piping).
 
-Resolution order:
-  1. Project + environment-scoped secret (if --project and --env are provided)
-  2. Project-scoped secret (fallback, no environment)
+{b}Resolution order{/b} (when {c}--project{/c} is provided):
+  1. Project + environment-scoped secret (if {c}--env{/c} is also provided)
+  2. Project-scoped secret (fallback, no specific environment)
   3. Global secret (fallback)
 
-Usage:
-  keysync get DATABASE_URL
-  keysync get STRIPE_KEY --project my-app
-  keysync get DATABASE_URL --project my-app --env staging
-  keysync get DATABASE_URL -u
-  keysync get DATABASE_URL --unmask`,
+Without {c}--project{/c}, only the global scope is checked.
+
+{b}Examples:{/b}
+  {c}keysync get DATABASE_URL{/c}                                    {g}# global only{/g}
+  {c}keysync get STRIPE_KEY --project my-app{/c}                     {g}# project → global{/g}
+  {c}keysync get DATABASE_URL --project my-app --env staging{/c}     {g}# env → project → global{/g}
+  {c}keysync get DATABASE_URL -u{/c}                                 {g}# print to stdout{/g}
+  {c}keysync get DATABASE_URL --unmask{/c}                           {g}# print to stdout{/g}
+
+{b}See also:{/b}
+  Tutorial: {u}https://github.com/dipockdas/keysync#quick-start{/u}`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]

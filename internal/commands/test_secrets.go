@@ -16,13 +16,21 @@ func newTestSecretsCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "test-secrets --project name [--count N] [--env name]",
 		Short: "Generate ephemeral test secrets for CI/local test runs",
-		Long: `Generates temporary, prefixed secrets for use in CI test runs or local
+		Long: F(`Generates temporary, prefixed secrets for use in CI test runs or local
 development testing. These are stored in the local OS secret store with a
-"TEST_" prefix.
+{b}TEST_{/b} prefix and hex-encoded random values.
 
-Usage:
-  keysync test-secrets --project my-app
-  keysync test-secrets --project my-app --count 5`,
+{c}--project{/c} is required. Use {c}--count{/c} to control how many test secrets to create
+(default: 3). Secrets are scoped to the project (and {c}--env{/c} if provided).
+
+{b}Examples:{/b}
+  {c}keysync test-secrets --project my-app{/c}
+  {c}keysync test-secrets --project my-app --count 5{/c}
+  {c}keysync test-secrets --project my-app --env staging{/c}
+
+{b}See also:{/b}
+  {c}keysync list --help{/c}
+  {c}keysync get --help{/c}`),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			ctx := cobraCmd.Context()
 

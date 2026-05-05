@@ -11,11 +11,11 @@ func TestDefaultConfig(t *testing.T) {
 	if cfg == nil {
 		t.Fatal("DefaultConfig returned nil")
 	}
-	if cfg.Projects == nil {
-		t.Fatal("DefaultConfig.Projects is nil")
+	if cfg.Repos == nil {
+		t.Fatal("DefaultConfig.Repos is nil")
 	}
-	if len(cfg.Projects) != 0 {
-		t.Errorf("DefaultConfig.Projects has %d entries, want 0", len(cfg.Projects))
+	if len(cfg.Repos) != 0 {
+		t.Errorf("DefaultConfig.Repos has %d entries, want 0", len(cfg.Repos))
 	}
 }
 
@@ -23,10 +23,12 @@ func TestLoadSaveConfig(t *testing.T) {
 	dir := t.TempDir()
 	path := filepath.Join(dir, ".keysync.json")
 
-	// Create a config with a project
+	// Create a config with a repo
 	cfg := &Config{
-		Projects: map[string]ProjectConfig{
-			"my-app": {
+		Repos: map[string]RepoConfig{
+			"myorg/my-app": {
+				Project: "my-app",
+				Globals: []string{"STRIPE_KEY"},
 				Platforms: PlatformConfig{
 					Vercel: &VercelConfig{
 						ProjectID: "vercel-proj-123",
@@ -63,15 +65,21 @@ func TestLoadSaveConfig(t *testing.T) {
 	}
 
 	// Verify contents
-	proj, ok := loaded.Projects["my-app"]
+	rc, ok := loaded.Repos["myorg/my-app"]
 	if !ok {
-		t.Fatal("loaded config missing project 'my-app'")
+		t.Fatal("loaded config missing repo 'myorg/my-app'")
 	}
-	if proj.Platforms.Vercel == nil || proj.Platforms.Vercel.ProjectID != "vercel-proj-123" {
-		t.Errorf("Vercel config mismatch: %+v", proj.Platforms.Vercel)
+	if rc.Project != "my-app" {
+		t.Errorf("project = %q, want %q", rc.Project, "my-app")
 	}
-	if proj.Platforms.Supabase == nil || proj.Platforms.Supabase.Ref != "supabase-ref-456" {
-		t.Errorf("Supabase config mismatch: %+v", proj.Platforms.Supabase)
+	if len(rc.Globals) != 1 || rc.Globals[0] != "STRIPE_KEY" {
+		t.Errorf("globals = %v, want [STRIPE_KEY]", rc.Globals)
+	}
+	if rc.Platforms.Vercel == nil || rc.Platforms.Vercel.ProjectID != "vercel-proj-123" {
+		t.Errorf("Vercel config mismatch: %+v", rc.Platforms.Vercel)
+	}
+	if rc.Platforms.Supabase == nil || rc.Platforms.Supabase.Ref != "supabase-ref-456" {
+		t.Errorf("Supabase config mismatch: %+v", rc.Platforms.Supabase)
 	}
 }
 
@@ -88,8 +96,8 @@ func TestLoadConfig_NotFound(t *testing.T) {
 	if cfg == nil {
 		t.Fatal("expected default config, got nil")
 	}
-	if len(cfg.Projects) != 0 {
-		t.Errorf("expected empty projects, got %d", len(cfg.Projects))
+	if len(cfg.Repos) != 0 {
+		t.Errorf("expected empty repos, got %d", len(cfg.Repos))
 	}
 }
 
@@ -164,5 +172,30 @@ func TestLoadConfig_EmptyFile(t *testing.T) {
 	_, _, err := LoadConfig(dir)
 	if err == nil {
 		t.Fatal("expected error for empty file, got nil")
+	}
+}
+
+func TestFindRepoByProject(t *testing.T) {
+	cfg := &Config{
+		Repos: map[string]RepoConfig{
+			"org/alpha": {Project: "alpha", Globals: []string{"GLOBAL_A"}},
+			"org/beta":  {Project: "beta", Globals: []string{"GLOBAL_B"}},
+		},
+	}
+
+	repo, rc, ok := FindRepoByProject(cfg, "beta")
+	if !ok {
+		t.Fatal("FindRepoByProject(beta) returned false")
+	}
+	if repo != "org/beta" {
+		t.Errorf("repo = %q, want %q", repo, "org/beta")
+	}
+	if rc.Globals[0] != "GLOBAL_B" {
+		t.Errorf("globals = %v, want [GLOBAL_B]", rc.Globals)
+	}
+
+	_, _, ok = FindRepoByProject(cfg, "nonexistent")
+	if ok {
+		t.Fatal("FindRepoByProject(nonexistent) returned true")
 	}
 }

@@ -33,10 +33,13 @@ func Execute() {
 func newRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "keysync",
-		Short: "Unified secret management for GitHub, local stores, and deployment platforms",
-		Long: `keysync manages secrets across GitHub Secrets (source of truth),
-local OS secret stores (macOS Keychain, Linux libsecret, Windows Credential Manager),
-and deployment platforms (Vercel, Railway, Supabase).`,
+		Short: "Local OS secret management, GitHub Secrets, and deployment platform sync",
+		Long: F(`keysync manages secrets in {g}local OS secret stores{/g} (macOS Keychain, Linux libsecret,
+Windows Credential Manager), {u}GitHub Secrets{/u} (source of truth), and {c}deployment platforms{/c}
+(Vercel, Railway, Supabase). Native client libraries ({c}Go{/c}, {c}Python{/c}, {c}TypeScript{/c}, {c}Swift{/c})
+let applications read secrets directly from the OS keychain at runtime.
+
+See {u}https://github.com/dipockdas/keysync{/u} for full documentation and tutorials.`),
 		PersistentPreRunE: func(cmd *cobra.Command, args []string) error {
 			// Skip commands that bootstrap the config or don't need it
 			if cmd.Name() == "init" || cmd.Name() == "migrate" || cmd.Name() == "help" {
@@ -63,6 +66,9 @@ and deployment platforms (Vercel, Railway, Supabase).`,
 	cmd.AddCommand(newTestSecretsCmd())
 	cmd.AddCommand(newMigrateCmd())
 	cmd.AddCommand(newExportCmd())
+
+	cmd.SetHelpTemplate(helpTemplate())
+	cmd.SetUsageTemplate(usageTemplate())
 
 	return cmd
 }
@@ -91,6 +97,78 @@ func initializeRuntime() error {
 	// Create OS secret store
 	secretSt = openStore(ctx)
 	return nil
+}
+
+// helpTemplate returns cobra's help template with ANSI-colorized section headings
+// when the terminal supports color.
+func helpTemplate() string {
+	b, r, g, o := "", "", "", ""
+	if !noColor {
+		b = "\033[1m"
+		g = "\033[38;5;40m"
+		o = "\033[38;5;202m"
+		r = "\033[0m"
+	}
+	return `{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
+
+{{end}}{{if or .Runnable .HasSubCommands}}` + b + `Usage:` + r + `{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  ` + o + `{{.CommandPath}}` + r + ` [command]{{end}}{{if gt (len .Aliases) 0}}
+
+` + b + `Aliases:` + r + `
+  {{.NameAndAliases}}{{end}}{{if .HasExample}}
+
+` + b + `Examples:` + r + `
+{{.Example}}{{end}}{{if .HasAvailableSubCommands}}
+
+` + b + `Available Commands:` + r + `{{range .Commands}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
+  {{rpad .Name .NamePadding }} ` + g + `{{.Short}}` + r + `{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
+
+` + b + `Flags:` + r + `
+{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
+
+` + b + `Global Flags:` + r + `
+{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasHelpSubCommands}}
+
+` + b + `Additional help topics:` + r + `{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
+  {{rpad .CommandPath .CommandPathPadding}} ` + g + `{{.Short}}` + r + `{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
+
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}{{end}}`
+}
+
+// usageTemplate returns cobra's usage template with ANSI-colorized section headings
+// when the terminal supports color.
+func usageTemplate() string {
+	b, r, g, o := "", "", "", ""
+	if !noColor {
+		b = "\033[1m"
+		g = "\033[38;5;40m"
+		o = "\033[38;5;202m"
+		r = "\033[0m"
+	}
+	return `Usage:{{if .Runnable}}
+  {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
+  ` + o + `{{.CommandPath}}` + r + ` [command]{{end}}{{if gt (len .Aliases) 0}}
+
+` + b + `Aliases:` + r + `
+  {{.NameAndAliases}}{{end}}{{if .HasExample}}
+
+` + b + `Examples:` + r + `
+{{.Example}}{{end}}{{if .HasAvailableSubCommands}}
+
+` + b + `Available Commands:` + r + `{{range .Commands}}{{if (or .IsAvailableCommand (eq .Name "help"))}}
+  {{rpad .Name .NamePadding }} ` + g + `{{.Short}}` + r + `{{end}}{{end}}{{end}}{{if .HasAvailableLocalFlags}}
+
+` + b + `Flags:` + r + `
+{{.LocalFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasAvailableInheritedFlags}}
+
+` + b + `Global Flags:` + r + `
+{{.InheritedFlags.FlagUsages | trimTrailingWhitespaces}}{{end}}{{if .HasHelpSubCommands}}
+
+` + b + `Additional help topics:` + r + `{{range .Commands}}{{if .IsAdditionalHelpTopicCommand}}
+  {{rpad .CommandPath .CommandPathPadding}} ` + g + `{{.Short}}` + r + `{{end}}{{end}}{{end}}{{if .HasAvailableSubCommands}}
+
+Use "{{.CommandPath}} [command] --help" for more information about a command.{{end}}`
 }
 
 // openStore creates the appropriate Store for the current platform.

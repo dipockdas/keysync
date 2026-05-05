@@ -2,10 +2,8 @@ package commands
 
 import (
 	"fmt"
-	"os"
 	"strings"
 
-	"github.com/dipockdas/keysync/internal/github"
 	"github.com/dipockdas/keysync/internal/store"
 	"github.com/spf13/cobra"
 )
@@ -14,16 +12,28 @@ func newSetCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "set KEY=value [--project name] [--env name]",
 		Short: "Store a secret in the local OS secret store",
-		Long: `Stores a secret in the local OS secret store (macOS Keychain, Linux libsecret, etc.).
+		Long: F(`Stores a secret in the local OS secret store (macOS Keychain, Linux libsecret,
+Windows Credential Manager). This is a local-only operation — it does not push to
+GitHub or deployment platforms. Use {c}keysync sync{/c} to push secrets upstream.
 
-If --project is provided, the secret is scoped to that project.
-If --env is also provided, the secret is scoped to that project+environment.
-Otherwise, it is stored as a global secret (available to all projects).
+{b}Syntax:{/b}
+  {c}keysync set KEY=VALUE{/c}        (use {c}={/c}, no space around it)
+  {c}keysync set KEY=VALUE --project NAME --env ENV{/c}
 
-Usage:
-  keysync set DATABASE_URL=postgres://user:pass@host/db    # global scope
-  keysync set STRIPE_KEY=sk_live_xxx --project my-app      # project scope
-  keysync set DB_URL=prod-url --project my-app --env production  # project+env scope`,
+If {c}--project{/c} is provided, the secret is scoped to that project.
+If {c}--env{/c} is also provided (default: production), the secret is scoped to that
+project+environment. Otherwise, it is stored as a {g}global{/g} secret (available to
+all projects on this machine).
+
+{b}Examples:{/b}
+  {c}keysync set DATABASE_URL=postgres://user:pass@host/db{/c}            {g}# global{/g}
+  {c}keysync set STRIPE_KEY=sk_live_xxx --project my-app{/c}              {g}# project{/g}
+  {c}keysync set DB_URL=prod-url --project my-app --env production{/c}    {g}# project+env{/g}
+  {c}keysync set DB_URL=staging-url --project my-app --env staging{/c}    {g}# project+env{/g}
+
+{b}See also:{/b}
+  {c}keysync sync --help{/c}
+  Tutorial: {u}https://github.com/dipockdas/keysync#quick-start{/u}`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			kv := args[0]
@@ -55,23 +65,9 @@ Usage:
 			}
 			fmt.Printf("Set %s/%s\n", scopeLabel(scope, proj), key)
 
-			// Also write to GitHub Secrets (best-effort)
-			if err := setGithubSecret(key, value); err != nil {
-				fmt.Fprintf(os.Stderr, "warning: failed to write to GitHub: %v\n", err)
-			}
-
 			return nil
 		},
 	}
-}
-
-// setGithubSecret writes a secret to GitHub Secrets.
-func setGithubSecret(key, value string) error {
-	gh, err := github.NewClient(repoFlag)
-	if err != nil {
-		return fmt.Errorf("github client: %w", err)
-	}
-	return gh.Set(key, value)
 }
 
 func scopeLabel(scope store.Scope, proj string) string {

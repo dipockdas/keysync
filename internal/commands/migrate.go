@@ -133,21 +133,26 @@ func newMigrateCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "migrate [--file .env] [--cloud vercel|railway|supabase] [--project name]",
 		Short: "Import secrets into keysync from an .env file or cloud platform",
-		Long: `Import secrets into keysync from a local .env file or directly from
+		Long: F(`Import secrets into keysync from a local {c}.env{/c} file or directly from
 a cloud platform (Vercel, Railway, or Supabase).
 
-For each key, you choose the scope (global, project, or project+env) and confirm storage.
-Use --dry-run to preview without side effects.
+For each key found, you interactively choose the scope (global, project, or
+project+env) and confirm storage. Use {c}--dry-run{/c} to preview without side effects.
 
-After migration, keysync prints step-by-step instructions for the coding assistant
-to replace direct .env usage with keysync commands.
+After migration, keysync prints step-by-step instructions for replacing direct
+{c}.env{/c} usage with keysync commands (including code examples for Node.js, Go,
+Python, and Ruby).
 
-Usage:
-  keysync migrate --file .env.local
-  keysync migrate --cloud vercel --project my-app
-  keysync migrate --cloud railway --project my-app
-  keysync migrate --cloud supabase --project my-app --dry-run
-  keysync migrate --project my-app --file .env.production`,
+{b}Examples:{/b}
+  {c}keysync migrate --file .env.local{/c}
+  {c}keysync migrate --file .env --project my-app{/c}
+  {c}keysync migrate --cloud vercel --project my-app{/c}
+  {c}keysync migrate --cloud railway --project my-app{/c}
+  {c}keysync migrate --cloud supabase --project my-app --dry-run{/c}
+
+{b}See also:{/b}
+  Migration docs: {u}https://github.com/dipockdas/keysync#migration{/u}
+  Tutorial: {u}https://github.com/dipockdas/keysync/blob/main/docs/tutorial-go-project.md{/u}`),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			var secrets []parsedKey
 			var sourceLabel string

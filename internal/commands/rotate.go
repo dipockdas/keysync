@@ -14,14 +14,23 @@ func newRotateCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "rotate KEY [--project name] [--env name]",
 		Short: "Generate a new random value for a secret and update everywhere",
-		Long: `Generates a cryptographically random value and updates the secret in
-the local OS secret store, GitHub Secrets, and all deployment platforms.
+		Long: F(`Generates a cryptographically random value (32 bytes, base64-encoded,
+44 characters) and updates the secret everywhere: local OS secret store,
+{u}GitHub Secrets{/u}, and all deployment platforms.
 
-The generated value is 32 bytes encoded as base64 (44 characters).
+Use this to rotate API keys, webhook secrets, or any credential that
+may have been compromised. The new value is generated using {c}crypto/rand{/c}.
 
-Usage:
-  keysync rotate WEBHOOK_SECRET
-  keysync rotate STRIPE_KEY --project my-app`,
+If {c}--project{/c} is provided, the rotation targets a project-scoped secret.
+If {c}--env{/c} is also provided, it targets a specific environment scope.
+
+{b}Examples:{/b}
+  {c}keysync rotate WEBHOOK_SECRET{/c}                           # global scope
+  {c}keysync rotate STRIPE_KEY --project my-app{/c}              # project scope
+  {c}keysync rotate DB_PASSWORD --project my-app --env prod{/c}  # env scope
+
+{b}See also:{/b}
+  {c}keysync set --help{/c}`),
 		Args: cobra.ExactArgs(1),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			key := args[0]

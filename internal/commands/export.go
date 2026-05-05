@@ -12,18 +12,25 @@ func newExportCmd() *cobra.Command {
 	return &cobra.Command{
 		Use:   "export [--project name] [--env name]",
 		Short: "Export secrets as shell-exportable environment variables",
-		Long: `Prints all matching secrets as 'export KEY=VALUE' lines suitable for
-shell eval or sourcing.
+		Long: F(`Prints all matching secrets as {c}export KEY=VALUE{/c} lines suitable for
+shell eval or sourcing. Useful for loading secrets into your environment
+without a .env file.
 
-Global secrets are always included. If --project is provided, project-scoped
+Global secrets are always included. If {c}--project{/c} is provided, project-scoped
 secrets are also exported and take precedence over globals with the same key.
-If --env is also provided, environment-scoped secrets take highest precedence.
+If {c}--env{/c} is also provided, environment-scoped secrets take highest precedence.
 
-Usage:
-  eval $(keysync export)
-  eval $(keysync export --project my-app)
-  eval $(keysync export --project my-app --env production)
-  source <(keysync export --project my-app)`,
+{b}Resolution order:{/b} global < project < project+env
+
+{b}Examples:{/b}
+  {c}eval $(keysync export){/c}                                    # all global secrets
+  {c}eval $(keysync export --project my-app){/c}                   # project + global
+  {c}eval $(keysync export --project my-app --env production){/c}  # env + project + global
+  {c}source <(keysync export --project my-app){/c}                 # source directly
+
+{b}See also:{/b}
+  {c}keysync get --help{/c}
+  {c}keysync list --help{/c}`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 

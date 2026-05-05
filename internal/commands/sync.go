@@ -7,6 +7,7 @@ import (
 	"os"
 	"strings"
 
+	"github.com/dipockdas/keysync/internal/config"
 	"github.com/dipockdas/keysync/internal/github"
 	"github.com/dipockdas/keysync/internal/platforms"
 	"github.com/dipockdas/keysync/internal/store"
@@ -18,33 +19,48 @@ var syncPlatforms string
 func newSyncCmd() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sync --project name [--env name] [--platforms vercel,railway,supabase]",
-		Short: "Push secrets to deployment platforms",
-		Long: `Pushes secrets from the local store to deployment platforms.
+		Short: "Push secrets to GitHub Secrets and deployment platforms",
+		Long: F(`Pushes secrets from the local OS secret store to {u}GitHub Secrets{/u}
+and deployment platforms (Vercel, Railway, Supabase).
 
-The --platforms flag filters which platforms to sync. By default, all configured platforms are synced.
-Platform tokens are read from the OS secret store (global scope), falling back to environment variables.
+Provide either {c}--project{/c} or {c}--repo{/c} to identify which repo to sync:
+  • {c}--project{/c} looks up the repo in {c}.keysync.json{/c}
+  • {c}--repo{/c} uses the repo directly
 
-To add a new platform, implement the Platform interface and register it.
+Secrets synced:
+  • Project-scoped secrets — always included for the matching project
+  • Environment-scoped secrets — included if {c}--env{/c} is provided
+  • Global secrets — only those listed in the repo's {c}"globals"{/c} config
 
-Usage:
-  keysync sync --project my-app
-  keysync sync --project my-app --env production
-  keysync sync --project my-app --env staging --platforms vercel,railway`,
+Platform tokens are read from the OS secret store (global scope), falling back
+to environment variables ({c}VERCEL_TOKEN{/c}, {c}RAILWAY_TOKEN{/c}, {c}SUPABASE_TOKEN{/c}).
+
+Use {c}--platforms{/c} to target specific platforms instead of all configured ones.
+
+{b}Custom platforms:{/b} Implement the Platform interface (Name, Upsert) and register
+via {c}platforms.Register(){/c}. See {c}internal/platforms/example_test.go{/c} for a
+copyable template.
+
+{b}Examples:{/b}
+  {c}keysync sync --project my-app{/c}                              # repo from config
+  {c}keysync sync --repo org/my-app{/c}                             # repo directly
+  {c}keysync sync --project my-app --env production{/c}             # production env
+  {c}keysync sync --project my-app --platforms vercel,railway{/c}   # specific platforms
+
+{b}See also:{/b}
+  Custom platform template: {u}https://github.com/dipockdas/keysync/blob/main/internal/platforms/example_test.go{/u}
+  GitHub Actions workflow: {u}https://github.com/dipockdas/keysync#github-actions-integration{/u}`),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			ctx := cobraCmd.Context()
 
-			if project == "" {
-				return fmt.Errorf("--project is required for sync")
+			// Resolve repo and project from --project or --repo flag
+			repoKey, project, globals, platformsCfg, err := resolveRepoConfig()
+			if err != nil {
+				return err
 			}
 
-			// Look up project config
-			projCfg, ok := cfg.Projects[project]
-			if !ok {
-				return fmt.Errorf("project %q not found in .keysync.json", project)
-			}
-
-			// Read secrets from local store
-			secrets, err := collectSecrets(ctx, project, envFlag)
+			// Read secrets from local store (only specified globals + project-scoped)
+			secrets, err := collectSecrets(ctx, project, envFlag, globals)
 			if err != nil {
 				return fmt.Errorf("collect secrets: %w", err)
 			}
@@ -53,23 +69,18 @@ Usage:
 				return nil
 			}
 
-			fmt.Printf("Syncing %d secrets for project %q (env: %s)\n", len(secrets), project, envFlag)
+			fmt.Printf("Syncing %d secrets for repo %q (project: %s, env: %s)\n", len(secrets), repoKey, project, envFlag)
 
 			// Determine which platforms to sync
 			var platformNames []string
 			if syncPlatforms != "" {
 				platformNames = strings.Split(syncPlatforms, ",")
 			} else {
-				platformNames = configuredPlatforms(projCfg.Platforms)
+				platformNames = configuredPlatforms(platformsCfg)
 			}
 
-			if len(platformNames) == 0 {
-				fmt.Println("No platforms configured for this project.")
-				return nil
-			}
-
-			// Also push to GitHub
-			if err := syncToGitHub(secrets); err != nil {
+			// Push to GitHub
+			if err := syncToGitHub(repoKey, secrets); err != nil {
 				fmt.Fprintf(os.Stderr, "warning: GitHub sync: %v\n", err)
 			}
 
@@ -77,7 +88,7 @@ Usage:
 			var syncErrors int
 			for _, name := range platformNames {
 				name = strings.TrimSpace(name)
-				platformCfg := getPlatformConfigJSON(projCfg.Platforms, name)
+				platformCfg := getPlatformConfigJSON(platformsCfg, name)
 				if platformCfg == "" {
 					fmt.Fprintf(os.Stderr, "  SKIP: %s (not configured)\n", name)
 					continue
@@ -115,20 +126,51 @@ Usage:
 	return cmd
 }
 
-// collectSecrets merges global, project, and environment-scoped secrets into one map.
-// Precedence: global < project < project+env
-func collectSecrets(ctx context.Context, project, env string) (map[string]string, error) {
+// resolveRepoConfig resolves the repo, project, globals, and platform config from
+// --project or --repo flags. Returns the repo key, project name, globals list,
+// platform config, or an error.
+func resolveRepoConfig() (repoKey, projName string, globals []string, platformsCfg any, err error) {
+	if project != "" {
+		// Look up repo by project name
+		repo, rc, ok := config.FindRepoByProject(cfg, project)
+		if !ok {
+			return "", "", nil, nil, fmt.Errorf("project %q not found in .keysync.json (add it under \"repos\")", project)
+		}
+		return repo, project, rc.Globals, rc.Platforms, nil
+	}
+	if repoFlag != "" {
+		rc, ok := cfg.Repos[repoFlag]
+		if !ok {
+			return "", "", nil, nil, fmt.Errorf("repo %q not found in .keysync.json", repoFlag)
+		}
+		return repoFlag, rc.Project, rc.Globals, rc.Platforms, nil
+	}
+	return "", "", nil, nil, fmt.Errorf("either --project or --repo is required for sync")
+}
+
+// collectSecrets merges global (filtered), project, and environment-scoped secrets.
+// Precedence: global (lowest) < project < project+env (highest).
+// Only global keys listed in the globals slice are included.
+func collectSecrets(ctx context.Context, project, env string, globals []string) (map[string]string, error) {
 	secrets := make(map[string]string)
 
-	// Global secrets (lowest precedence)
-	globalEntries, err := secretSt.List(ctx, store.ScopeGlobal, "", "")
-	if err != nil {
-		return nil, fmt.Errorf("list global secrets: %w", err)
-	}
-	for _, e := range globalEntries {
-		val, err := secretSt.Get(ctx, store.ScopeGlobal, "", "", e.Key)
-		if err == nil {
-			secrets[e.Key] = val
+	// Global secrets — only those explicitly listed in the repo's globals config
+	if len(globals) > 0 {
+		globalSet := make(map[string]bool, len(globals))
+		for _, g := range globals {
+			globalSet[g] = true
+		}
+		globalEntries, err := secretSt.List(ctx, store.ScopeGlobal, "", "")
+		if err != nil {
+			return nil, fmt.Errorf("list global secrets: %w", err)
+		}
+		for _, e := range globalEntries {
+			if globalSet[e.Key] {
+				val, err := secretSt.Get(ctx, store.ScopeGlobal, "", "", e.Key)
+				if err == nil {
+					secrets[e.Key] = val
+				}
+			}
 		}
 	}
 
@@ -171,7 +213,6 @@ func configuredPlatforms(pc any) []string {
 	}
 	for name, cfg := range raw {
 		if len(cfg) > 0 && string(cfg) != "{}" && string(cfg) != "null" {
-			// Check if the config has the required fields by trying to parse
 			var v any
 			if err := json.Unmarshal(cfg, &v); err == nil && v != nil {
 				names = append(names, name)
@@ -195,9 +236,9 @@ func getPlatformConfigJSON(pc any, platformName string) string {
 	return string(cfg)
 }
 
-// syncToGitHub pushes all secrets to GitHub Secrets.
-func syncToGitHub(secrets map[string]string) error {
-	gh, err := github.NewClient(repoFlag)
+// syncToGitHub pushes all secrets to GitHub Secrets for the given repo.
+func syncToGitHub(repoKey string, secrets map[string]string) error {
+	gh, err := github.NewClient(repoKey)
 	if err != nil {
 		return err
 	}
