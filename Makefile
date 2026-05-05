@@ -1,11 +1,13 @@
-.PHONY: build clean
+.PHONY: build clean test test-short
 
-BINDIR := ./bin
-BINARY := keysync
+BINDIR  := ./bin
+BINARY  := keysync
+VERSION := $(shell git describe --tags --always --dirty 2>/dev/null || echo "dev")
+LDFLAGS := -X github.com/dipockdas/keysync/internal/commands.Version=$(VERSION)
 
 build:
 	@mkdir -p $(BINDIR)
-	go build -o $(BINDIR)/$(BINARY) ./cmd/keysync
+	go build -ldflags "$(LDFLAGS)" -o $(BINDIR)/$(BINARY) ./cmd/keysync
 
 clean:
 	rm -rf $(BINDIR)

@@ -11,6 +11,9 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Version is set at build time via -ldflags. Default is "dev" for local builds.
+var Version = "dev"
+
 var (
 	cfgFile    string
 	project    string
@@ -32,8 +35,9 @@ func Execute() {
 
 func newRootCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "keysync",
-		Short: "Local OS secret management, GitHub Secrets, and deployment platform sync",
+		Use:     "keysync",
+		Version: Version,
+		Short:   "Local OS secret management, GitHub Secrets, and deployment platform sync",
 		Long: F(`keysync manages secrets in {g}local OS secret stores{/g} (macOS Keychain, Linux libsecret,
 Windows Credential Manager), {u}GitHub Secrets{/u} (source of truth), and {c}deployment platforms{/c}
 (Vercel, Railway, Supabase). Native client libraries ({c}Go{/c}, {c}Python{/c}, {c}TypeScript{/c}, {c}Swift{/c})
@@ -66,6 +70,15 @@ See {u}https://github.com/dipockdas/keysync{/u} for full documentation and tutor
 	cmd.AddCommand(newTestSecretsCmd())
 	cmd.AddCommand(newMigrateCmd())
 	cmd.AddCommand(newExportCmd())
+
+	// Version command
+	cmd.AddCommand(&cobra.Command{
+		Use:   "version",
+		Short: "Print the version number",
+		Run: func(cmd *cobra.Command, args []string) {
+			fmt.Println(Version)
+		},
+	})
 
 	cmd.SetHelpTemplate(helpTemplate())
 	cmd.SetUsageTemplate(usageTemplate())
@@ -111,7 +124,9 @@ func helpTemplate() string {
 	}
 	return `{{with (or .Long .Short)}}{{. | trimTrailingWhitespaces}}
 
-{{end}}{{if or .Runnable .HasSubCommands}}` + b + `Usage:` + r + `{{if .Runnable}}
+{{end}}` + g + `Version: ` + r + `{{.Version}}
+` + o + `Source: ` + r + `https://github.com/dipockdas/keysync
+{{if or .Runnable .HasSubCommands}}` + b + `Usage:` + r + `{{if .Runnable}}
   {{.UseLine}}{{end}}{{if .HasAvailableSubCommands}}
   ` + o + `{{.CommandPath}}` + r + ` [command]{{end}}{{if gt (len .Aliases) 0}}
 
