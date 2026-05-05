@@ -6,8 +6,10 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strings"
 
+	"github.com/dipockdas/keysync/internal/config"
 	"github.com/dipockdas/keysync/internal/store"
 	"github.com/spf13/cobra"
 )
@@ -201,6 +203,17 @@ Python, and Ruby).
 			// Initialize the store (needed since PersistentPreRunE skips migrate)
 			initStore()
 
+			// Detect git repo and suggest project for auto-config
+			detectedRepo, _ := detectGitRepo()
+			detectedName := detectProjectName()
+			if detectedRepo != "" {
+				fmt.Printf("Detected git repo: %s\n", detectedRepo)
+				if project == "" && detectedName != "" {
+					fmt.Printf("Suggested project name: %s (use --project to set)\n", detectedName)
+				}
+			}
+			fmt.Println()
+
 			// Interactive migration
 			scanner := bufio.NewScanner(os.Stdin)
 			var migratedKeys []migratedKey
@@ -287,6 +300,22 @@ Python, and Ruby).
 				fmt.Printf("%d of %d secrets migrated.\n", len(migratedKeys), len(secrets))
 			}
 			fmt.Println()
+
+			// Auto-create .keysync.json if repo was detected
+			if !migrateDryRun && detectedRepo != "" && project != "" {
+				fmt.Printf("Repo %q detected with project %q.\n", detectedRepo, project)
+				fmt.Print("Save this mapping to .keysync.json? [Y/n]: ")
+				saveChoice := readLine(scanner, "y")
+				if !strings.EqualFold(saveChoice, "n") && !strings.EqualFold(saveChoice, "no") {
+					if err := saveRepoConfig(detectedRepo, project); err != nil {
+						fmt.Fprintf(os.Stderr, "  Warning: failed to save .keysync.json: %v\n", err)
+					} else {
+						fmt.Printf("  ✓ Saved .keysync.json — repo %q → project %q\n", detectedRepo, project)
+						fmt.Println("  Edit this file to add platform configurations (Vercel, Railway, Supabase) if needed.")
+					}
+				}
+				fmt.Println()
+			}
 
 			if len(migratedKeys) == 0 {
 				return nil
@@ -420,6 +449,63 @@ func storeLabel() string {
 	default:
 		return "secret store"
 	}
+}
+
+// detectGitRepo detects the GitHub repo from the current git remote.
+// Returns "owner/repo" or empty string if not detectable.
+func detectGitRepo() (string, error) {
+	cmd := exec.Command("git", "remote", "get-url", "origin")
+	out, err := cmd.Output()
+	if err != nil {
+		return "", fmt.Errorf("not in a git repo with remote 'origin'")
+	}
+	return parseGitHubRepo(strings.TrimSpace(string(out))), nil
+}
+
+// parseGitHubRepo extracts "owner/repo" from various GitHub URL formats:
+//
+//	git@github.com:owner/repo.git       → owner/repo
+//	https://github.com/owner/repo.git   → owner/repo
+//	https://github.com/owner/repo       → owner/repo
+func parseGitHubRepo(url string) string {
+	url = strings.TrimSuffix(url, ".git")
+	// Handle git@github.com:owner/repo
+	if before, after, ok := strings.Cut(url, ":"); ok && strings.HasPrefix(before, "git@") {
+		return strings.TrimPrefix(after, "/")
+	}
+	// Handle https://github.com/owner/repo
+	if strings.HasPrefix(url, "https://") || strings.HasPrefix(url, "http://") {
+		parts := strings.SplitN(url, "/", 4)
+		if len(parts) == 4 {
+			return parts[3]
+		}
+	}
+	return url
+}
+
+// detectProjectName returns the current directory name as a suggested project name.
+func detectProjectName() string {
+	dir, err := os.Getwd()
+	if err != nil {
+		return ""
+	}
+	return filepath.Base(dir)
+}
+
+// saveRepoConfig creates or updates .keysync.json with a repo entry.
+// If the file already exists, the repo entry is added to the existing config.
+func saveRepoConfig(repo, projectName string) error {
+	cfg := config.DefaultConfig()
+	if existing, path, err := config.LoadConfig("."); err == nil && path != "" {
+		cfg = existing
+	}
+	cfg.Repos[repo] = config.RepoConfig{
+		Project:   projectName,
+		Globals:   cfg.Repos[repo].Globals, // preserve any existing globals
+		Platforms: config.PlatformConfig{},
+	}
+	savePath := config.DefaultConfigPath(".")
+	return config.SaveConfig(cfg, savePath)
 }
 
 // printMigrationInstructions outputs step-by-step instructions for replacing
