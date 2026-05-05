@@ -8,6 +8,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 
 	"github.com/dipockdas/keysync/internal/config"
 	"github.com/dipockdas/keysync/internal/store"
@@ -336,6 +337,13 @@ Python, and Ruby).
 
 			// Human-readable instructions for the coding assistant
 			printMigrationInstructions(migratedKeys)
+
+			// Source code scan for references to migrated keys
+			if !migrateDryRun && len(migratedKeys) > 0 {
+				scanResults := scanSourceCode(".", migratedKeys)
+				printCleanupGuide(".", migratedKeys, scanResults)
+			}
+
 			return nil
 		},
 	}
@@ -506,6 +514,244 @@ func saveRepoConfig(repo, projectName string) error {
 	}
 	savePath := config.DefaultConfigPath(".")
 	return config.SaveConfig(cfg, savePath)
+}
+
+// keyReference records a source file reference to a migrated secret key.
+type keyReference struct {
+	Key      string
+	FilePath string
+	Line     int
+	Content  string
+}
+
+// scanSourceCode walks the project directory and finds references to migrated keys
+// in source files. It skips .git, node_modules, vendor, and build output directories.
+func scanSourceCode(rootDir string, migratedKeys []migratedKey) []keyReference {
+	// Build set of keys to search for
+	keySet := make(map[string]bool, len(migratedKeys))
+	for _, m := range migratedKeys {
+		keySet[m.Key] = true
+	}
+
+	var refs []keyReference
+	var mu sync.Mutex
+
+	_ = filepath.Walk(rootDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return nil
+		}
+		if info.IsDir() {
+			base := filepath.Base(path)
+			if base == ".git" || base == "node_modules" || base == "vendor" ||
+				base == ".next" || base == "dist" || base == "build" ||
+				base == "__pycache__" || base == ".venv" || base == "venv" ||
+				strings.HasPrefix(base, ".env") {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+
+		// Only scan source-like files
+		ext := strings.ToLower(filepath.Ext(path))
+		if !isScannableExt(ext) {
+			return nil
+		}
+
+		content, err := os.ReadFile(path)
+		if err != nil {
+			return nil
+		}
+
+		lines := strings.Split(string(content), "\n")
+		for i, line := range lines {
+			for key := range keySet {
+				if strings.Contains(line, key) && isEnvReference(line, key) {
+					mu.Lock()
+					refs = append(refs, keyReference{
+						Key:      key,
+						FilePath: path,
+						Line:     i + 1,
+						Content:  strings.TrimSpace(line),
+					})
+					mu.Unlock()
+				}
+			}
+		}
+		return nil
+	})
+
+	return refs
+}
+
+// isScannableExt returns true for file extensions that may contain env var references.
+func isScannableExt(ext string) bool {
+	switch ext {
+	case ".go", ".js", ".ts", ".jsx", ".tsx", ".py", ".rb", ".sh", ".bash",
+		".yaml", ".yml", ".json", ".toml", ".cfg", ".conf", ".ini",
+		".env", ".env.example", ".env.sample":
+		return true
+	}
+	return false
+}
+
+// isEnvReference checks if a line contains an environment variable reference
+// for the given key, reducing false positives from coincidental name matches.
+func isEnvReference(line, key string) bool {
+	lower := strings.ToLower(line)
+
+	// Check for explicit env var access patterns
+	patterns := []string{
+		"process.env." + key,
+		"process.env[\"" + key,
+		"process.env['" + key,
+		"process.env[`" + key,
+		"os.Getenv(\"" + key,
+		"os.Getenv(`" + key,
+		"os.LookupEnv(\"" + key,
+		"os.LookupEnv(`" + key,
+		"os.Environ[\"" + key,
+		"os.environ.get(\"" + key,
+		"os.environ[\"" + key,
+		"os.environ['" + key,
+		"ENV[\"" + key,
+		"ENV['" + key,
+		"ENV.fetch(\"" + key,
+		"ENV.fetch('" + key,
+		"\"" + key + "\"",   // generic quoted string
+		"${" + key + "}",     // shell/bash
+	}
+	for _, p := range patterns {
+		if strings.Contains(line, p) {
+			return true
+		}
+	}
+
+	// Check for lowercased key patterns (e.g., os.getenv("database_url"))
+	lowerKey := strings.ToLower(key)
+	lowerPatterns := []string{
+		"os.getenv(\"" + lowerKey,
+		"os.environ[\"" + lowerKey,
+		"process.env." + lowerKey,
+	}
+	for _, p := range lowerPatterns {
+		if strings.Contains(lower, p) {
+			return true
+		}
+	}
+
+	return false
+}
+
+// printCleanupGuide prints a structured cleanup section after migration,
+// listing which keys to remove from .env and which source files reference them.
+func printCleanupGuide(rootDir string, migratedKeys []migratedKey, refs []keyReference) {
+	fmt.Println()
+	fmt.Println("=== Cleanup Guide ===")
+	fmt.Println()
+
+	// 1. Keys to remove from .env
+	fmt.Println("1. Remove these keys from your .env file (they're now in your OS keychain):")
+	for _, m := range migratedKeys {
+		fmt.Printf("   - %s\n", m.Key)
+	}
+	fmt.Println()
+
+	// 2. Source code references
+	if len(refs) > 0 {
+		fmt.Println("2. Source code references found — update these files to use keysync:")
+
+		// Group references by key
+		type groupedRef struct {
+			key  string
+			refs []keyReference
+		}
+		keyOrder := make([]string, 0, len(migratedKeys))
+		grouped := make(map[string][]keyReference)
+		for _, r := range refs {
+			if grouped[r.Key] == nil {
+				keyOrder = append(keyOrder, r.Key)
+			}
+			grouped[r.Key] = append(grouped[r.Key], r)
+		}
+
+		for _, key := range keyOrder {
+			refs := grouped[key]
+			fmt.Printf("\n   %s:\n", key)
+			for _, r := range refs {
+				shortPath := strings.TrimPrefix(r.FilePath, rootDir+string(filepath.Separator))
+				if shortPath == r.FilePath {
+					shortPath = r.FilePath
+				}
+				fmt.Printf("     %s:%d  %s\n", shortPath, r.Line, r.Content)
+			}
+		}
+		fmt.Println()
+
+		// 3. Suggested replacements by language
+		fmt.Println("3. Suggested replacements — use the keysync client library for your language:")
+		printClientLibrarySuggestions(refs)
+	} else {
+		fmt.Println("2. No source code references found — your project may use .env directly")
+		fmt.Println("   without referencing specific keys in code (e.g., dotenv loads all vars).")
+		fmt.Println()
+		fmt.Println("   Next steps:")
+		fmt.Println("    - Replace dotenv/load_dotenv with:")
+		fmt.Println("      eval $(keysync export" + projectFlag() + ")")
+		fmt.Println("    - Or use the inject approach:")
+		fmt.Println("      keysync inject" + projectFlag() + " > .env.local")
+	}
+
+	fmt.Println()
+	fmt.Println("See the client libraries for language-specific usage:")
+	fmt.Println("  https://github.com/dipockdas/keysync/tree/main/clients/")
+}
+
+// projectFlag returns " --project <name>" if project is set, empty string otherwise.
+func projectFlag() string {
+	if project != "" {
+		return " --project " + project
+	}
+	return ""
+}
+
+// printClientLibrarySuggestions prints client library usage examples for the
+// languages detected in the scan results.
+func printClientLibrarySuggestions(refs []keyReference) {
+	langs := make(map[string]bool)
+	for _, r := range refs {
+		ext := strings.ToLower(filepath.Ext(r.FilePath))
+		switch ext {
+		case ".go":
+			langs["Go"] = true
+		case ".js", ".ts", ".jsx", ".tsx":
+			langs["TypeScript"] = true
+		case ".py":
+			langs["Python"] = true
+		case ".rb":
+			langs["Ruby"] = true
+		}
+	}
+
+	suggestions := map[string]string{
+		"Go": `   Go:     keysync.GetSecret("KEY", "` + project + `")
+           https://github.com/dipockdas/keysync/blob/main/clients/go/`,
+		"TypeScript": `   Node:   getSecret("KEY", "` + project + `")
+           https://github.com/dipockdas/keysync/blob/main/clients/node/`,
+		"Python": `   Python: get_secret("KEY", project="` + project + `")
+           https://github.com/dipockdas/keysync/blob/main/clients/python/`,
+		"Ruby": `   Ruby:   KeySync.get_secret("KEY", project: "` + project + `")
+           (see clients/ for Go, Python, TypeScript, Swift)`,
+	}
+
+	// Print in a consistent order
+	langOrder := []string{"Go", "Python", "TypeScript", "Ruby"}
+	for _, lang := range langOrder {
+		if langs[lang] {
+			fmt.Println(suggestions[lang])
+		}
+	}
+	fmt.Println()
+	fmt.Println("   For full documentation, see the clients/ directory in the repo.")
 }
 
 // printMigrationInstructions outputs step-by-step instructions for replacing
