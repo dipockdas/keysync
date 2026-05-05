@@ -44,8 +44,8 @@ all projects on this machine).
 			key := kv[:eq]
 			value := kv[eq+1:]
 
-			if key == "" {
-				return fmt.Errorf("key cannot be empty")
+			if err := validateKeyName(key); err != nil {
+				return err
 			}
 
 			scope := store.ScopeGlobal
@@ -68,6 +68,27 @@ all projects on this machine).
 			return nil
 		},
 	}
+}
+
+// validateKeyName checks that a secret key follows env-var naming conventions
+// to prevent flag injection attacks when passing keys to CLI tools.
+func validateKeyName(key string) error {
+	if key == "" {
+		return fmt.Errorf("key cannot be empty")
+	}
+	if len(key) > 256 {
+		return fmt.Errorf("key too long (max 256 characters)")
+	}
+	for i, r := range key {
+		if i == 0 && r >= '0' && r <= '9' {
+			return fmt.Errorf("key cannot start with a digit: %q", key)
+		}
+		if !((r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') ||
+			(r >= '0' && r <= '9') || r == '_') {
+			return fmt.Errorf("invalid character %q in key %q (only A-Z, a-z, 0-9, and _ allowed)", r, key)
+		}
+	}
+	return nil
 }
 
 func scopeLabel(scope store.Scope, proj string) string {

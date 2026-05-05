@@ -34,6 +34,9 @@ If {c}--env{/c} is also provided, it targets a specific environment scope.
 		Args: cobra.ExactArgs(1),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			key := args[0]
+			if err := validateKeyName(key); err != nil {
+				return err
+			}
 			ctx := cobraCmd.Context()
 
 			scope := store.ScopeGlobal

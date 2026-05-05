@@ -206,6 +206,10 @@ Python, and Ruby).
 			var migratedKeys []migratedKey
 
 			for _, kv := range secrets {
+				if err := validateKeyName(kv.key); err != nil {
+					fmt.Printf("  SKIP: %s (%v)\n", kv.key, err)
+					continue
+				}
 				fmt.Printf("  %s=***\n", kv.key)
 
 				// Scope prompt

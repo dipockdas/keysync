@@ -203,12 +203,16 @@ func (k *KeychainStore) Set(_ context.Context, scope Scope, project, environment
 		"-a", accountName(key),
 	).Run()
 
+	// Use -w flag to read password from stdin (avoid exposing value in process list).
+	// The security CLI reads stdin twice — once for the password and once for confirmation —
+	// so we send the value twice.
 	cmd := exec.Command("security", "add-generic-password",
 		"-s", svc,
 		"-a", accountName(key),
-		"-p", value,
 		"-U", // allow update (though we already deleted)
+		"-w", // read password from stdin
 	)
+	cmd.Stdin = strings.NewReader(value + "\n" + value + "\n")
 	if out, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("security add-generic-password: %w: %s", err, strings.TrimSpace(string(out)))
 	}

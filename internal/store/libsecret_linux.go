@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"os/exec"
 	"strings"
+	"sync"
 )
 
 // serviceAttrValue returns the service attribute for secret-tool.
@@ -149,23 +150,18 @@ func isSecretToolNotFound(err error) bool {
 
 // keyIndex tracks which keys exist in the store for fast listing.
 type keyIndex struct {
-	mu   syncStore
+	mu   sync.RWMutex
 	path string
 	keys []SecretEntry
 }
-
-type syncStore struct{}
-
-func (s *syncStore) Lock()    {}
-func (s *syncStore) Unlock()  {}
-func (s *syncStore) RLock()   {}
-func (s *syncStore) RUnlock() {}
 
 func loadKeyIndex() (*keyIndex, error) {
 	return &keyIndex{path: ""}, nil
 }
 
 func (ki *keyIndex) add(entry SecretEntry) error {
+	ki.mu.Lock()
+	defer ki.mu.Unlock()
 	// Deduplicate
 	var filtered []SecretEntry
 	for _, e := range ki.keys {
@@ -180,6 +176,8 @@ func (ki *keyIndex) add(entry SecretEntry) error {
 }
 
 func (ki *keyIndex) remove(scope Scope, project, environment, key string) error {
+	ki.mu.Lock()
+	defer ki.mu.Unlock()
 	var filtered []SecretEntry
 	for _, e := range ki.keys {
 		if e.Scope == scope && e.Project == project && e.Environment == environment && e.Key == key {
@@ -192,6 +190,8 @@ func (ki *keyIndex) remove(scope Scope, project, environment, key string) error 
 }
 
 func (ki *keyIndex) list(scope Scope, project, environment string) []SecretEntry {
+	ki.mu.RLock()
+	defer ki.mu.RUnlock()
 	var result []SecretEntry
 	for _, e := range ki.keys {
 		if (scope == "" || e.Scope == scope) &&

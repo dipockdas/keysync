@@ -40,6 +40,9 @@ Without {c}--project{/c}, only the global scope is checked.
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
+			if err := validateKeyName(key); err != nil {
+				return err
+			}
 			ctx := cmd.Context()
 
 			// Try project + env scope first

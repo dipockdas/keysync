@@ -77,7 +77,7 @@ func SaveConfig(cfg *Config, path string) error {
 	if err != nil {
 		return fmt.Errorf("marshal config: %w", err)
 	}
-	return os.WriteFile(path, raw, 0644)
+	return os.WriteFile(path, raw, 0600)
 }
 
 // FindRepoByProject finds the repo key that contains the given project name.
