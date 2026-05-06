@@ -1,4 +1,4 @@
-.PHONY: build clean test test-short
+.PHONY: build clean run test test-short test-platform release distclean
 
 BINDIR  := ./bin
 BINARY  := keysync
@@ -23,3 +23,26 @@ test-short:
 
 test-platform:
 	go test ./internal/platforms/... -v -count=1
+
+# Cross-compile for all supported platforms.
+# Usage: make release VERSION=v0.1.0
+release: distclean
+	@mkdir -p dist
+	$(call xbuild,darwin,amd64)
+	$(call xbuild,darwin,arm64)
+	$(call xbuild,linux,amd64)
+	$(call xbuild,linux,arm64)
+	$(call xbuild,windows,amd64)
+	$(call xbuild,windows,arm64)
+	@echo "Release artifacts in dist/:"
+	@ls -1 dist/
+
+define xbuild
+	@echo "Building for $(1)/$(2)..."
+	@GOOS=$(1) GOARCH=$(2) go build -ldflags "$(LDFLAGS)" \
+		-o dist/keysync_$(1)_$(2)/$(BINARY)$(if $(filter windows,$(1)),.exe,) \
+		./cmd/keysync
+endef
+
+distclean:
+	rm -rf dist

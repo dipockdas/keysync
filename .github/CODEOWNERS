@@ -1,0 +1,5 @@
+# Each owner line is a glob pattern followed by one or more @owners
+# See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+# Default owner for everything in the repo
+* @dipockdas
