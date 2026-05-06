@@ -157,8 +157,8 @@ func TestFindConfig_NotFound(t *testing.T) {
 }
 
 func TestDefaultConfigPath(t *testing.T) {
+	want := filepath.Join("/some/dir", ".keysync.json")
 	got := DefaultConfigPath("/some/dir")
-	want := "/some/dir/.keysync.json"
 	if got != want {
 		t.Errorf("DefaultConfigPath = %q, want %q", got, want)
 	}
