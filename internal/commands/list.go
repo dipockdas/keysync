@@ -16,16 +16,16 @@ func newListCmd() *cobra.Command {
 		Short: "List all managed secrets",
 		Long: F(`Lists all secrets in the local OS secret store.
 
-If {c}--project{/c} is provided, only secrets for that project are shown (alongside
-global secrets). If {c}--env{/c} is also provided, only secrets for that environment are shown.
-Global secrets are included in all listings.
+Without {c}--project{/c}, all secrets across every project and scope are shown.
+With {c}--project{/c}, only global secrets and secrets for that project are shown.
+Add {c}--env{/c} to further filter by environment.
 
 Use {c}--unmask{/c} to also display secret values (for verification purposes).
 
 {b}Examples:{/b}
-  {c}keysync list{/c}                                    # all secrets
-  {c}keysync list --project my-app{/c}                   # project + global
-  {c}keysync list --project my-app --env production{/c}  # env + project + global
+  {c}keysync list{/c}                                    # all secrets (every project)
+  {c}keysync list --project my-app{/c}                   # project + global only
+  {c}keysync list --project my-app --env production{/c}  # specific env
   {c}keysync list --unmask{/c}                           # show values
 
 {b}See also:{/b}
@@ -34,22 +34,27 @@ Use {c}--unmask{/c} to also display secret values (for verification purposes).
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
-			// Always list global secrets
-			globalEntries, err := secretSt.List(ctx, store.ScopeGlobal, "", "")
-			if err != nil {
-				return fmt.Errorf("list global secrets: %w", err)
-			}
-
-			// List project secrets
-			var projectEntries []store.SecretEntry
+			var all []store.SecretEntry
 			if project != "" {
-				projectEntries, err = secretSt.List(ctx, store.ScopeProject, project, envFlag)
+				// Show project-scoped + global secrets for the specified project
+				projectEntries, err := secretSt.List(ctx, store.ScopeProject, project, envFlag)
 				if err != nil {
 					return fmt.Errorf("list project secrets: %w", err)
 				}
+				globalEntries, err := secretSt.List(ctx, store.ScopeGlobal, "", "")
+				if err != nil {
+					return fmt.Errorf("list global secrets: %w", err)
+				}
+				all = append(globalEntries, projectEntries...)
+			} else {
+				// No --project: list ALL secrets across every project and scope
+				var err error
+				all, err = secretSt.List(ctx, "", "", "")
+				if err != nil {
+					return fmt.Errorf("list secrets: %w", err)
+				}
 			}
 
-			all := append(globalEntries, projectEntries...)
 			if len(all) == 0 {
 				fmt.Println("No secrets found.")
 				return nil
