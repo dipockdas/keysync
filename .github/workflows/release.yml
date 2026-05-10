@@ -61,7 +61,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: linux-windows-artifacts
-          path: dist/keysync_*.tar.gz dist/keysync_*.zip
+          path: |
+            dist/keysync_*.tar.gz
+            dist/keysync_*.zip
 
   build-darwin:
     needs: test
