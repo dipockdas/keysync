@@ -96,18 +96,25 @@ func (ki *keyIndex) add(entry SecretEntry) error {
 	return ki.save()
 }
 
-func (ki *keyIndex) remove(scope Scope, project, environment, key string) error {
+// remove deletes an entry from the index. Returns true if an entry was actually removed.
+func (ki *keyIndex) remove(scope Scope, project, environment, key string) bool {
 	ki.mu.Lock()
 	defer ki.mu.Unlock()
 	filtered := make([]SecretEntry, 0, len(ki.keys))
+	removed := false
 	for _, e := range ki.keys {
 		if e.Scope == scope && e.Project == project && e.Environment == environment && e.Key == key {
+			removed = true
 			continue
 		}
 		filtered = append(filtered, e)
 	}
+	if !removed {
+		return false
+	}
 	ki.keys = filtered
-	return ki.save()
+	_ = ki.save()
+	return true
 }
 
 func (ki *keyIndex) list(scope Scope, project, environment string) []SecretEntry {
@@ -277,6 +284,12 @@ func (k *KeychainStore) Delete(_ context.Context, scope Scope, project, environm
 
 	status := C.ks_find(cSvc, cAcct, &pwlen, &pwdata, &itemRef)
 	if int(status) == errSecItemNotFound {
+		// Key not in keychain, but may be a stale index entry. Clean up index.
+		if k.index != nil {
+			if removed := k.index.remove(scope, project, environment, key); removed {
+				return nil // removed stale index entry
+			}
+		}
 		return ErrNotFound
 	}
 	if int(status) != errSecSuccess {
