@@ -9,29 +9,44 @@ permissions:
   contents: write
 
 jobs:
-  goreleaser:
+  test:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
-
-      - name: Setup Go
-        uses: actions/setup-go@v5
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
         with:
           go-version: stable
           check-latest: true
+      - run: go test ./internal/store/... ./internal/config/... ./internal/crypto/... ./internal/commands/... -race -count=1
 
-      - name: Run tests
-        run: go test ./internal/store/... ./internal/config/... ./internal/crypto/... ./internal/commands/... -race -count=1
+  build-linux:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          check-latest: true
+      - name: Build linux + windows
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          LDFLAGS="-X github.com/dipockdas/keysync/internal/commands.Version=${VERSION}"
+          mkdir -p dist
 
-      - name: Build release binaries
-        env:
-          VERSION: ${{ github.ref_name }}
-        run: make release VERSION="${{ github.ref_name }}"
-
-      - name: Create release archive
+          for os in linux windows; do
+            for arch in amd64 arm64; do
+              echo "Building for $os/$arch..."
+              ext=""
+              [ "$os" = "windows" ] && ext=".exe"
+              GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build \
+                -ldflags "$LDFLAGS" \
+                -o "dist/keysync_${os}_${arch}/keysync${ext}" \
+                ./cmd/keysync
+            done
+          done
+      - name: Package archives
         shell: bash
         run: |
           cd dist
@@ -43,13 +58,59 @@ jobs:
               (cd "$dir" && tar czf "../keysync_${os_arch}.tar.gz" .)
             fi
           done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: linux-windows-artifacts
+          path: dist/keysync_*.tar.gz dist/keysync_*.zip
 
-      - name: Generate checksums
+  build-darwin:
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: stable
+          check-latest: true
+      - name: Build darwin (native, with Keychain cgo support)
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          LDFLAGS="-X github.com/dipockdas/keysync/internal/commands.Version=${VERSION}"
+          mkdir -p dist
+
+          for arch in amd64 arm64; do
+            echo "Building for darwin/$arch..."
+            GOOS=darwin GOARCH=$arch CGO_ENABLED=1 go build \
+              -ldflags "$LDFLAGS" \
+              -o "dist/keysync_darwin_${arch}/keysync" \
+              ./cmd/keysync
+          done
+      - name: Package archives
         shell: bash
         run: |
           cd dist
-          sha256sum keysync_*.tar.gz keysync_*.zip > checksums.txt 2>/dev/null || true
+          for dir in keysync_darwin_*; do
+            (cd "$dir" && tar czf "../${dir}.tar.gz" .)
+          done
+      - uses: actions/upload-artifact@v4
+        with:
+          name: darwin-artifacts
+          path: dist/keysync_darwin_*.tar.gz
 
+  create-release:
+    needs: [build-linux, build-darwin]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: artifacts
+      - name: Generate checksums
+        shell: bash
+        run: |
+          find artifacts -name '*.tar.gz' -o -name '*.zip' | while read f; do
+            sha256sum "$f"
+          done > artifacts/checksums.txt
       - name: Create release
         env:
           GH_TOKEN: ${{ github.token }}
@@ -61,15 +122,17 @@ jobs:
           Build artifacts:
           "
 
-          for f in dist/keysync_*.tar.gz dist/keysync_*.zip dist/checksums.txt; do
-            if [ -f "$f" ]; then
-              NOTES="${NOTES}
+          for f in $(find artifacts -name '*.tar.gz' -o -name '*.zip' -o -name 'checksums.txt' | sort); do
+            NOTES="${NOTES}
           - \`$(basename $f)\`"
-            fi
           done
+
+          # Flatten and collect all artifacts
+          mkdir -p release-assets
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name 'checksums.txt' \) -exec cp {} release-assets/ \;
 
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --notes "$NOTES" \
             --draft \
-            dist/keysync_*.tar.gz dist/keysync_*.zip dist/checksums.txt
+            release-assets/*
