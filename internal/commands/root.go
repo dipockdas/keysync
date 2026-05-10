@@ -19,6 +19,7 @@ var (
 	project    string
 	envFlag    string
 	repoFlag   string
+	storeFlag  string
 	cfg        *config.Config
 	secretSt   store.Store
 	configPath string
@@ -57,6 +58,10 @@ See {u}https://github.com/dipockdas/keysync{/u} for full documentation and tutor
 	cmd.PersistentFlags().StringVarP(&project, "project", "p", "", "project name (from .keysync.json)")
 	cmd.PersistentFlags().StringVarP(&envFlag, "env", "e", "production", "environment name (e.g. production, staging)")
 	cmd.PersistentFlags().StringVar(&repoFlag, "repo", "", "GitHub repository (owner/repo). Auto-detected if not set.")
+	cmd.PersistentFlags().StringVar(&storeFlag, "store", "", `secret store backend ("fallback" to skip OS keychain and use NaCl-encrypted file)`)
+	cmd.RegisterFlagCompletionFunc("store", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		return []string{"fallback"}, cobra.ShellCompDirectiveDefault
+	})
 
 	cmd.AddCommand(newInitCmd())
 	cmd.AddCommand(newSetCmd())
@@ -105,6 +110,13 @@ func initializeRuntime() error {
 		cfg, configPath, err = config.LoadConfig(searchDir)
 		if err != nil {
 			return fmt.Errorf("load config: %w", err)
+		}
+	}
+
+	// Allow store backend to be set via environment variable
+	if storeFlag == "" {
+		if v, ok := os.LookupEnv("KEYSYNC_STORE"); ok {
+			storeFlag = v
 		}
 	}
 
@@ -189,7 +201,17 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.{{e
 
 // openStore creates the appropriate Store for the current platform.
 func openStore(ctx context.Context) store.Store {
-	// Attempt macOS Keychain first on darwin
+	// Use fallback store when explicitly requested (avoids keychain prompts).
+	if storeFlag == "fallback" {
+		st, err := store.NewFallbackStore()
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "warning: failed to open fallback store: %v\n", err)
+			return store.NewMemoryStore()
+		}
+		return st
+	}
+
+	// Attempt OS-native keychain first
 	if st, err := tryKeychain(ctx); err == nil {
 		return st
 	}

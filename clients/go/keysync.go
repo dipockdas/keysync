@@ -13,15 +13,31 @@
 //	dbURL, err := keysync.GetSecret("DATABASE_URL", "my-project")
 package keysync
 
-import "fmt"
+import (
+	"fmt"
+	"os"
+)
 
-// GetSecret retrieves a secret from the OS keychain.
+// GetSecret retrieves a secret.
 //
-// If project is non-empty, it checks project scope first, then falls back
-// to global scope. If project is empty, only global scope is checked.
+// Checks the environment variable identified by *key* first. If set, returns
+// it immediately without touching the OS keychain. This is the primary path
+// for both local development (where secrets are injected via
+// `eval $(keysync export)`) and cloud deployments (where platforms inject
+// environment variables directly).
+//
+// If the env var is not set, falls back to the OS keychain. When *project* is
+// non-empty it checks project scope first, then global scope.
 //
 // Returns ErrNotFound if the secret doesn't exist in any checked scope.
 func GetSecret(key, project string) (string, error) {
+	// Primary path: check environment variable first.
+	// In local dev the user runs `eval $(keysync export)` at shell startup;
+	// in cloud/CI the platform injects env vars directly.
+	if val, ok := os.LookupEnv(key); ok {
+		return val, nil
+	}
+
 	// Try project scope first
 	if project != "" {
 		svc := serviceName("project", project)

@@ -1,4 +1,4 @@
-.PHONY: build clean run test test-short test-platform release distclean
+.PHONY: build clean sign build-signed run test test-short test-platform release distclean
 
 BINDIR  := ./bin
 BINARY  := keysync
@@ -8,6 +8,33 @@ LDFLAGS := -X github.com/dipockdas/keysync/internal/commands.Version=$(VERSION)
 build:
 	@mkdir -p $(BINDIR)
 	go build -ldflags "$(LDFLAGS)" -o $(BINDIR)/$(BINARY) ./cmd/keysync
+
+# Sign the binary with a Developer ID certificate for macOS Keychain access control.
+# Once signed, "Always Allow" in keychain dialogs persists across rebuilds.
+# Usage: make build && make sign
+sign:
+	@if [ "$(shell uname)" != "Darwin" ]; then \
+		echo "signing is only available on macOS"; exit 1; \
+	fi
+	@identity=$$(security find-identity -v -p basic 2>/dev/null | grep "Developer ID Application" | head -1 | sed 's/.*"\(.*\)"/\1/'); \
+	if [ -z "$$identity" ]; then \
+		echo "No Developer ID Application certificate found."; \
+		echo "Run: security find-identity -v -p basic"; \
+		exit 1; \
+	fi; \
+	echo "Signing with: $$identity"; \
+	codesign --sign "$$identity" \
+		--options runtime \
+		--timestamp \
+		--force \
+		$(BINDIR)/$(BINARY); \
+	codesign -dvvv $(BINDIR)/$(BINARY) 2>&1 | grep -E '^Signed|^Authority|^TeamIdentifier'
+
+# Build and sign in one step (macOS only; falls back to plain build on other platforms).
+build-signed: build
+	@if [ "$(shell uname)" = "Darwin" ]; then \
+		$(MAKE) sign; \
+	fi
 
 clean:
 	rm -rf $(BINDIR)

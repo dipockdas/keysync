@@ -12,6 +12,7 @@ Usage:
     api_key = get_secret("GLOBAL_API_KEY")
 """
 
+import os as _os
 import sys as _sys
 
 from keysync._errors import KeySyncError, SecretNotFoundError
@@ -67,6 +68,13 @@ def get_secret(key: str, project: str | None = None) -> str:
 
     Raises SecretNotFoundError if the secret doesn't exist.
     """
+    # Primary path: check environment variable first.
+    # In local dev the user runs eval $(keysync export) at shell startup;
+    # in cloud/CI the platform injects env vars directly.
+    val = _os.environ.get(key)
+    if val is not None:
+        return val
+
     # Try project scope first
     if project:
         svc = _service_name("project", project)

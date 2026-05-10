@@ -53,8 +53,14 @@ const platform: PlatformImpl = selectPlatform();
 /**
  * Retrieve a secret from the OS keychain.
  *
- * If `project` is provided, checks project scope first, then falls back
- * to global scope. If `project` is omitted, only checks global scope.
+ * Checks the environment variable identified by `key` first. If set, returns
+ * it immediately without touching the OS keychain. This is the primary path
+ * for both local development (where secrets are injected via
+ * `eval $(keysync export)`) and cloud deployments (where platforms inject
+ * environment variables directly).
+ *
+ * If the env var is not set, falls back to the OS keychain. When `project` is
+ * provided, checks project scope first, then global scope.
  *
  * @param key - The secret key name (e.g. "DATABASE_URL").
  * @param project - Optional project name for project-scoped secrets.
@@ -62,6 +68,14 @@ const platform: PlatformImpl = selectPlatform();
  * @throws {KeySyncError} with code "notFound" if the secret doesn't exist.
  */
 export async function getSecret(key: string, project?: string): Promise<string> {
+  // Primary path: check environment variable first.
+  // In local dev the user runs eval $(keysync export) at shell startup;
+  // in cloud/CI the platform injects env vars directly.
+  const envVal = process.env[key];
+  if (envVal !== undefined) {
+    return envVal;
+  }
+
   // Try project scope first
   if (project) {
     const svc = serviceName("project", project);

@@ -38,9 +38,26 @@ Keysync has two layers: a **CLI** for managing secrets and a set of **client lib
 |-------|-------|---------|
 | **`.keysync.json`** | Non-secret project metadata | Platform project IDs, service names, deployment targets |
 | **OS keychain** | All secret values | API tokens, database URLs, encryption keys |
-| **Environment variables** | Fallback for platform tokens (CI/CD) | `VERCEL_TOKEN`, `RAILWAY_TOKEN`, `SUPABASE_TOKEN` |
+| **Environment variables** | Primary runtime path for secrets | Injected by `eval $(keysync export)` (local) or platform (cloud) |
 
 The `.keysync.json` file tells keysync *which platforms* each project deploys to. The actual secret values — including platform API tokens — live in your OS keychain. This means checking `.keysync.json` into version control is safe: it contains no secrets.
+
+### Runtime architecture: env vars first
+
+Client libraries check environment variables before touching the OS keychain:
+
+| Environment | How secrets get into env vars | App reads via |
+|---|---|---|
+| **Local dev** | `eval $(keysync export)` in shell profile or service launch script | `os.environ` (no keychain call) |
+| **Cloud (Vercel, Railway, Supabase, AWS)** | Platform injects env vars (set via `keysync sync`) | `os.environ` (no keychain call) |
+| **CI/CD** | GitHub Actions injects env vars from GitHub Secrets | `os.environ` (no keychain call) |
+
+The keychain is touched only by the CLI during setup and management — never at application runtime. This means:
+
+- **Local dev**: One `eval $(keysync export)` at shell startup, zero prompts for the rest of the session
+- **CI/CD**: Platform injects env vars, no keychain involved at all
+- **Cloud deployment**: Platform injects env vars via `keysync sync`, app reads from `os.environ` — exactly as it works today
+- **No .env files anywhere**: The entire chain is `keychain → export → env var`, no plaintext files
 
 ### Three scope levels
 
@@ -224,6 +241,7 @@ source <(keysync export --project my-app)
 | `-p, --project` | Project name (from `.keysync.json`) |
 | `-e, --env` | Environment name (default `production`). Used for environment-scoped secrets |
 | `--repo` | GitHub repository (`owner/repo`), used with `sync` as an alternative to `--project` |
+| `--store` | Secret store backend (`"fallback"` to use NaCl-encrypted file instead of OS keychain). Also settable via `KEYSYNC_STORE` env var |
 
 ---
 
@@ -333,7 +351,7 @@ When syncing, secrets are merged with three-level precedence: environment-scoped
 
 ## Client Libraries
 
-Retrieve secrets at runtime in your application using native OS keychain access — no dependency on the `keysync` binary.
+Retrieve secrets at runtime in your application. Client libraries check environment variables first (the primary path), then fall back to the OS keychain. No dependency on the `keysync` binary.
 
 | Language | Location | macOS | Linux | Windows | Status |
 |----------|----------|-------|-------|---------|--------|
@@ -379,7 +397,36 @@ Each OS keychain is accessed automatically — no manual configuration is usuall
 - Uses the built-in `security` CLI — no additional software required
 - Secrets stored as generic passwords in the default Keychain
 - Index file at `~/.config/keysync/index.json` tracks stored secret names for fast listing
-- First access may prompt for Keychain permission; add your terminal app to *Keychain Access > Always Allow* to suppress future prompts
+
+**Avoiding keychain prompts**
+
+macOS may prompt for your keychain password when accessing secrets. There are two ways to avoid this:
+
+1. **Sign the binary** — A signed binary lets macOS remember your "Always Allow" choice across rebuilds:
+
+   ```bash
+   make build && make sign
+   # or in one step:
+   make build-signed
+   ```
+
+   Requires a Developer ID Application certificate in your keychain. If you don't have one, see [Apple's docs](https://developer.apple.com/developer-id).
+
+2. **Use the fallback store** — Skips the keychain entirely and uses the NaCl-encrypted file at `~/.config/keysync/store.json`. Best for services and scripts:
+
+   ```bash
+   keysync --store fallback get DATABASE_URL
+   # or set the env var persistently:
+   export KEYSYNC_STORE=fallback
+   ```
+
+**Service launch scripts** — For services that restart, combine the fallback store with export:
+
+```bash
+eval $(keysync --store fallback export --project my-app)
+exec my-app
+```
+
 - View stored secrets: open `Keychain Access.app` > search for "keysync"
 
 ### Linux
@@ -491,6 +538,9 @@ Use `--dry-run` to preview without storing.
 ```bash
 # Build
 make build
+
+# Build and codesign for macOS (avoids keychain "Always Allow" prompt reset)
+make build-signed
 
 # Run tests
 make test
