@@ -1,4 +1,4 @@
-.PHONY: build clean sign build-signed run test test-short test-platform release distclean
+.PHONY: build clean sign build-signed run test test-short test-platform test-clients test-all release distclean
 
 BINDIR  := ./bin
 BINARY  := keysync
@@ -43,13 +43,19 @@ run: build
 	$(BINDIR)/$(BINARY) $(ARGS)
 
 test:
-	go test ./internal/store/... ./internal/config/... ./internal/crypto/... ./internal/commands/... -v -race -count=1
+	go test ./internal/... -v -race -count=1
 
 test-short:
-	go test ./internal/store/... ./internal/config/... ./internal/crypto/... ./internal/commands/... -race -count=1
+	go test ./internal/... -race -count=1
 
 test-platform:
 	go test ./internal/platforms/... -v -count=1
+
+test-clients:
+	cd clients/go && go test ./... -v -race -count=1
+
+test-all: test test-clients
+	@echo "All tests passed."
 
 # Cross-compile for all supported platforms.
 # Usage: make release VERSION=v0.1.0

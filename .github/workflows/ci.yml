@@ -24,7 +24,7 @@ jobs:
           check-latest: true
 
       - name: Run tests
-        run: go test ./internal/store/... ./internal/config/... ./internal/crypto/... ./internal/commands/... -race -count=1
+        run: go test ./internal/... -race -count=1
 
       - name: Verify build
         run: go build -o keysync ./cmd/keysync

@@ -8,6 +8,17 @@ import (
 	"strings"
 )
 
+// execCommand is overridable for testing.
+var execCommand = exec.Command
+
+// SetExecCommandForTesting replaces the exec.Command function used internally by
+// the github package. It returns a restore function. Only use this in tests.
+func SetExecCommandForTesting(fn func(name string, arg ...string) *exec.Cmd) func() {
+	orig := execCommand
+	execCommand = fn
+	return func() { execCommand = orig }
+}
+
 // Client wraps the `gh` CLI for GitHub Secrets operations.
 type Client struct {
 	repo string // "owner/repo"
@@ -34,10 +45,10 @@ func NewClient(repo string) (*Client, error) {
 // detectRepo uses `gh repo view` to determine the current repo.
 func detectRepo() (string, error) {
 	// First check we're in a git repo
-	if err := exec.Command("git", "rev-parse", "--git-dir").Run(); err != nil {
+	if err := execCommand("git", "rev-parse", "--git-dir").Run(); err != nil {
 		return "", fmt.Errorf("could not detect repo: not inside a git repository. Run from your project directory or use --repo owner/name")
 	}
-	cmd := exec.Command("gh", "repo", "view", "--json", "nameWithOwner")
+	cmd := execCommand("gh", "repo", "view", "--json", "nameWithOwner")
 	out, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("could not detect repo: 'gh repo view' failed — is gh installed and authenticated? Use --repo owner/name to set it explicitly")
@@ -56,7 +67,7 @@ func detectRepo() (string, error) {
 
 // Set creates or updates a secret in GitHub.
 func (c *Client) Set(name, value string) error {
-	cmd := exec.Command("gh", "secret", "set", name,
+	cmd := execCommand("gh", "secret", "set", name,
 		"--repo", c.repo,
 	)
 	cmd.Stdin = strings.NewReader(value)
@@ -70,7 +81,7 @@ func (c *Client) Set(name, value string) error {
 
 // List returns all secret names for the repo.
 func (c *Client) List() ([]string, error) {
-	cmd := exec.Command("gh", "secret", "list",
+	cmd := execCommand("gh", "secret", "list",
 		"--repo", c.repo,
 		"--json", "name",
 	)
@@ -105,7 +116,7 @@ func (c *Client) Get(name string) (string, error) {
 
 // Delete removes a secret from GitHub.
 func (c *Client) Delete(name string) error {
-	cmd := exec.Command("gh", "secret", "delete", name,
+	cmd := execCommand("gh", "secret", "delete", name,
 		"--repo", c.repo,
 	)
 	var stderr bytes.Buffer

@@ -7,6 +7,9 @@ import (
 	"strings"
 )
 
+// execCommand is overridable for testing.
+var execCommand = exec.Command
+
 // GetSecret retrieves a secret from the OS secret store via the keysync CLI.
 // This is a bridge for non-Go languages or when the Go library isn't available.
 //
@@ -19,7 +22,7 @@ func GetSecret(project, key string) (string, error) {
 		args = append(args, "--project", project)
 	}
 
-	cmd := exec.Command("keysync", args...)
+	cmd := execCommand("keysync", args...)
 	out, err := cmd.Output()
 	if err != nil {
 		if exitErr, ok := err.(*exec.ExitError); ok {

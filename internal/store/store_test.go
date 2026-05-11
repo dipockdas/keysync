@@ -49,6 +49,10 @@ func TestParseServiceName(t *testing.T) {
 		{"empty string", "", ScopeGlobal, "", ""},
 		{"unprefixed", "other/global", ScopeGlobal, "", ""},
 		{"keysync/ only", "keysync/", ScopeGlobal, "", ""},
+		{"trailing slash global", "keysync/global/", ScopeGlobal, "", ""},
+		{"trailing slash project", "keysync/project/my-app/", ScopeProject, "my-app/", ""},
+		{"env as project name", "keysync/project/env", ScopeProject, "env", ""},
+		{"env as project with env", "keysync/project/env/env/staging", ScopeProject, "env", "staging"},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
@@ -277,4 +281,28 @@ func TestMemoryStore_Concurrency(t *testing.T) {
 		}(i)
 	}
 	wg.Wait()
+}
+
+func TestParseServiceName_RoundTrip(t *testing.T) {
+	cases := []struct {
+		scope   Scope
+		project string
+		env     string
+	}{
+		{ScopeGlobal, "", ""},
+		{ScopeProject, "my-app", ""},
+		{ScopeProject, "my-app", "production"},
+		{ScopeProject, "deep/nested/app", ""},
+		{ScopeProject, "deep/nested/app", "staging"},
+		{ScopeProject, "env", ""},
+		{ScopeProject, "env", "staging"},
+	}
+	for _, tc := range cases {
+		name := serviceName(tc.scope, tc.project, tc.env)
+		gotScope, gotProj, gotEnv := parseServiceName(name)
+		if gotScope != tc.scope || gotProj != tc.project || gotEnv != tc.env {
+			t.Errorf("round-trip(%q, %q, %q): serviceName→parseServiceName = (%q, %q, %q)",
+				tc.scope, tc.project, tc.env, gotScope, gotProj, gotEnv)
+		}
+	}
 }
