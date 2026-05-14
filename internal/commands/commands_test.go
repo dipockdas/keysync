@@ -83,9 +83,11 @@ func captureCommand(cmd *cobra.Command, args []string) (stdout, stderr string, e
 }
 
 // shellCommand wraps exec.Command with a shell that works cross-platform.
+// On Unix it passes the command to /bin/sh -c (which strips outer quotes).
+// On Windows it uses cmd /C, stripping single quotes since cmd doesn't do that.
 func shellCommand(command string) *exec.Cmd {
 	if runtime.GOOS == "windows" {
-		return exec.Command("cmd", "/C", command)
+		return exec.Command("cmd", "/C", strings.ReplaceAll(command, "'", ""))
 	}
 	return exec.Command("/bin/sh", "-c", command)
 }
