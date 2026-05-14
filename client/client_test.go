@@ -3,6 +3,7 @@ package client
 import (
 	"context"
 	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 )
@@ -78,15 +79,30 @@ func TestGetSecretContext(t *testing.T) {
 }
 
 // setHelperProcess overrides exec.Command so keysync CLI invocations go through
-// a /bin/sh -c script. Returns a cleanup function.
+// a cross-platform shell script. Returns a cleanup function.
 func setHelperProcess(t *testing.T, script string) func() {
 	t.Helper()
 
 	orig := execCommand
 	execCommand = func(name string, arg ...string) *exec.Cmd {
-		// Redirect to shell script
-		allArgs := strings.Join(append([]string{name}, arg...), " ")
-		return exec.Command("/bin/sh", "-c", script+" # "+allArgs)
+		return shellCommand(script)
 	}
 	return func() { execCommand = orig }
+}
+
+// shellCommand creates a cross-platform command from a POSIX sh script.
+// Translates echo, stderr redirect, and exit for Windows cmd compatibility.
+func shellCommand(script string) *exec.Cmd {
+	if runtime.GOOS == "windows" {
+		cmd := script
+		// cmd echo with no args outputs "ECHO is on." — use echo. for blank line
+		cmd = strings.ReplaceAll(cmd, "echo ''", "echo.")
+		// Strip single quotes (sh uses them for grouping, cmd treats them literally)
+		cmd = strings.ReplaceAll(cmd, "'", "")
+		// Translate sh redirect/stderr/command separator syntax
+		cmd = strings.ReplaceAll(cmd, ">&2", "1>&2")
+		cmd = strings.ReplaceAll(cmd, ";", " & ")
+		return exec.Command("cmd", "/C", cmd)
+	}
+	return exec.Command("/bin/sh", "-c", script)
 }
