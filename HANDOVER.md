@@ -25,7 +25,6 @@ CLI tool for unified secret management. Source of truth is **GitHub Secrets**; s
 ### Not Yet Implemented
 
 - **Client-side encryption** — `internal/crypto/crypto.go` exists (NaCl sealed boxes) but is not wired into the GitHub client yet
-- **Full test suite** — only manual testing done so far; `MemoryStore` is ready for unit tests
 - **macOS/Linux index file persistence** — only macOS has persistent `~/.config/keysync/index.json`; Linux and Windows use in-memory caches rebuilt on startup
 
 ## Project Structure
@@ -95,7 +94,7 @@ Single binary, ~11MB. Cross-compile with `GOOS=linux GOARCH=amd64 go build`.
 
 1. **Encrypt fallback store** — wire `internal/crypto` into `fallback.go` for at-rest encryption of the file store
 2. **Migrate `--cloud-json` flag** — for programmatic consumption of cloud envs (output as JSON without interactive prompts)
-3. **Test suite** — write unit tests using `MemoryStore` and `httptest` for platform clients
+3. **Index file persistence for Linux/Windows** — persist `keyIndex` to `~/.config/keysync/index.json` for faster startup (currently only macOS has this)
 4. **Homebrew tap** — distribute via `brew install steath/keysync`
 5. **Skill packaging** — package as a Claude Code skill for LLM-guided migration
-6. **Index file persistence for Linux/Windows** — persist `keyIndex` to `~/.config/keysync/index.json` for faster startup (currently only macOS has this)
+6. **Migrate `--cloud-json` flag** — for programmatic consumption of cloud envs (output as JSON without interactive prompts)

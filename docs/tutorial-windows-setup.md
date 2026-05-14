@@ -7,7 +7,7 @@ This tutorial covers building, configuring, and using keysync on Windows. The Wi
 - **Windows 10 or later** (desktop or server edition)
 - **Go 1.25+** — download from [go.dev](https://go.dev/dl/)
 - **Git for Windows** — `git` on your PATH
-- **GitHub CLI (`gh`)** — optional, for GitHub Secrets integration
+- **GitHub CLI (`gh`)** — required for GitHub Secrets integration (`sync`, `set`, `rotate`, `pull`). Install from [cli.github.com](https://cli.github.com) and run `gh auth login`.
 - **Python 3.11+** — optional, for the Python client library
 
 ## Step 1: Install Go

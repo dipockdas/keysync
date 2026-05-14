@@ -98,6 +98,8 @@ When you run `keysync sync`, secrets are collected at all three scope levels (wi
 1. **GitHub Secrets** — via the `gh` CLI
 2. **Deployment platforms** — via their REST/GraphQL APIs
 
+> **Requires `gh` CLI**: The `sync`, `set`, `rotate`, and `pull` commands all interact with GitHub Secrets via the `gh` CLI. Install it from [cli.github.com](https://cli.github.com) and authenticate with `gh auth login` before using these commands.
+
 **Built-in platforms**: Vercel, Railway, and Supabase are supported out of the box — add their project IDs to `.keysync.json` and store the API tokens as global secrets.
 
 **Custom platforms**: The `Platform` interface (`internal/platforms/platform.go`) is extensible — just implement `Name()` and `Upsert(key, value)` and register via `platforms.Register()`. If you use an AI coding assistant, it can help you write the integration: open `internal/platforms/` and ask it to implement a new platform following the existing patterns.
@@ -488,7 +490,7 @@ jobs:
       - name: Build keysync
         run: go build -o ./bin/keysync ./cmd/keysync
       - name: Sync all platforms
-        run: ./bin/keysync sync
+        run: ./bin/keysync sync --repo ${{ github.repository }} --store fallback
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
