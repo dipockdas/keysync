@@ -5,6 +5,8 @@ import (
 	"context"
 	"io"
 	"os"
+	"os/exec"
+	"runtime"
 	"strings"
 	"testing"
 
@@ -78,6 +80,14 @@ func captureCommand(cmd *cobra.Command, args []string) (stdout, stderr string, e
 	io.Copy(errBuf, rErr)
 
 	return outBuf.String(), errBuf.String(), err
+}
+
+// shellCommand wraps exec.Command with a shell that works cross-platform.
+func shellCommand(command string) *exec.Cmd {
+	if runtime.GOOS == "windows" {
+		return exec.Command("cmd", "/C", command)
+	}
+	return exec.Command("/bin/sh", "-c", command)
 }
 
 // ---------------------------------------------------------------------------

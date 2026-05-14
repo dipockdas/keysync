@@ -19,7 +19,7 @@ func TestRotateCmd_ProjectScope(t *testing.T) {
 
 	// Suppress github error by mocking exec to succeed silently
 	defer github.SetExecCommandForTesting(func(name string, arg ...string) *exec.Cmd {
-		return exec.Command("/bin/sh", "-c", "exit 0")
+		return shellCommand("exit 0")
 	})()
 
 	cmd := newRotateCmd()
@@ -55,7 +55,7 @@ func TestRotateCmd_EnvScope(t *testing.T) {
 	secretSt.Set(ctx, store.ScopeProject, "test-app", "staging", "ROTATE_KEY", "old-env-val")
 
 	defer github.SetExecCommandForTesting(func(name string, arg ...string) *exec.Cmd {
-		return exec.Command("/bin/sh", "-c", "exit 0")
+		return shellCommand("exit 0")
 	})()
 
 	cmd := newRotateCmd()
