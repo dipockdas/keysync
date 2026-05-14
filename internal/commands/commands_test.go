@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"runtime"
 	"strings"
 	"testing"
@@ -90,6 +91,20 @@ func shellCommand(command string) *exec.Cmd {
 		return exec.Command("cmd", "/C", strings.ReplaceAll(command, "'", ""))
 	}
 	return exec.Command("/bin/sh", "-c", command)
+}
+
+// mockOutput creates an exec.Cmd that writes the given text to stdout.
+// Uses temp files to avoid shell quoting issues across platforms.
+func mockOutput(t *testing.T, s string) *exec.Cmd {
+	t.Helper()
+	f := filepath.Join(t.TempDir(), "out")
+	if err := os.WriteFile(f, []byte(s), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if runtime.GOOS == "windows" {
+		return exec.Command("cmd", "/C", "type", f)
+	}
+	return exec.Command("cat", f)
 }
 
 // ---------------------------------------------------------------------------

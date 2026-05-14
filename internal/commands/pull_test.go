@@ -18,8 +18,7 @@ func TestPullCmd_AllFound(t *testing.T) {
 
 	// Mock github to return matching secrets
 	defer github.SetExecCommandForTesting(func(name string, arg ...string) *exec.Cmd {
-		return shellCommand(
-			`echo '[{"name":"SECRET_1"},{"name":"SECRET_2"}]'`)
+		return mockOutput(t, `[{"name":"SECRET_1"},{"name":"SECRET_2"}]`)
 	})()
 
 	cmd := newPullCmd()
@@ -48,8 +47,7 @@ func TestPullCmd_SomeMissing(t *testing.T) {
 	secretSt.Set(ctx, store.ScopeGlobal, "", "", "SECRET_1", "val1")
 
 	defer github.SetExecCommandForTesting(func(name string, arg ...string) *exec.Cmd {
-		return shellCommand(
-			`echo '[{"name":"SECRET_1"},{"name":"SECRET_2"}]'`)
+		return mockOutput(t, `[{"name":"SECRET_1"},{"name":"SECRET_2"}]`)
 	})()
 
 	cmd := newPullCmd()
@@ -74,8 +72,7 @@ func TestPullCmd_ProjectScopeCheck(t *testing.T) {
 	secretSt.Set(ctx, store.ScopeProject, "test-app", "", "SECRET_1", "val1")
 
 	defer github.SetExecCommandForTesting(func(name string, arg ...string) *exec.Cmd {
-		return shellCommand(
-			`echo '[{"name":"SECRET_1"}]'`)
+		return mockOutput(t, `[{"name":"SECRET_1"}]`)
 	})()
 
 	cmd := newPullCmd()
@@ -103,8 +100,7 @@ func TestPullCmd_EnvScopeCheck(t *testing.T) {
 	secretSt.Set(ctx, store.ScopeProject, "test-app", "production", "SECRET_1", "val1")
 
 	defer github.SetExecCommandForTesting(func(name string, arg ...string) *exec.Cmd {
-		return shellCommand(
-			`echo '[{"name":"SECRET_1"}]'`)
+		return mockOutput(t, `[{"name":"SECRET_1"}]`)
 	})()
 
 	cmd := newPullCmd()
@@ -127,7 +123,7 @@ func TestPullCmd_EmptyGithub(t *testing.T) {
 	defer setupTest(t)()
 
 	defer github.SetExecCommandForTesting(func(name string, arg ...string) *exec.Cmd {
-		return shellCommand( `echo '[]'`)
+		return mockOutput(t, `[]`)
 	})()
 
 	cmd := newPullCmd()
