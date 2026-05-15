@@ -74,6 +74,17 @@ jobs:
         with:
           go-version: stable
           check-latest: true
+
+      - name: Install signing certificate
+        run: |
+          echo "${{ secrets.DEVELOPER_ID_CERT }}" | base64 -d > /tmp/cert.p12
+          security create-keychain -p temp temp.keychain
+          security unlock-keychain -p temp temp.keychain
+          security import /tmp/cert.p12 -k temp.keychain \
+            -P "${{ secrets.DEVELOPER_ID_CERT_PWD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k temp temp.keychain
+          security default-keychain -s temp.keychain
+
       - name: Build darwin (native, with Keychain cgo support)
         shell: bash
         run: |
@@ -88,17 +99,33 @@ jobs:
               -o "dist/keysync_darwin_${arch}/keysync" \
               ./cmd/keysync
           done
-      - name: Package archives
+
+      - name: Sign binaries
+        shell: bash
+        run: |
+          for dir in dist/keysync_darwin_*; do
+            codesign --force --sign "Developer ID Application: Dipock Das (W69M8X9AXT)" \
+              --timestamp "$dir/keysync"
+          done
+
+      - name: Package and notarize
         shell: bash
         run: |
           cd dist
           for dir in keysync_darwin_*; do
-            (cd "$dir" && tar czf "../${dir}.tar.gz" .)
+            zip_file="${dir}.zip"
+            (cd "$dir" && zip -r "../$zip_file" .)
+            xcrun notarytool submit "$zip_file" \
+              --apple-id ${{ secrets.APPLE_ID }} \
+              --team-id ${{ secrets.TEAM_ID }} \
+              --password ${{ secrets.APPLE_ID_PWD }} \
+              --wait
           done
+
       - uses: actions/upload-artifact@v4
         with:
           name: darwin-artifacts
-          path: dist/keysync_darwin_*.tar.gz
+          path: dist/keysync_darwin_*.zip
 
   create-release:
     needs: [build-linux, build-darwin]
