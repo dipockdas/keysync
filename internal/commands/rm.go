@@ -26,7 +26,15 @@ secrets from GitHub or deployment platforms.
 {b}See also:{/b}
   {c}keysync list --help{/c}
   {c}keysync set --help{/c}`),
-		Args: cobra.ExactArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return fmt.Errorf("requires a KEY to delete (e.g. keysync rm OLD_SECRET)")
+			}
+			if len(args) > 1 {
+				return fmt.Errorf("accepts only one KEY at a time")
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			key := args[0]
 

@@ -76,7 +76,7 @@ development testing. These are stored in the local OS secret store with a
 func generateTestValue() (string, error) {
 	b := make([]byte, 16)
 	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("rand.Read: %w", err)
+		return "", fmt.Errorf("generate random value: %w", err)
 	}
 	return hex.EncodeToString(b), nil
 }

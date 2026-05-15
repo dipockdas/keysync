@@ -34,7 +34,15 @@ all projects on this machine).
 {b}See also:{/b}
   {c}keysync sync --help{/c}
   Tutorial: {u}https://github.com/dipockdas/keysync#quick-start{/u}`),
-		Args: cobra.ExactArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return fmt.Errorf("requires KEY=value argument (e.g. keysync set DATABASE_URL=postgres://localhost/db)")
+			}
+			if len(args) > 1 {
+				return fmt.Errorf("too many arguments — did you forget to quote? Use KEY=value syntax")
+			}
+			return nil
+		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			kv := args[0]
 			eq := strings.IndexByte(kv, '=')

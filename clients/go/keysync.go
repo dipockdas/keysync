@@ -46,7 +46,7 @@ func GetSecret(key, project string) (string, error) {
 			return val, nil
 		}
 		if !isNotFound(err) {
-			return "", fmt.Errorf("project scope: %w", err)
+			return "", fmt.Errorf("read project-scoped secret: %w", err)
 		}
 	}
 
@@ -57,7 +57,7 @@ func GetSecret(key, project string) (string, error) {
 		if isNotFound(err) {
 			return "", ErrNotFound
 		}
-		return "", fmt.Errorf("global scope: %w", err)
+		return "", fmt.Errorf("read global secret: %w", err)
 	}
 	return val, nil
 }

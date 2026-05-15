@@ -56,7 +56,7 @@ func (s *SealedBox) Encrypt(plaintext []byte) ([]byte, error) {
 	// Sealed box: anonymous sender, recipient with secret key can open
 	encrypted, err := box.SealAnonymous(nil, plaintext, s.publicKey, rand.Reader)
 	if err != nil {
-		return nil, fmt.Errorf("seal anonymous: %w", err)
+		return nil, fmt.Errorf("encrypt data: %w", err)
 	}
 	return encrypted, nil
 }
@@ -65,7 +65,7 @@ func (s *SealedBox) Encrypt(plaintext []byte) ([]byte, error) {
 func (s *SealedBox) Decrypt(ciphertext []byte) ([]byte, error) {
 	decrypted, ok := box.OpenAnonymous(nil, ciphertext, s.publicKey, s.secretKey)
 	if !ok {
-		return nil, fmt.Errorf("open anonymous: decryption failed")
+		return nil, fmt.Errorf("decrypt data: decryption failed")
 	}
 	return decrypted, nil
 }

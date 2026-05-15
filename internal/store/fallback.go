@@ -28,7 +28,7 @@ type FallbackStore struct {
 func NewFallbackStore() (*FallbackStore, error) {
 	home, err := os.UserHomeDir()
 	if err != nil {
-		return nil, fmt.Errorf("home dir: %w", err)
+		return nil, fmt.Errorf("cannot find home directory: %w", err)
 	}
 	dir := filepath.Join(home, ".config", "keysync")
 	if err := os.MkdirAll(dir, 0700); err != nil {

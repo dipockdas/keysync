@@ -31,7 +31,15 @@ If {c}--env{/c} is also provided, it targets a specific environment scope.
 
 {b}See also:{/b}
   {c}keysync set --help{/c}`),
-		Args: cobra.ExactArgs(1),
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) == 0 {
+				return fmt.Errorf("requires a KEY to rotate (e.g. keysync rotate DB_PASSWORD)")
+			}
+			if len(args) > 1 {
+				return fmt.Errorf("accepts only one KEY at a time")
+			}
+			return nil
+		},
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			key := args[0]
 			if err := validateKeyName(key); err != nil {
@@ -79,7 +87,7 @@ If {c}--env{/c} is also provided, it targets a specific environment scope.
 func generateSecret() (string, error) {
 	b := make([]byte, 32)
 	if _, err := rand.Read(b); err != nil {
-		return "", fmt.Errorf("rand.Read: %w", err)
+		return "", fmt.Errorf("generate random value: %w", err)
 	}
 	return base64.RawStdEncoding.EncodeToString(b), nil
 }
