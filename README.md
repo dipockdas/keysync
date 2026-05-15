@@ -4,6 +4,7 @@
 [![Sync Secrets](https://github.com/dipockdas/keysync/actions/workflows/sync-secrets.yml/badge.svg)](https://github.com/dipockdas/keysync/actions/workflows/sync-secrets.yml)
 [![Release](https://img.shields.io/github/v/release/dipockdas/keysync)](https://github.com/dipockdas/keysync/releases)
 [![Go Report](https://goreportcard.com/badge/github.com/dipockdas/keysync)](https://goreportcard.com/report/github.com/dipockdas/keysync)
+[![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 **Unified secret management CLI** — store and sync secrets across local OS keychains, GitHub Secrets, and deployment platforms (Vercel, Railway, Supabase).
 
