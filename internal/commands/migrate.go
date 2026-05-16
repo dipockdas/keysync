@@ -142,9 +142,9 @@ a cloud platform (Vercel, Railway, or Supabase).
 For each key found, you interactively choose the scope (global, project, or
 project+env) and confirm storage. Use {c}--dry-run{/c} to preview without side effects.
 
-After migration, keysync prints step-by-step instructions for replacing direct
-{c}.env{/c} usage with keysync commands (including code examples for Node.js, Go,
-Python, and Ruby).
+After migration, keysync prints step-by-step instructions for the coding
+assistant to complete the migration, with code examples for TypeScript, Go,
+and Python.
 
 {b}Examples:{/b}
   {c}keysync migrate --file .env.local{/c}
@@ -215,9 +215,17 @@ Python, and Ruby).
 			}
 			fmt.Println()
 
-			// Interactive migration
+			// Interactive migration — remember scope/project between keys
 			scanner := bufio.NewScanner(os.Stdin)
 			var migratedKeys []migratedKey
+			var savedScope string // "", "global", or "project"
+			var savedProject string
+
+			// Default project name: from --project flag, or detected from CWD
+			defaultProject := project
+			if defaultProject == "" {
+				defaultProject = detectedName
+			}
 
 			for _, kv := range secrets {
 				if err := validateKeyName(kv.key); err != nil {
@@ -226,15 +234,10 @@ Python, and Ruby).
 				}
 				fmt.Printf("  %s=***\n", kv.key)
 
-				// Scope prompt
-				defaultScope := "g"
-				scopeHint := "global"
-				if project != "" {
-					defaultScope = "p"
-					scopeHint = fmt.Sprintf("project/%s", project)
-				}
-				fmt.Printf("    Scope: [g]lobal / [p]roject (default: %s): ", scopeHint)
-				scopeChoice := readLine(scanner, defaultScope)
+				// Scope prompt — use saved choice as default
+				def := scopePromptDefaults(savedScope, savedProject)
+				fmt.Printf("    Scope: [g]lobal / [p]roject (default: %s): ", def.hint)
+				scopeChoice := readLine(scanner, def.key)
 				if scanner.Err() != nil {
 					return fmt.Errorf("read input: %w", scanner.Err())
 				}
@@ -244,17 +247,25 @@ Python, and Ruby).
 				env := ""
 				if strings.EqualFold(scopeChoice, "p") || strings.EqualFold(scopeChoice, "project") {
 					scope = store.ScopeProject
+					savedScope = "project"
 					proj = project
 					if proj == "" {
-						fmt.Print("    Project name: ")
-						proj = readLine(scanner, "")
+						prompt := fmt.Sprintf("    Project name (default: %s): ", savedProject)
+						if savedProject == "" {
+							prompt = "    Project name: "
+						}
+						fmt.Print(prompt)
+						proj = readLine(scanner, defaultProject)
 						if proj == "" {
 							fmt.Println("    Skipping — no project name given.")
 							continue
 						}
+						savedProject = proj
 					}
 					// Use default env (production) for project-scoped migration
 					env = envFlag
+				} else {
+					savedScope = "global"
 				}
 
 				if migrateDryRun {
@@ -441,6 +452,25 @@ func readLine(scanner *bufio.Scanner, defaultVal string) string {
 		return defaultVal
 	}
 	return text
+}
+
+// scopePromptDef holds the default key and human label for the scope prompt.
+type scopePromptDef struct {
+	key  string // "g" or "p"
+	hint string // "global", "project", "project - myapp"
+}
+
+// scopePromptDefaults computes the scope prompt defaults based on previously
+// saved choices, enabling "remember between keys" behaviour.
+func scopePromptDefaults(savedScope, savedProject string) scopePromptDef {
+	if savedScope == "project" {
+		hint := "project"
+		if savedProject != "" {
+			hint += " - " + savedProject
+		}
+		return scopePromptDef{key: "p", hint: hint}
+	}
+	return scopePromptDef{key: "g", hint: "global"}
 }
 
 // storeLabel returns a human-readable name for the current OS store.
@@ -754,106 +784,50 @@ func printClientLibrarySuggestions(refs []keyReference) {
 	fmt.Println("   For full documentation, see the clients/ directory in the repo.")
 }
 
-// printMigrationInstructions outputs step-by-step instructions for replacing
-// direct .env usage with keysync commands, formatted for both humans and LLMs.
+// printMigrationInstructions outputs concise next-step instructions for the coding
+// assistant to complete the migration (replace .env access in source code).
 func printMigrationInstructions(keys []migratedKey) {
-	proj := project
-	projFlag := ""
-	if proj != "" {
-		projFlag = fmt.Sprintf(" --project %s", proj)
-	}
-
 	fmt.Println("---INSTRUCTIONS_START---")
-	fmt.Println("# Migration Instructions for Coding Assistant")
+	fmt.Println("# Migration Complete — Next Steps for Coding Assistant")
 	fmt.Println()
-	fmt.Println("The following secrets have been migrated from .env to keysync.")
-	fmt.Println("Replace all direct .env access with keysync commands.")
-
-	if migrateDryRun {
-		fmt.Println()
-		fmt.Println("## NOTE: This was a DRY RUN")
-		fmt.Println("No secrets were actually stored. Run the following to apply:")
-		fmt.Println("```bash")
-		fmt.Println("keysync migrate --file .env")
-		fmt.Println("```")
-	}
-
-	if proj == "" {
-		fmt.Println()
-		fmt.Println("## 1. Set a project name (recommended for multi-project setups)")
-		fmt.Println("Run: keysync init")
-		fmt.Printf("Then edit .keysync.json to add your project.\n")
-		fmt.Println("Re-run: keysync migrate --file .env.local --project <name>")
+	fmt.Println("These secrets are now in the OS keychain. Replace all direct .env access")
+	fmt.Println("with keysync calls in the source code below.")
+	fmt.Println()
+	fmt.Println("## Migrated secrets")
+	for _, m := range keys {
+		label := "global"
+		if m.Scope == "project" {
+			label = "project/" + m.Project
+		}
+		fmt.Printf("- %s → stored as %s\n", m.Key, label)
 	}
 
 	fmt.Println()
-	fmt.Println("## 2. Remove .env loading from your application")
+	fmt.Println("## Replace .env access in source code")
 	fmt.Println()
-	fmt.Println("### Node.js / TypeScript")
+	fmt.Println("### TypeScript / Node.js")
+	fmt.Println("```typescript")
+	fmt.Println(`import { getSecret } from "@keysync/node";`)
+	fmt.Println(`const apiKey = await getSecret("SECRET_NAME");`)
 	fmt.Println("```")
-	fmt.Println("// REMOVE these lines:")
-	fmt.Println("require('dotenv').config()           // CJS")
-	fmt.Println("import 'dotenv/config'               // ESM")
-	fmt.Println("import { config } from 'dotenv'      // named import")
-	fmt.Println("config()")
-	fmt.Println()
-	fmt.Println("// REPLACE process.env.X with:")
-	fmt.Println("const { execSync } = require('child_process');")
-	fmt.Println("const DATABASE_URL = execSync('keysync get DATABASE_URL" + projFlag + "', { encoding: 'utf-8' }).trim();")
-	fmt.Println("```")
-	fmt.Println()
-	fmt.Println("Or use the inject approach (recommended for migration):")
-	fmt.Println("```bash")
-	fmt.Println("keysync inject" + projFlag + " > .env.local")
-	fmt.Println("# Then keep your existing dotenv loading — .env.local is gitignored")
-	fmt.Println("```")
-
 	fmt.Println()
 	fmt.Println("### Go")
+	fmt.Println("```go")
+	fmt.Println(`import "github.com/dipockdas/keysync/clients/go"`)
+	fmt.Println(`val, err := keysync.GetGlobal("SECRET_NAME")  // or keysync.GetSecret(project, "SECRET_NAME")`)
 	fmt.Println("```")
-	fmt.Println("import \"github.com/dipockdas/keysync/client\"")
-	fmt.Println()
-	fmt.Printf("val, err := client.GetSecret(%q, \"KEY\")\n", proj)
-	fmt.Println("```")
-
 	fmt.Println()
 	fmt.Println("### Python")
 	fmt.Println("```python")
-	fmt.Println("import subprocess")
-	fmt.Println()
-	fmt.Println("# REPLACE os.environ[\"KEY\"] with:")
-	fmt.Printf("val = subprocess.check_output([\"keysync\", \"get\", \"KEY\"%s]).decode().strip()\n", projFlag)
+	fmt.Println(`from keysync import get_secret`)
+	fmt.Println(`api_key = get_secret("SECRET_NAME")`)
 	fmt.Println("```")
 
 	fmt.Println()
-	fmt.Println("### Ruby")
-	fmt.Println("```")
-	fmt.Println("# REPLACE ENV[\"KEY\"] with:")
-	fmt.Printf("val = `keysync get KEY%s`.strip\n", projFlag)
-	fmt.Println("```")
+	fmt.Println("## Cleanup checklist")
+	fmt.Println("1. Remove .env from source control: `echo \".env*\" >> .gitignore`")
+	fmt.Println("2. Remove dotenv/config imports from entry points")
+	fmt.Println("3. For CI/CD: run `keysync sync` in your workflow to push secrets to GitHub")
 
-	fmt.Println()
-	fmt.Println("## 3. Add .env to .gitignore (if not already there)")
-	fmt.Println("```")
-	fmt.Println(".env")
-	fmt.Println(".env.local")
-	fmt.Println(".env.*")
-	fmt.Println("```")
-
-	fmt.Println()
-	fmt.Println("## 4. For CI/CD")
-	fmt.Println("Add secrets to GitHub Secrets via:")
-	fmt.Println("```bash")
-	for _, m := range keys {
-		scope := "global"
-		if m.Scope == "project" {
-			scope = "project/" + m.Project
-		}
-		fmt.Printf("keysync set %s=<value> --%s\n", m.Key, scope)
-	}
-	fmt.Println("```")
-	fmt.Println()
-	fmt.Println("Then the GitHub Action (.github/workflows/sync-secrets.yml) will")
-	fmt.Println("automatically push them to deployment platforms on push to main.")
 	fmt.Println("---INSTRUCTIONS_END---")
 }

@@ -1,6 +1,9 @@
 package commands
 
 import (
+	"bytes"
+	"os"
+	"strings"
 	"testing"
 )
 
@@ -262,6 +265,150 @@ func TestIsScannableExt_Valid(t *testing.T) {
 				t.Errorf("isScannableExt(%q) = false, want true", ext)
 			}
 		})
+	}
+}
+
+// ---------------------------------------------------------------------------
+// scopePromptDefaults tests — verify saved scope/project memory
+// ---------------------------------------------------------------------------
+
+func TestScopePromptDefaults_NoSavedScope(t *testing.T) {
+	d := scopePromptDefaults("", "")
+	if d.key != "g" {
+		t.Errorf("key = %q, want %q", d.key, "g")
+	}
+	if d.hint != "global" {
+		t.Errorf("hint = %q, want %q", d.hint, "global")
+	}
+}
+
+func TestScopePromptDefaults_SavedGlobal(t *testing.T) {
+	d := scopePromptDefaults("global", "")
+	if d.key != "g" {
+		t.Errorf("key = %q, want %q", d.key, "g")
+	}
+	if d.hint != "global" {
+		t.Errorf("hint = %q, want %q", d.hint, "global")
+	}
+}
+
+func TestScopePromptDefaults_SavedProjectNoName(t *testing.T) {
+	d := scopePromptDefaults("project", "")
+	if d.key != "p" {
+		t.Errorf("key = %q, want %q", d.key, "p")
+	}
+	if d.hint != "project" {
+		t.Errorf("hint = %q, want %q", d.hint, "project")
+	}
+}
+
+func TestScopePromptDefaults_SavedProjectWithName(t *testing.T) {
+	d := scopePromptDefaults("project", "myapp")
+	if d.key != "p" {
+		t.Errorf("key = %q, want %q", d.key, "p")
+	}
+	if d.hint != "project - myapp" {
+		t.Errorf("hint = %q, want %q", d.hint, "project - myapp")
+	}
+}
+
+func TestScopePromptDefaults_SwitchingBack(t *testing.T) {
+	// After project scope, explicitly choose global — call savedScope="global"
+	d := scopePromptDefaults("global", "myapp")
+	if d.key != "g" {
+		t.Errorf("key = %q, want %q", d.key, "g")
+	}
+	if d.hint != "global" {
+		t.Errorf("hint = %q, want %q", d.hint, "global")
+	}
+}
+
+// ---------------------------------------------------------------------------
+// printMigrationInstructions tests — verify the rewritten output
+// ---------------------------------------------------------------------------
+
+func TestPrintMigrationInstructions_Output(t *testing.T) {
+	keys := []migratedKey{
+		{Key: "API_KEY", Scope: "global", Project: ""},
+		{Key: "DB_URL", Scope: "project", Project: "myapp"},
+	}
+
+	// Capture stdout
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	defer func() { os.Stdout = old }()
+
+	printMigrationInstructions(keys)
+
+	w.Close()
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	// Must start with the marker
+	if !strings.Contains(output, "---INSTRUCTIONS_START---") {
+		t.Error("output missing INSTRUCTIONS_START marker")
+	}
+	if !strings.Contains(output, "---INSTRUCTIONS_END---") {
+		t.Error("output missing INSTRUCTIONS_END marker")
+	}
+
+	// Must contain proper TypeScript client import (not execSync)
+	if !strings.Contains(output, `import { getSecret } from "@keysync/node"`) {
+		t.Error("output missing TypeScript client library import")
+	}
+	if strings.Contains(output, "execSync") {
+		t.Error("output should not contain execSync shell-out examples")
+	}
+
+	// Must contain proper Go client import
+	if !strings.Contains(output, `import "github.com/dipockdas/keysync/clients/go"`) {
+		t.Error("output missing Go client library import")
+	}
+
+	// Must contain proper Python client import
+	if !strings.Contains(output, `from keysync import get_secret`) {
+		t.Error("output missing Python client library import")
+	}
+
+	// Must NOT contain Ruby examples
+	if strings.Contains(output, "Ruby") || strings.Contains(output, `ENV["`) {
+		t.Error("output should not contain Ruby examples")
+	}
+
+	// Must NOT contain circular "re-run migrate" advice
+	if strings.Contains(output, "Re-run") {
+		t.Error("output should not contain 're-run migrate' advice")
+	}
+
+	// Must contain the migrated keys
+	if !strings.Contains(output, "API_KEY") || !strings.Contains(output, "DB_URL") {
+		t.Error("output missing migrated key names")
+	}
+
+	// Must contain scope info
+	if !strings.Contains(output, "global") || !strings.Contains(output, "project/myapp") {
+		t.Error("output missing scope information")
+	}
+}
+
+func TestPrintMigrationInstructions_Empty(t *testing.T) {
+	old := os.Stdout
+	r, w, _ := os.Pipe()
+	os.Stdout = w
+	defer func() { os.Stdout = old }()
+
+	printMigrationInstructions(nil)
+
+	w.Close()
+	var buf bytes.Buffer
+	buf.ReadFrom(r)
+	output := buf.String()
+
+	// Should still produce valid marked output
+	if !strings.Contains(output, "---INSTRUCTIONS_START---") {
+		t.Error("output missing INSTRUCTIONS_START marker")
 	}
 }
 
