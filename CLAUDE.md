@@ -41,35 +41,43 @@ make clean          # rm -rf ./bin/
 
 When helping a user who has run `keysync migrate` and needs to update source code:
 
-```bash
-# The migrate output lists migrated keys — reference these
-keysync migrate --file .env --project <name>
+### Workflow
 
-# Search for .env usage patterns
-rg "process\.env\.|os\.Getenv|os\.environ" --type-add 'src:*.{ts,js,go,py}' -t src
-```
+1. **Get the migrated keys** from the `---MIGRATION_RESULT_START---` JSON block in the user's `keysync migrate` output. Each entry has `key`, `scope` ("global" or "project"), and `project`.
 
-**Replacement patterns** (never expose secret values, only use key names):
+2. **Find references** across the project:
+   ```bash
+   rg "process\.env\.|os\.Getenv|os\.environ|ENV\[" --glob '*.{ts,tsx,js,jsx,go,py,rb,swift}'
+   ```
 
+3. **Replace** each reference using the patterns below. Use global accessor for `scope: "global"`, project accessor for `scope: "project"`.
+
+4. **Remove dotenv imports** — `import 'dotenv/config'`, `require('dotenv').config()`, `load_dotenv()`, `from dotenv import load_dotenv`.
+
+5. **Clean up** — add `.env*` to `.gitignore`. The `.env` file is safe to delete (keysync never modifies it).
+
+### Replacement patterns
+
+**TypeScript** (install `@keysync/node`):
 ```typescript
-// TypeScript: replace process.env.KEY
-- const key = process.env.API_KEY;
-+ import { getSecret } from '@keysync/node';
-+ const key = await getSecret('API_KEY');
+import { getSecret } from '@keysync/node';
+const key = await getSecret('API_KEY');                    // global
+const key = await getSecret('DB_URL', 'myapp');            // project
+const [a, b] = await Promise.all([getSecret('A'), getSecret('B')]);
 ```
 
+**Go** (`go get github.com/dipockdas/keysync/clients/go`):
 ```go
-// Go: replace os.Getenv("KEY")
-- key := os.Getenv("API_KEY")
-+ import "github.com/dipockdas/keysync/clients/go"
-+ key, err := keysync.GetGlobal("API_KEY")
+import "github.com/dipockdas/keysync/clients/go"
+val, err := keysync.GetGlobal("API_KEY")                  // global
+val, err := keysync.GetSecret("myapp", "DB_URL")          // project
 ```
 
+**Python** (`pip install keysync`):
 ```python
-# Python: replace os.environ.get("KEY")
-- key = os.environ.get("API_KEY")
-+ from keysync import get_secret
-+ key = get_secret("API_KEY")
+from keysync import get_secret
+key = get_secret("API_KEY")                               # global
+key = get_secret("DB_URL", project="myapp")               # project
 ```
 
-Also remove dotenv imports and add `.env*` to `.gitignore`.
+**Never inspect or log secret values.** Only key names are needed for migration.

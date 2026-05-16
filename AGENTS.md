@@ -41,32 +41,77 @@ Each library follows the same pattern:
 
 When a user has run `keysync migrate` and needs their source code updated:
 
-**Step 1: Understand what was migrated**
-The `keysync migrate` output lists every migrated key with its scope. For example:
+### Workflow
+
+1. **Get the migrated key list** — If the user provides the `---MIGRATION_RESULT_START---` JSON block from `keysync migrate` output, use it. Otherwise ask: "What keys were migrated and what scope did you choose for each?"
+
+2. **Find .env references** — Search the project for these patterns:
+   ```bash
+   rg "process\.env\.|os\.Getenv|os\.environ|ENV\[" --glob '*.{ts,tsx,js,jsx,go,py,rb}'
+   ```
+
+3. **Replace each reference** — Use the appropriate client library below. Match the scope: use global accessor for global secrets, project accessor for project-scoped ones.
+
+4. **Remove dotenv imports** — Delete `import 'dotenv/config'`, `require('dotenv').config()`, `load_dotenv()`, `from dotenv import load_dotenv`.
+
+5. **Clean up** — Add `.env*` to `.gitignore`. Tell the user the `.env` file is safe to delete (keysync never modifies it).
+
+### Replacement patterns by language
+
+**TypeScript / Node.js** — install `@keysync/node`, then:
+
+```typescript
+// Global secret
+import { getSecret } from '@keysync/node';
+const apiKey = await getSecret('API_KEY');
+
+// Project-scoped secret (falls back to global if no project match)
+const dbUrl = await getSecret('DATABASE_URL', 'myapp');
+
+// Multiple secrets
+const [key, url] = await Promise.all([
+  getSecret('API_KEY'),
+  getSecret('DATABASE_URL', 'myapp'),
+]);
 ```
-API_KEY → stored as global
-DB_URL → stored as project/myapp
+
+**Go** — add `github.com/dipockdas/keysync/clients/go` to `go.mod`, then:
+
+```go
+import "github.com/dipockdas/keysync/clients/go"
+
+// Global secret
+apiKey, err := keysync.GetGlobal("API_KEY")
+
+// Project-scoped secret
+dbUrl, err := keysync.GetSecret("myapp", "DATABASE_URL")
 ```
 
-**Step 2: Find all references in source code**
-Search for `process.env.KEY`, `os.Getenv("KEY")`, `os.environ["KEY"]`, `ENV["KEY"]`.
+**Python** — install `keysync`, then:
 
-**Step 3: Replace with the appropriate client library call**
+```python
+from keysync import get_secret
 
-| Language | Before | After |
-|----------|--------|-------|
-| TypeScript | `process.env.KEY` | `await getSecret("KEY")` from `@keysync/node` |
-| Go | `os.Getenv("KEY")` | `keysync.GetGlobal("KEY")` or `keysync.GetSecret("project", "KEY")` |
-| Python | `os.environ.get("KEY")` | `get_secret("KEY")` from `keysync` |
+# Global secret
+api_key = get_secret("API_KEY")
 
-**Step 4: Remove dotenv imports**
-Remove `import 'dotenv/config'`, `require('dotenv').config()`, `load_dotenv()` etc.
+# Project-scoped secret
+db_url = get_secret("DATABASE_URL", project="myapp")
+```
 
-**Step 5: Clean up**
-- Add `.env*` to `.gitignore`
-- Delete or archive the `.env` file
+**Swift** — add `KeySync` package dependency, then:
 
-Never read or expose the actual secret values — only the key names are needed.
+```swift
+import KeySync
+
+// Global secret
+let apiKey = try KeySyncClient.shared.getSecret("API_KEY")
+
+// Project-scoped secret
+let dbUrl = try KeySyncClient.shared.getSecret("DATABASE_URL", project: "myapp")
+```
+
+**Important:** Never read or expose secret values. Only key names and scope labels are needed for migration.
 
 ## Writing client libraries
 
