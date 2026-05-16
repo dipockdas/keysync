@@ -12,7 +12,7 @@
   "keywords": ["keysync", "secrets", "keychain"],
   "license": "MIT",
   "devDependencies": {
-    "typescript": "^5.5.0",
+    "typescript": "^6.0.3",
     "vitest": "^2.0.0",
     "@types/node": "^22.0.0"
   }
