@@ -4,6 +4,7 @@ import (
 	"context"
 	"os"
 	"path/filepath"
+	"sync"
 	"testing"
 )
 
@@ -138,18 +139,21 @@ func TestFallbackStore_Concurrency(t *testing.T) {
 	}
 
 	// Concurrent writes
-	done := make(chan struct{})
+	var wg sync.WaitGroup
+	wg.Add(3)
 	go func() {
+		defer wg.Done()
 		s.Set(ctx, ScopeGlobal, "", "", "CONCUR_A", "a")
-		close(done)
 	}()
 	go func() {
+		defer wg.Done()
 		s.Set(ctx, ScopeGlobal, "", "", "CONCUR_B", "b")
 	}()
 	go func() {
+		defer wg.Done()
 		s.Get(ctx, ScopeGlobal, "", "", "CONCUR_A")
 	}()
-	<-done
+	wg.Wait()
 
 	val, err := s.Get(ctx, ScopeGlobal, "", "", "CONCUR_A")
 	if err != nil {
