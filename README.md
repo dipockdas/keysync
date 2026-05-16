@@ -2,7 +2,6 @@
 
 [![CI](https://github.com/dipockdas/keysync/actions/workflows/ci.yml/badge.svg)](https://github.com/dipockdas/keysync/actions/workflows/ci.yml)
 [![Sync Secrets](https://github.com/dipockdas/keysync/actions/workflows/sync-secrets.yml/badge.svg)](https://github.com/dipockdas/keysync/actions/workflows/sync-secrets.yml)
-[![CodeQL](https://github.com/dipockdas/keysync/actions/workflows/codeql.yml/badge.svg)](https://github.com/dipockdas/keysync/actions/workflows/codeql.yml)
 [![Release](https://img.shields.io/github/v/release/dipockdas/keysync)](https://github.com/dipockdas/keysync/releases)
 [![Go Report](https://goreportcard.com/badge/github.com/dipockdas/keysync)](https://goreportcard.com/report/github.com/dipockdas/keysync)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
