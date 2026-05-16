@@ -28,3 +28,19 @@ Tests/KeySyncTests/
 - `KeySyncError` for all error types (notFound, keychainError, unsupportedPlatform)
 - Swift Testing framework (`@Test`, `#expect`) for tests
 - Service naming: `keysync/global`, `keysync/project/<name>`
+
+## Migration: replacing ProcessInfo.environment with KeySync
+
+```swift
+import KeySync
+
+// Global secret (shared across projects)
+let apiKey = try KeySyncClient.shared.getSecret("API_KEY")
+
+// Project-scoped secret (falls back to global if no project match)
+let dbUrl = try KeySyncClient.shared.getSecret("DATABASE_URL", project: "myapp")
+
+// List all secrets
+let globals = try KeySyncClient.shared.listSecrets()
+let project = try KeySyncClient.shared.listSecrets(project: "myapp")
+```

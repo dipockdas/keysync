@@ -30,3 +30,19 @@ tests/
 - `SecretNotFoundError` for missing secrets, `KeySyncError` for platform/OS errors
 - Python 3.11+ with type annotations
 - uv for package management
+
+## Migration: replacing os.environ with keysync
+
+```python
+from keysync import get_secret, list_secrets
+
+# Global secret (shared across projects)
+api_key = get_secret("API_KEY")
+
+# Project-scoped secret (falls back to global if no project match)
+db_url = get_secret("DATABASE_URL", project="myapp")
+
+# List all secrets
+globals = list_secrets()                    # global only
+project = list_secrets(project="myapp")     # project + global fallback
+```

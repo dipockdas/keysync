@@ -36,3 +36,40 @@ make clean          # rm -rf ./bin/
 - Never commit `.env` files or secret values
 - Client libraries in `clients/` access the OS keychain directly (no dependency on the keysync binary)
 - Each client library has its own README.md, CLAUDE.md, and AGENTS.md
+
+## Migration: replacing .env with keysync
+
+When helping a user who has run `keysync migrate` and needs to update source code:
+
+```bash
+# The migrate output lists migrated keys — reference these
+keysync migrate --file .env --project <name>
+
+# Search for .env usage patterns
+rg "process\.env\.|os\.Getenv|os\.environ" --type-add 'src:*.{ts,js,go,py}' -t src
+```
+
+**Replacement patterns** (never expose secret values, only use key names):
+
+```typescript
+// TypeScript: replace process.env.KEY
+- const key = process.env.API_KEY;
++ import { getSecret } from '@keysync/node';
++ const key = await getSecret('API_KEY');
+```
+
+```go
+// Go: replace os.Getenv("KEY")
+- key := os.Getenv("API_KEY")
++ import "github.com/dipockdas/keysync/clients/go"
++ key, err := keysync.GetGlobal("API_KEY")
+```
+
+```python
+# Python: replace os.environ.get("KEY")
+- key = os.environ.get("API_KEY")
++ from keysync import get_secret
++ key = get_secret("API_KEY")
+```
+
+Also remove dotenv imports and add `.env*` to `.gitignore`.

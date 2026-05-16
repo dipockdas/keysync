@@ -30,3 +30,19 @@ src/__tests__/
 - Async API (Promise-based) for all operations
 - Compiled with `tsc` to `dist/`, NodeNext module resolution
 - vitest for testing
+
+## Migration: replacing process.env with keysync
+
+```typescript
+import { getSecret, listSecrets } from '@keysync/node';
+
+// Global secret (shared across projects)
+const apiKey = await getSecret('API_KEY');
+
+// Project-scoped secret (falls back to global if no project match)
+const dbUrl = await getSecret('DATABASE_URL', 'myapp');
+
+// List all secrets
+const globals = await listSecrets();
+const project = await listSecrets('myapp');
+```

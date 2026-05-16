@@ -37,6 +37,37 @@ Each library follows the same pattern:
 3. `listSecrets(scope?, project?)` with filtering
 4. Service naming: `keysync/global`, `keysync/project/<name>`
 
+## Helping users migrate from .env to keysync
+
+When a user has run `keysync migrate` and needs their source code updated:
+
+**Step 1: Understand what was migrated**
+The `keysync migrate` output lists every migrated key with its scope. For example:
+```
+API_KEY → stored as global
+DB_URL → stored as project/myapp
+```
+
+**Step 2: Find all references in source code**
+Search for `process.env.KEY`, `os.Getenv("KEY")`, `os.environ["KEY"]`, `ENV["KEY"]`.
+
+**Step 3: Replace with the appropriate client library call**
+
+| Language | Before | After |
+|----------|--------|-------|
+| TypeScript | `process.env.KEY` | `await getSecret("KEY")` from `@keysync/node` |
+| Go | `os.Getenv("KEY")` | `keysync.GetGlobal("KEY")` or `keysync.GetSecret("project", "KEY")` |
+| Python | `os.environ.get("KEY")` | `get_secret("KEY")` from `keysync` |
+
+**Step 4: Remove dotenv imports**
+Remove `import 'dotenv/config'`, `require('dotenv').config()`, `load_dotenv()` etc.
+
+**Step 5: Clean up**
+- Add `.env*` to `.gitignore`
+- Delete or archive the `.env` file
+
+Never read or expose the actual secret values — only the key names are needed.
+
 ## Writing client libraries
 
 When adding a new client library:

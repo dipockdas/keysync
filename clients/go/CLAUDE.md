@@ -28,3 +28,22 @@ keysync_test.go     # Tests
 - `init()` functions in tagged files set `platformGet`, `platformList`, `isNotFound` vars
 - `ErrNotFound` sentinel error for missing secrets
 - Module path: `github.com/dipockdas/keysync/clients/go`
+
+## Migration: replacing os.Getenv with keysync
+
+```go
+import "github.com/dipockdas/keysync/clients/go"
+
+// Global secret (shared across projects)
+val, err := keysync.GetGlobal("API_KEY")
+
+// Project-scoped secret (falls back to global if no project match)
+val, err := keysync.GetSecret("myapp", "DATABASE_URL")
+
+// With context
+val, err := keysync.GetGlobalContext(ctx, "API_KEY")
+
+// List all secrets for a scope
+secrets, err := keysync.ListSecrets("myapp") // project-scoped including globals
+secrets, err := keysync.ListGlobals()        // global only
+```
