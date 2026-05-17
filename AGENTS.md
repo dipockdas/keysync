@@ -26,10 +26,15 @@ directly from the OS keychain with no dependency on the keysync binary:
 
 | Library | Location | macOS | Linux | Windows |
 |---------|----------|-------|-------|---------|
-| Go | `clients/go/` | security CLI | secret-tool CLI | wincred |
+| Go | `clients/go/` | security CLI | secret-tool CLI | wincred library |
 | Python | `clients/python/` | security CLI | secret-tool CLI | ctypes Win32 API |
 | TypeScript | `clients/node/` | security CLI | secret-tool CLI | PowerShell + Win32 |
 | Swift | `clients/swift/` | Security.framework | secret-tool CLI | Not planned |
+| Java | `clients/java/` | security CLI | secret-tool CLI | JNA → Win32 API |
+| C# (.NET) | `clients/csharp/` | security CLI | secret-tool CLI | P/Invoke → Win32 API |
+| Rust | `clients/rust/` | security CLI | secret-tool CLI | windows-sys → Win32 API |
+| C++ | `clients/cpp/` | security CLI | secret-tool CLI | Win32 API (wincred.h) |
+| Ruby | `clients/ruby/` | security CLI | secret-tool CLI | PowerShell + inline C# |
 
 Each library follows the same pattern:
 1. Platform detection at import time
@@ -109,6 +114,66 @@ let apiKey = try KeySyncClient.shared.getSecret("API_KEY")
 
 // Project-scoped secret
 let dbUrl = try KeySyncClient.shared.getSecret("DATABASE_URL", project: "myapp")
+```
+
+**Java** — add `io.keysync:keysync` Maven dependency, then:
+
+```java
+import io.keysync.KeySyncClient;
+
+KeySyncClient client = KeySyncClient.getInstance();
+
+// Global secret
+String apiKey = client.getSecret("API_KEY");
+
+// Project-scoped secret
+String dbUrl = client.getSecret("DATABASE_URL", "myapp");
+```
+
+**C# (.NET)** — add `KeySync` package reference, then:
+
+```csharp
+using KeySync;
+
+// Global secret
+string apiKey = KeySyncClient.GetSecret("API_KEY");
+
+// Project-scoped secret
+string dbUrl = KeySyncClient.GetSecret("DATABASE_URL", "myapp");
+```
+
+**Rust** — add `keysync` to `Cargo.toml`, then:
+
+```rust
+use keysync::get_secret;
+
+// Global secret
+let api_key = get_secret("API_KEY", None)?;
+
+// Project-scoped secret
+let db_url = get_secret("DATABASE_URL", Some("myapp"))?;
+```
+
+**C++** — add `#include <keysync/keysync.hpp>`, then:
+
+```cpp
+// Global secret
+std::string apiKey = keysync::getSecret("API_KEY");
+
+// Project-scoped secret
+std::string dbUrl = keysync::getSecret("DATABASE_URL", "myapp");
+```
+
+**Ruby** — add `gem "keysync"` to Gemfile, then:
+
+```ruby
+require "keysync"
+
+# Global secret
+api_key = KeySync.get_secret("API_KEY")
+
+# Project-scoped secret
+db_url = KeySync.get_secret("DATABASE_URL", project: "myapp")
 ```
 
 **Important:** Never read or expose secret values. Only key names and scope labels are needed for migration.

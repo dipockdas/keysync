@@ -16,6 +16,11 @@ clients/                # Native language client libraries
   node/                 #   TypeScript/Node.js client
   python/               #   Python client
   swift/                #   Swift client
+  java/                 #   Java client (Maven, JNA for Windows)
+  csharp/               #   C# client (.NET 8.0, P/Invoke for Windows)
+  rust/                 #   Rust client (cargo, windows-sys crate)
+  cpp/                  #   C++ client (CMake C++17, wincred.h)
+  ruby/                 #   Ruby client (pure Ruby, PowerShell for Windows)
 docs/                   # Tutorials and guides
 ```
 
@@ -78,6 +83,40 @@ val, err := keysync.GetSecret("myapp", "DB_URL")          // project
 from keysync import get_secret
 key = get_secret("API_KEY")                               # global
 key = get_secret("DB_URL", project="myapp")               # project
+```
+
+**Java** (Maven: `io.keysync:keysync`):
+```java
+KeySyncClient client = KeySyncClient.getInstance();
+String key = client.getSecret("API_KEY");                    // global
+String key = client.getSecret("DB_URL", "myapp");            // project
+```
+
+**C# (.NET)** (NuGet: `KeySync`):
+```csharp
+using KeySync;
+string key = KeySyncClient.GetSecret("API_KEY");             // global
+string key = KeySyncClient.GetSecret("DB_URL", "myapp");     // project
+```
+
+**Rust** (Cargo: `keysync`):
+```rust
+use keysync::get_secret;
+let key = get_secret("API_KEY", None)?;                      // global
+let key = get_secret("DB_URL", Some("myapp"))?;              // project
+```
+
+**C++** (`#include <keysync/keysync.hpp>`):
+```cpp
+std::string key = keysync::getSecret("API_KEY");             // global
+std::string key = keysync::getSecret("DB_URL", "myapp");     // project
+```
+
+**Ruby** (Gemfile: `gem "keysync"`):
+```ruby
+require "keysync"
+key = KeySync.get_secret("API_KEY")                          # global
+key = KeySync.get_secret("DB_URL", project: "myapp")         # project
 ```
 
 **Never inspect or log secret values.** Only key names are needed for migration.

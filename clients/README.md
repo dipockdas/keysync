@@ -11,8 +11,13 @@ convention that `keysync` uses internally.
 |---------|----------|-------|-------|---------|--------|
 | **Go** | `clients/go/` | `security` CLI | `secret-tool` CLI | `wincred` Go lib | Ready |
 | **Python** | `clients/python/` | `security` CLI | `secret-tool` CLI | `ctypes` Win32 API | Ready |
-| **TypeScript** | `clients/node/` | `security` CLI | `secret-tool` CLI | Planned | Ready (macOS/Linux) |
-| **Swift** | `clients/swift/` | `Security.framework` | `secret-tool` CLI | Stub | Ready (macOS/Linux) |
+| **TypeScript** | `clients/node/` | `security` CLI | `secret-tool` CLI | PowerShell + Win32 | Ready |
+| **Swift** | `clients/swift/` | `Security.framework` | `secret-tool` CLI | Not planned | Ready (macOS/Linux) |
+| **Java** | `clients/java/` | `security` CLI | `secret-tool` CLI | JNA → Win32 API | Ready |
+| **C# (.NET)** | `clients/csharp/` | `security` CLI | `secret-tool` CLI | P/Invoke → Win32 API | Ready |
+| **Rust** | `clients/rust/` | `security` CLI | `secret-tool` CLI | `windows-sys` crate | Ready |
+| **C++** | `clients/cpp/` | `security` CLI | `secret-tool` CLI | Win32 API (wincred.h) | Ready |
+| **Ruby** | `clients/ruby/` | `security` CLI | `secret-tool` CLI | PowerShell + inline C# | Ready |
 
 ## Design
 
@@ -93,6 +98,26 @@ npm install @dipockdas/keysync
 
 # Swift — add to Package.swift
 // .package(url: "https://github.com/dipockdas/keysync.git", branch: "main"),
+
+# Java — add to pom.xml
+// <dependency>
+//   <groupId>io.keysync</groupId>
+//   <artifactId>keysync</artifactId>
+//   <version>1.0.0</version>
+// </dependency>
+
+# C# (.NET) — add to .csproj
+// dotnet add package KeySync
+
+# Rust — add to Cargo.toml
+// keysync = "1.0.0"
+
+# C++ — add via CMake FetchContent or subdirectory
+// add_subdirectory(path/to/keysync/clients/cpp)
+// target_link_libraries(your_app PRIVATE keysync)
+
+# Ruby — add to Gemfile
+// gem "keysync"
 ```
 
 ## Per-library documentation
@@ -104,3 +129,8 @@ instructions), and AGENTS.md (AI agent instructions):
 - [Python client](python/) — `clients/python/`
 - [TypeScript client](node/) — `clients/node/`
 - [Swift client](swift/) — `clients/swift/`
+- [Java client](java/) — `clients/java/`
+- [C# (.NET) client](csharp/) — `clients/csharp/`
+- [Rust client](rust/) — `clients/rust/`
+- [C++ client](cpp/) — `clients/cpp/`
+- [Ruby client](ruby/) — `clients/ruby/`
