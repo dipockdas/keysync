@@ -5,7 +5,7 @@ Read secrets from the OS-native keychain -- zero dependency on the `keysync` bin
 Each platform uses its native keychain tooling:
 - **macOS**: `security` CLI (built-in)
 - **Linux**: `secret-tool` CLI (libsecret)
-- **Windows**: PowerShell with inline C# P/Invoke to `advapi32.dll` (CredReadW / CredEnumerateW)
+- **Windows**: PowerShell with inline C# P/Invoke to `advapi32.dll` (CredReadW / CredEnumerateW) -- available, not fully tested on Windows
 
 ## Installation
 

@@ -4,11 +4,11 @@ Java library for reading secrets from the OS-native keychain with zero dependenc
 
 ## Supported platforms
 
-| Platform | Backend | Dependency |
-|----------|---------|------------|
-| macOS | `security` CLI | Built-in |
-| Linux | `secret-tool` CLI | `libsecret-tools` package |
-| Windows | Win32 Credential Manager (JNA) | `net.java.dev.jna:jna` |
+| Platform | Backend | Dependency | Status |
+|----------|---------|------------|--------|
+| macOS | `security` CLI | Built-in | Ready |
+| Linux | `secret-tool` CLI | `libsecret-tools` package | Ready |
+| Windows | Win32 Credential Manager (JNA) | `net.java.dev.jna:jna` | Available (not fully tested on Windows) |
 
 ## Requirements
 

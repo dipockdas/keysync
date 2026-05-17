@@ -11,7 +11,7 @@ with no dependency on the keysync binary.
 |----------|-----------|--------|
 | macOS | `security` CLI via Process.Start | Ready |
 | Linux | `secret-tool` CLI via Process.Start | Ready |
-| Windows | P/Invoke → advapi32.dll (CredReadW / CredEnumerateW) | Ready |
+| Windows | P/Invoke → advapi32.dll (CredReadW / CredEnumerateW) | Available (not fully tested on Windows) |
 
 ## API
 

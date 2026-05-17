@@ -11,7 +11,7 @@ with no dependency on the keysync binary.
 |----------|-----------|--------|
 | macOS | `security` CLI via popen() | Ready |
 | Linux | `secret-tool` CLI via popen() | Ready |
-| Windows | Win32 API (CredReadW / CredEnumerateW) | Ready |
+| Windows | Win32 API (CredReadW / CredEnumerateW) | Available (not fully tested on Windows) |
 
 ## API
 

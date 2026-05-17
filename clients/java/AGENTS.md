@@ -11,7 +11,7 @@ with no dependency on the keysync binary.
 |----------|-----------|--------|
 | macOS | `security` CLI via ProcessBuilder | Ready |
 | Linux | `secret-tool` CLI via ProcessBuilder | Ready |
-| Windows | JNA → advapi32.dll (CredReadW / CredEnumerateW) | Ready |
+| Windows | JNA → advapi32.dll (CredReadW / CredEnumerateW) | Available (not fully tested on Windows) |
 
 ## API
 

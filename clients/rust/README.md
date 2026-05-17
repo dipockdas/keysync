@@ -6,11 +6,11 @@ library to access secrets at runtime.
 
 ## Platform support
 
-| Platform | Mechanism | Requirements |
-|----------|-----------|--------------|
-| macOS    | `security` CLI (built-in) | None |
-| Linux    | `secret-tool` CLI (libsecret) | Requires `libsecret-tools` |
-| Windows  | Win32 Credential Manager API | Requires `windows-sys` crate |
+| Platform | Mechanism | Requirements | Status |
+|----------|-----------|--------------|--------|
+| macOS    | `security` CLI (built-in) | None | Ready |
+| Linux    | `secret-tool` CLI (libsecret) | Requires `libsecret-tools` | Ready |
+| Windows  | Win32 Credential Manager API | Requires `windows-sys` crate | Available (not fully tested on Windows) |
 
 ## Installation
 

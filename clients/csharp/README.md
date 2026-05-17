@@ -9,7 +9,7 @@ directly from the OS keychain, with no dependency on the `keysync` binary.
 |----------|-----------|--------|
 | macOS    | `security` CLI (built-in) | Ready |
 | Linux    | `secret-tool` CLI (libsecret) | Ready |
-| Windows  | P/Invoke to `advapi32.dll` (Credential Manager) | Ready |
+| Windows  | P/Invoke to `advapi32.dll` (Credential Manager) | Available (not fully tested on Windows) |
 
 ## Requirements
 

@@ -17,10 +17,11 @@ src/
   types.ts         # Service name helpers
   darwin.ts        # macOS: child_process execFile → security CLI
   linux.ts         # Linux: child_process execFile → secret-tool CLI
-  windows.ts       # Windows: throws unsupportedPlatform
+  windows.ts       # Windows: PowerShell with inline C# (CredReadW/CredEnumerateW)
 src/__tests__/
   index.test.ts    # Error type tests
   types.test.ts    # Service name parsing tests
+  windows.test.ts  # Windows target conversion tests
 ```
 
 ## Conventions
@@ -30,6 +31,9 @@ src/__tests__/
 - Async API (Promise-based) for all operations
 - Compiled with `tsc` to `dist/`, NodeNext module resolution
 - vitest for testing
+- Windows: PowerShell with inline C# compiles at runtime to P/Invoke CredReadW / CredEnumerateW
+  from advapi32.dll — no native compilation or helper binary needed
+- Windows target names: slashes replaced with underscores (keysync/global → keysync_global)
 
 ## Migration: replacing process.env with keysync
 

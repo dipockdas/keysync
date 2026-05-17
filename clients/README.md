@@ -11,13 +11,13 @@ convention that `keysync` uses internally.
 |---------|----------|-------|-------|---------|--------|
 | **Go** | `clients/go/` | `security` CLI | `secret-tool` CLI | `wincred` Go lib | Ready |
 | **Python** | `clients/python/` | `security` CLI | `secret-tool` CLI | `ctypes` Win32 API | Ready |
-| **TypeScript** | `clients/node/` | `security` CLI | `secret-tool` CLI | PowerShell + Win32 | Ready |
+| **TypeScript** | `clients/node/` | `security` CLI | `secret-tool` CLI | PowerShell + Win32 | Ready (macOS/Linux) |
 | **Swift** | `clients/swift/` | `Security.framework` | `secret-tool` CLI | Not planned | Ready (macOS/Linux) |
-| **Java** | `clients/java/` | `security` CLI | `secret-tool` CLI | JNA → Win32 API | Ready |
-| **C# (.NET)** | `clients/csharp/` | `security` CLI | `secret-tool` CLI | P/Invoke → Win32 API | Ready |
-| **Rust** | `clients/rust/` | `security` CLI | `secret-tool` CLI | `windows-sys` crate | Ready |
-| **C++** | `clients/cpp/` | `security` CLI | `secret-tool` CLI | Win32 API (wincred.h) | Ready |
-| **Ruby** | `clients/ruby/` | `security` CLI | `secret-tool` CLI | PowerShell + inline C# | Ready |
+| **Java** | `clients/java/` | `security` CLI | `secret-tool` CLI | JNA → Win32 API | Available (Windows: not fully tested) |
+| **C# (.NET)** | `clients/csharp/` | `security` CLI | `secret-tool` CLI | P/Invoke → Win32 API | Available (Windows: not fully tested) |
+| **Rust** | `clients/rust/` | `security` CLI | `secret-tool` CLI | `windows-sys` crate | Available (Windows: not fully tested) |
+| **C++** | `clients/cpp/` | `security` CLI | `secret-tool` CLI | Win32 API (wincred.h) | Available (Windows: not fully tested) |
+| **Ruby** | `clients/ruby/` | `security` CLI | `secret-tool` CLI | PowerShell + inline C# | Available (Windows: not fully tested) |
 
 ## Design
 

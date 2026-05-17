@@ -6,11 +6,11 @@ library to access secrets at runtime.
 
 ## Platform support
 
-| Platform | Mechanism | Notes |
-|----------|-----------|-------|
-| macOS    | `security` CLI (built-in) | Uses `popen()` to call `security find-generic-password` |
-| Linux    | `secret-tool` CLI (libsecret) | Requires `libsecret-tools` package |
-| Windows  | Win32 Credential Manager API | Calls `CredReadW` / `CredEnumerateW` directly |
+| Platform | Mechanism | Notes | Status |
+|----------|-----------|-------|--------|
+| macOS    | `security` CLI (built-in) | Uses `popen()` to call `security find-generic-password` | Ready |
+| Linux    | `secret-tool` CLI (libsecret) | Requires `libsecret-tools` package | Ready |
+| Windows  | Win32 Credential Manager API | Calls `CredReadW` / `CredEnumerateW` directly | Available (not fully tested on Windows) |
 
 ## Build
 

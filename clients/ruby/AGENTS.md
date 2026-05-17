@@ -11,7 +11,7 @@ with no dependency on the keysync binary.
 |----------|-----------|--------|
 | macOS | `security` CLI via Open3.capture3 | Ready |
 | Linux | `secret-tool` CLI via Open3.capture3 | Ready |
-| Windows | PowerShell with inline C# (CredReadW / CredEnumerateW) | Ready |
+| Windows | PowerShell with inline C# (CredReadW / CredEnumerateW) | Available (not fully tested on Windows) |
 
 ## API
 

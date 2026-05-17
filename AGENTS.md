@@ -24,17 +24,17 @@ Project scope overrides global when both exist with the same key.
 The `clients/` directory contains per-language libraries that read secrets
 directly from the OS keychain with no dependency on the keysync binary:
 
-| Library | Location | macOS | Linux | Windows |
-|---------|----------|-------|-------|---------|
-| Go | `clients/go/` | security CLI | secret-tool CLI | wincred library |
-| Python | `clients/python/` | security CLI | secret-tool CLI | ctypes Win32 API |
-| TypeScript | `clients/node/` | security CLI | secret-tool CLI | PowerShell + Win32 |
-| Swift | `clients/swift/` | Security.framework | secret-tool CLI | Not planned |
-| Java | `clients/java/` | security CLI | secret-tool CLI | JNA → Win32 API |
-| C# (.NET) | `clients/csharp/` | security CLI | secret-tool CLI | P/Invoke → Win32 API |
-| Rust | `clients/rust/` | security CLI | secret-tool CLI | windows-sys → Win32 API |
-| C++ | `clients/cpp/` | security CLI | secret-tool CLI | Win32 API (wincred.h) |
-| Ruby | `clients/ruby/` | security CLI | secret-tool CLI | PowerShell + inline C# |
+| Library | Location | macOS | Linux | Windows | Status |
+|---------|----------|-------|-------|---------|--------|
+| Go | `clients/go/` | security CLI | secret-tool CLI | wincred library | Ready |
+| Python | `clients/python/` | security CLI | secret-tool CLI | ctypes Win32 API | Ready |
+| TypeScript | `clients/node/` | security CLI | secret-tool CLI | PowerShell + Win32 | Ready (macOS/Linux) |
+| Swift | `clients/swift/` | Security.framework | secret-tool CLI | Not planned | Ready (macOS/Linux) |
+| Java | `clients/java/` | security CLI | secret-tool CLI | JNA → Win32 API | Available (Windows: not fully tested) |
+| C# (.NET) | `clients/csharp/` | security CLI | secret-tool CLI | P/Invoke → Win32 API | Available (Windows: not fully tested) |
+| Rust | `clients/rust/` | security CLI | secret-tool CLI | windows-sys → Win32 API | Available (Windows: not fully tested) |
+| C++ | `clients/cpp/` | security CLI | secret-tool CLI | Win32 API (wincred.h) | Available (Windows: not fully tested) |
+| Ruby | `clients/ruby/` | security CLI | secret-tool CLI | PowerShell + inline C# | Available (Windows: not fully tested) |
 
 Each library follows the same pattern:
 1. Platform detection at import time

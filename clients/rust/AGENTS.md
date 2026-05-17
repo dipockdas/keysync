@@ -1,5 +1,13 @@
 # keysync Rust Client — Agent Instructions
 
+## Platform support
+
+| Platform | Mechanism | Status |
+|----------|-----------|--------|
+| macOS | `security` CLI via std::process::Command | Ready |
+| Linux | `secret-tool` CLI via std::process::Command | Ready |
+| Windows | `windows-sys` → Win32 API (CredReadW / CredEnumerateW) | Available (not fully tested on Windows) |
+
 ## Quick start
 
 ```bash

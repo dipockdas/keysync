@@ -9,7 +9,7 @@ directly from the OS keychain, with no dependency on the `keysync` binary.
 |----------|-----------|--------|
 | macOS    | `security` CLI (built-in) | Ready |
 | Linux    | `secret-tool` CLI (libsecret) | Ready |
-| Windows  | Companion helper binary (Go) | Planned |
+| Windows  | PowerShell with inline C# (CredReadW/CredEnumerateW) | Available (not fully tested on Windows) |
 
 ## Installation
 
@@ -75,7 +75,7 @@ The library shells out to the OS keychain tooling directly:
 
 - **macOS**: `security find-generic-password -s keysync/global -a DATABASE_URL -w`
 - **Linux**: `secret-tool lookup service keysync/global account DATABASE_URL`
-- **Windows**: Not yet available (use Go or Python client)
+- **Windows**: PowerShell with inline C# calling CredReadW / CredEnumerateW from advapi32.dll
 
 No dependency on the `keysync` binary. Read operations work standalone as long
 as secrets have been stored (via `keysync set` or any other method that writes
