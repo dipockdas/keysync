@@ -28,8 +28,8 @@ directly from the OS keychain with no dependency on the keysync binary:
 |---------|----------|-------|-------|---------|
 | Go | `clients/go/` | security CLI | secret-tool CLI | wincred |
 | Python | `clients/python/` | security CLI | secret-tool CLI | ctypes Win32 API |
-| TypeScript | `clients/node/` | security CLI | secret-tool CLI | Planned |
-| Swift | `clients/swift/` | Security.framework | secret-tool CLI | Stub |
+| TypeScript | `clients/node/` | security CLI | secret-tool CLI | PowerShell + Win32 |
+| Swift | `clients/swift/` | Security.framework | secret-tool CLI | Not planned |
 
 Each library follows the same pattern:
 1. Platform detection at import time
