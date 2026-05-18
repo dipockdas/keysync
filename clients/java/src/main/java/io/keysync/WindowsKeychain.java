@@ -19,7 +19,11 @@ import java.util.List;
  * slashes:
  * <ul>
  *   <li>{@code "keysync/global"} becomes {@code "keysync_global"}</li>
- *   <li>{@code "keysync/project/myapp"} becomes {@code "keysync_project_myapp"}</li>
+ *   <li>{@code "keysync/project/myapp"} becomes {@code
+ *   "keysync_project_myapp"}</li>
+ *   <li>{@code "keysync/project/myapp/env/dev"} becomes {@code
+ *   "keysync_project_myapp_dev"} (strips {@code /env/} keyword, replaces
+ *   remaining slashes with underscores)</li>
  * </ul>
  *
  * <p>Requires the JNA library ({@code net.java.dev.jna:jna}) on the classpath.
@@ -204,7 +208,12 @@ class WindowsKeychain implements KeychainProvider {
                 }
 
                 String service = targetToService(target);
-                results.add(new Credential(service, userName != null ? userName : ""));
+                // Extract environment from service name for Credential
+                String env = null;
+                if (service.contains("/env/")) {
+                    env = service.substring(service.indexOf("/env/") + 5);
+                }
+                results.add(new Credential(service, userName != null ? userName : "", env));
             }
 
             return results;
@@ -221,29 +230,36 @@ class WindowsKeychain implements KeychainProvider {
 
     /**
      * Converts a keysync service name to a Windows Credential Manager target
-     * name by replacing slashes with underscores.
+     * name by replacing slashes with underscores and stripping the /env/
+     * keyword.
      *
      * <pre>
-     * "keysync/global"      → "keysync_global"
-     * "keysync/project/app" → "keysync_project_app"
+     * "keysync/global"                    → "keysync_global"
+     * "keysync/project/app"               → "keysync_project_app"
+     * "keysync/project/app/env/staging"   → "keysync_project_app_staging"
      * </pre>
      */
     static String serviceToTarget(String service) {
-        return service.replace('/', '_');
+        // Strip /env/ keyword so environment is just part of the path
+        String processed = service.replace("/env/", "/");
+        return processed.replace('/', '_');
     }
 
     /**
      * Converts a Windows target name back to a keysync service name.
      *
      * <pre>
-     * "keysync_global"             → "keysync/global"
-     * "keysync_project_myapp"      → "keysync/project/myapp"
-     * "keysync_project_my_deep"    → "keysync/project/my/deep"
+     * "keysync_global"                   → "keysync/global"
+     * "keysync_project_myapp"            → "keysync/project/myapp"
+     * "keysync_project_myapp_staging"    → "keysync/project/myapp/env/staging"
+     * "keysync_project_my_deep_app"      → "keysync/project/my/deep/app"
      * </pre>
      *
      * The first underscore after "keysync_" separates the scope from the
-     * project. For "global" there is no project part. For "project" the
-     * remaining underscores become slashes.
+     * rest. For "global" there is nothing after. For "project" the remaining
+     * underscores become slashes. If there are 3+ segments after scope
+     * (project, extra1, extra2...), we insert /env/ between project and
+     * the extras.
      */
     static String targetToService(String target) {
         // Strip the "keysync_" prefix
@@ -256,14 +272,24 @@ class WindowsKeychain implements KeychainProvider {
         }
 
         String scope = remainder.substring(0, firstUnderscore);
-        String projectPart = remainder.substring(firstUnderscore + 1);
+        String rest = remainder.substring(firstUnderscore + 1);
 
         if ("global".equals(scope)) {
             return "keysync/global";
         }
 
-        // project scope: replace remaining underscores with slashes
-        return "keysync/" + scope + "/" + projectPart.replace('_', '/');
+        // For project scope: check if rest contains another underscore
+        // (indicating 3+ segments: project + env + possibly more)
+        int secondUnderscore = rest.indexOf('_');
+        if (secondUnderscore >= 0) {
+            // Has 3+ segments: project + env (+ possibly more)
+            String projectPart = rest.substring(0, secondUnderscore);
+            String envPart = rest.substring(secondUnderscore + 1).replace('_', '/');
+            return "keysync/" + scope + "/" + projectPart + "/env/" + envPart;
+        }
+
+        // Only 2 segments: project scope only
+        return "keysync/" + scope + "/" + rest;
     }
 
     // --- helpers ---

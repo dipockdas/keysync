@@ -17,8 +17,8 @@ library to access secrets at runtime.
 ## API
 
 ```go
-GetSecret(key, project string) (string, error)
-ListSecrets(scope, project string) ([]SecretEntry, error)
+GetSecret(key, project, environment string) (string, error)
+ListSecrets(scope, project, environment string) ([]SecretEntry, error)
 ```
 
 ## Testing

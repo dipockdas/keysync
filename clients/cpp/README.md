@@ -37,6 +37,9 @@ int main() {
         // Retrieve a project-scoped secret (falls back to global)
         std::string dbUrl = keysync::getSecret("DATABASE_URL", "myapp");
 
+        // Retrieve an environment-scoped secret (falls back: env → project → global)
+        std::string stagingDb = keysync::getSecret("DATABASE_URL", "myapp", "staging");
+
         // List all global secrets
         auto globals = keysync::listSecrets();
         for (const auto& entry : globals) {
@@ -69,15 +72,20 @@ target_link_libraries(myapp PRIVATE keysync)
    This is the fast path for local dev (`eval $(keysync export)`) and cloud/CI
    environments where the platform injects environment variables directly.
 2. If not found, fall back to the OS keychain.
-3. If a project is provided, check the project scope (`keysync/project/<name>`)
-   first, then fall back to the global scope (`keysync/global`).
+3. If an environment is provided, check the environment scope
+   (`keysync/project/<project>/env/<env>`) first. Use for environment-specific
+   overrides (e.g., staging vs. production).
+4. If a project is provided, check the project scope (`keysync/project/<name>`)
+   next.
+5. Fall back to the global scope (`keysync/global`).
 
 **Service naming:**
 
-| Scope   | Service Name               | Account (Key)       |
-|---------|----------------------------|---------------------|
-| Global  | `keysync/global`           | `DATABASE_URL`      |
-| Project | `keysync/project/my-api`   | `DATABASE_URL`      |
+| Scope       | Service Name                         | Account (Key)       |
+|-------------|--------------------------------------|---------------------|
+| Global      | `keysync/global`                     | `DATABASE_URL`      |
+| Project     | `keysync/project/my-api`             | `DATABASE_URL`      |
+| Environment | `keysync/project/my-api/env/staging` | `DATABASE_URL`      |
 
 **Platform-specific commands:**
 

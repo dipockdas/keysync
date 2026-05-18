@@ -24,22 +24,25 @@ go get github.com/dipockdas/keysync/clients/go
 import "github.com/dipockdas/keysync/clients/go"
 
 // Retrieve a project-scoped secret (falls back to global scope)
-dbURL, err := keysync.GetSecret("DATABASE_URL", "my-api")
+dbURL, err := keysync.GetSecret("DATABASE_URL", "my-api", "")
 if err == keysync.ErrNotFound {
     // secret doesn't exist
 }
 
 // Retrieve a global-only secret
-apiKey, err := keysync.GetSecret("GLOBAL_API_KEY", "")
+apiKey, err := keysync.GetSecret("GLOBAL_API_KEY", "", "")
+
+// Retrieve an environment-scoped secret
+prodDB, err := keysync.GetSecret("DATABASE_URL", "my-api", "production")
 
 // List all secrets
-entries, err := keysync.ListSecrets("", "")
+entries, err := keysync.ListSecrets("", "", "")
 for _, e := range entries {
-    fmt.Printf("%s/%s => %s\n", e.Scope, e.Project, e.Key)
+    fmt.Printf("%s/%s/%s => %s\n", e.Scope, e.Project, e.Environment, e.Key)
 }
 
-// Filter by scope and project
-projectEntries, err := keysync.ListSecrets("project", "my-api")
+// Filter by scope, project, and environment
+projectEntries, err := keysync.ListSecrets("project", "my-api", "production")
 ```
 
 ## Testing
@@ -71,12 +74,28 @@ Secrets are stored in the OS keychain with this naming convention:
 |-------|-------------|--------------|
 | Global | `keysync/global` | key name (e.g. `DATABASE_URL`) |
 | Project | `keysync/project/<name>` | key name |
+| Env | `keysync/project/<name>/env/<env>` | key name |
+
+### Resolution order
+
+When `GetSecret` is called, secrets are resolved in this order:
+
+1. Environment variable with the same name (always checked first)
+2. Environment-scoped keychain entry (`keysync/project/<name>/env/<env>`)
+3. Project-scoped keychain entry (`keysync/project/<name>`)
+4. Global keychain entry (`keysync/global`)
+
+The `environment` parameter is optional -- pass an empty string to skip
+environment-level resolution.
 
 The library calls the OS keychain tooling directly:
 
 - **macOS**: `security find-generic-password -s keysync/global -a DATABASE_URL -w`
 - **Linux**: `secret-tool lookup service keysync/global account DATABASE_URL`
 - **Windows**: `wincred.GetGenericCredential("keysync_global")`
+
+On Windows, environment is encoded by appending `_<env>` to the credential
+target name (e.g. `keysync_project_myapp_production`).
 
 No subprocess chain, no dependency on the keysync CLI. Read operations work
 standalone as long as secrets have been stored (via `keysync set` or any other

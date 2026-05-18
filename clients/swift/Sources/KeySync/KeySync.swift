@@ -2,31 +2,53 @@ import Foundation
 
 /// Service name helpers matching the keysync convention.
 ///
-/// Secrets are stored with a service name that encodes scope and project:
-///   Global:  "keysync/global"
-///   Project: "keysync/project/<name>"
+/// Secrets are stored with a service name that encodes scope, project, and environment:
+///   Global:      "keysync/global"
+///   Project:     "keysync/project/<name>"
+///   Environment: "keysync/project/<name>/env/<env>"
 enum ServiceName {
-    static func forScope(_ scope: String, project: String?) -> String {
+    static func forScope(_ scope: String, project: String?, environment: String? = nil) -> String {
         if let project = project, !project.isEmpty, scope == "project" {
+            if let env = environment, !env.isEmpty {
+                return "keysync/\(scope)/\(project)/env/\(env)"
+            }
             return "keysync/\(scope)/\(project)"
         }
         return "keysync/\(scope)"
     }
 
-    /// Parse "keysync/global" → ("global", nil)
-    /// Parse "keysync/project/my-app" → ("project", "my-app")
-    static func parse(_ service: String) -> (scope: String, project: String?) {
+    /// Parse "keysync/global" → ("global", nil, nil)
+    /// Parse "keysync/project/my-app" → ("project", "my-app", nil)
+    /// Parse "keysync/project/my-app/env/staging" → ("project", "my-app", "staging")
+    static func parse(_ service: String) -> (scope: String, project: String?, environment: String?) {
         let trimmed = service
             .trimmingCharacters(in: .whitespaces)
             .replacingOccurrences(of: "keysync/", with: "")
-        let parts = trimmed.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: true)
+        // "keysync" without a slash is equivalent to global
+        if trimmed == "keysync" {
+            return ("global", nil, nil)
+        }
+        let parts = trimmed.split(separator: "/", omittingEmptySubsequences: true)
         guard let scope = parts.first.map(String.init) else {
-            return ("global", nil)
+            return ("global", nil, nil)
         }
         guard parts.count > 1, scope == "project" else {
-            return (scope, nil)
+            return (scope, nil, nil)
         }
-        return (scope, String(parts[1]))
+
+        // Check for "/env/" segment to detect environment.
+        // envIndex > 1 ensures the "env" literal is not the project name itself.
+        // envIndex < parts.count - 1 ensures there is a value after "env".
+        if let envIndex = parts.firstIndex(of: "env"), envIndex > 1, envIndex < parts.count - 1 {
+            let projectParts = parts[1..<envIndex]
+            let envParts = parts[(envIndex + 1)...]
+            let project = projectParts.joined(separator: "/")
+            let environment = envParts.joined(separator: "/")
+            return ("project", project, environment)
+        }
+
+        let project = parts[1...].joined(separator: "/")
+        return ("project", project, nil)
     }
 }
 

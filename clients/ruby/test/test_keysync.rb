@@ -22,6 +22,7 @@ class TestKeySync < Minitest::Test
     assert_equal "API_KEY", entry.account
     assert_equal "global", entry.scope
     assert_nil entry.project
+    assert_nil entry.environment
   end
 
   def test_credential_entry_from_raw_project
@@ -30,6 +31,16 @@ class TestKeySync < Minitest::Test
     assert_equal "DB_URL", entry.account
     assert_equal "project", entry.scope
     assert_equal "myapp", entry.project
+    assert_nil entry.environment
+  end
+
+  def test_credential_entry_from_raw_environment
+    entry = KeySync::CredentialEntry.from_raw("keysync/project/myapp/env/staging", "DB_URL")
+    assert_equal "keysync/project/myapp/env/staging", entry.service
+    assert_equal "DB_URL", entry.account
+    assert_equal "project", entry.scope
+    assert_equal "myapp", entry.project
+    assert_equal "staging", entry.environment
   end
 
   def test_error_hierarchy
@@ -74,6 +85,8 @@ class TestKeySync < Minitest::Test
       KeySync::Windows.service_to_target("keysync/project/myapp")
     assert_equal "keysync_project_my_deep_app",
       KeySync::Windows.service_to_target("keysync/project/my/deep/app")
+    assert_equal "keysync_project_myapp_dev",
+      KeySync::Windows.service_to_target("keysync/project/myapp/env/dev")
   end
 
   def test_windows_target_reverse
@@ -82,6 +95,8 @@ class TestKeySync < Minitest::Test
       KeySync::Windows.target_to_service("keysync_global")
     assert_equal "keysync/project/myapp",
       KeySync::Windows.target_to_service("keysync_project_myapp")
+    assert_equal "keysync/project/myapp/env/dev",
+      KeySync::Windows.target_to_service("keysync_project_myapp_dev")
     assert_nil KeySync::Windows.target_to_service("not_keysync")
   end
 end

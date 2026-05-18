@@ -63,11 +63,13 @@ module KeySync
     #
     # Resolution order:
     # 1. Check ENV[key] first -- supports cloud/CI environments
-    # 2. If project is provided, check project scope first
-    # 3. Fall back to global scope
+    # 2. If both project and environment are provided, check environment scope first
+    # 3. If project is provided, check project scope
+    # 4. Fall back to global scope
     #
     # @param key [String] the secret key name
     # @param project [String, nil] optional project name for project-scoped secrets
+    # @param environment [String, nil] optional environment name (e.g. "staging", "production")
     # @return [String] the secret value
     # @raise [SecretNotFoundError] if the secret cannot be found
     # @raise [KeySyncError] if the keychain tool fails or platform is unsupported
@@ -77,14 +79,18 @@ module KeySync
     #
     # @example Get a project-scoped secret (falls back to global)
     #   db_url = KeySync.get_secret("DATABASE_URL", project: "myapp")
-    def get_secret(key, project: nil)
-      Client.get_secret(key, project: project)
+    #
+    # @example Get an environment-scoped secret
+    #   staging_db = KeySync.get_secret("DATABASE_URL", project: "myapp", environment: "staging")
+    def get_secret(key, project: nil, environment: nil)
+      Client.get_secret(key, project: project, environment: environment)
     end
 
     # List all stored secret entries.
     #
     # @param project [String, nil] optional project name to filter by.
     #   When provided, returns global secrets plus this project's secrets.
+    # @param environment [String, nil] optional environment name to filter by.
     # @return [Array<CredentialEntry>] list of credential entries
     #
     # @example List all global secrets
@@ -92,8 +98,11 @@ module KeySync
     #
     # @example List project secrets (includes global fallback)
     #   project = KeySync.list_secrets(project: "myapp")
-    def list_secrets(project: nil)
-      Client.list_secrets(project: project)
+    #
+    # @example List environment-scoped secrets
+    #   staging = KeySync.list_secrets(project: "myapp", environment: "staging")
+    def list_secrets(project: nil, environment: nil)
+      Client.list_secrets(project: project, environment: environment)
     end
   end
 

@@ -13,33 +13,52 @@ use windows_sys::Win32::Foundation::{
 use crate::error::{KeySyncError, Result};
 use crate::credential::CredentialEntry;
 
-/// Convert a keysync service name to a Windows Credential Manager target.
+/// Convert a keysync service name to a Windows Credential Manager target,
+/// stripping the /env/ keyword and replacing slashes with underscores.
 ///
-/// "keysync/global"         -> "keysync_global"
-/// "keysync/project/my-app" -> "keysync_project_my-app"
+/// "keysync/global"                  -> "keysync_global"
+/// "keysync/project/my-app"           -> "keysync_project_my-app"
+/// "keysync/project/my-app/env/dev"   -> "keysync_project_my-app_dev"
 fn service_to_target(service: &str) -> String {
-    if let Some(stripped) = service.strip_prefix("keysync/") {
+    // Strip /env/ keyword so environment is just part of the path
+    let processed = service.replace("/env/", "/");
+    if let Some(stripped) = processed.strip_prefix("keysync/") {
         format!("keysync_{}", stripped.replace('/', "_"))
     } else {
-        format!("keysync_{}", service)
+        format!("keysync_{}", processed)
     }
 }
 
-/// Parse a Windows target name back into scope and project.
+/// Parse a Windows target name back into scope, project, and environment.
 ///
-/// "keysync_global"          -> ("global", "")
-/// "keysync_project_my-app"  -> ("project", "my-app")
-fn parse_target(target: &str) -> (&str, &str) {
+/// "keysync_global"               -> ("global", "", "")
+/// "keysync_project_my-app"       -> ("project", "my-app", "")
+/// "keysync_project_my-app_dev"   -> ("project", "my-app", "dev")
+fn parse_target(target: &str) -> (&str, &str, &str) {
     let trimmed = target.strip_prefix("keysync_").unwrap_or(target);
     let mut parts = trimmed.splitn(2, '_');
     let scope = parts.next().unwrap_or("global");
 
     if scope != "global" && scope != "project" {
-        return ("global", "");
+        return ("global", "", "");
     }
 
-    let project = parts.next().unwrap_or("");
-    (scope, project)
+    let rest = parts.next().unwrap_or("");
+
+    if scope == "global" {
+        return ("global", "", "");
+    }
+
+    // For project scope: look for 3+ segments
+    // Split into project and env parts (using _ as separator)
+    let rest_parts: Vec<&str> = rest.splitn(2, '_').collect();
+    if rest_parts.len() == 2 {
+        // Two segments: project_env => project + env
+        return ("project", rest_parts[0], rest_parts[1]);
+    }
+
+    // Only one segment: just project, no env
+    ("project", rest_parts.get(0).unwrap_or(&""), "")
 }
 
 /// Read a UTF-16 wide string starting at `ptr` up to `len` characters.
@@ -162,14 +181,14 @@ pub(crate) fn list_secrets() -> Result<Vec<CredentialEntry>> {
             continue;
         }
 
-        let (scope, project) = parse_target(&target);
+        let (scope, project, env) = parse_target(&target);
         let username = unsafe { read_wide_str(cred.UserName, 256) };
 
         if username.is_empty() {
             continue;
         }
 
-        entries.push(CredentialEntry::new(scope, project, &username));
+        entries.push(CredentialEntry::new(scope, project, env, &username));
     }
 
     unsafe { CredFree(p_creds as *mut std::ffi::c_void) };
@@ -200,6 +219,14 @@ mod tests {
     }
 
     #[test]
+    fn test_service_to_target_environment() {
+        assert_eq!(
+            service_to_target("keysync/project/my-app/env/dev"),
+            "keysync_project_my-app_dev"
+        );
+    }
+
+    #[test]
     fn test_service_to_target_project_with_dashes() {
         assert_eq!(
             service_to_target("keysync/project/my-app-v2"),
@@ -214,38 +241,61 @@ mod tests {
 
     #[test]
     fn test_parse_target_global() {
-        let (scope, project) = parse_target("keysync_global");
+        let (scope, project, env) = parse_target("keysync_global");
         assert_eq!(scope, "global");
         assert_eq!(project, "");
+        assert_eq!(env, "");
     }
 
     #[test]
     fn test_parse_target_project() {
-        let (scope, project) = parse_target("keysync_project_my-app");
+        let (scope, project, env) = parse_target("keysync_project_my-app");
         assert_eq!(scope, "project");
         assert_eq!(project, "my-app");
+        assert_eq!(env, "");
+    }
+
+    #[test]
+    fn test_parse_target_project_with_env() {
+        let (scope, project, env) = parse_target("keysync_project_my-app_dev");
+        assert_eq!(scope, "project");
+        assert_eq!(project, "my-app");
+        assert_eq!(env, "dev");
     }
 
     #[test]
     fn test_parse_target_project_with_underscore() {
         // Project names can contain underscores; only split on the first two
-        let (scope, project) = parse_target("keysync_project_my_app_name");
+        let (scope, project, env) = parse_target("keysync_project_my_app_name");
         assert_eq!(scope, "project");
         assert_eq!(project, "my_app_name");
+        assert_eq!(env, "");
     }
 
     #[test]
     fn test_parse_target_unknown() {
-        let (scope, project) = parse_target("something_else");
+        let (scope, project, env) = parse_target("something_else");
         assert_eq!(scope, "global");
         assert_eq!(project, "");
+        assert_eq!(env, "");
     }
 
     #[test]
     fn test_parse_target_empty() {
-        let (scope, project) = parse_target("");
+        let (scope, project, env) = parse_target("");
         assert_eq!(scope, "global");
         assert_eq!(project, "");
+        assert_eq!(env, "");
+    }
+
+    #[test]
+    fn test_roundtrip_environment() {
+        let original = "keysync/project/my-app/env/staging";
+        let target = service_to_target(original);
+        let (scope, project, env) = parse_target(&target);
+        assert_eq!(scope, "project");
+        assert_eq!(project, "my-app");
+        assert_eq!(env, "staging");
     }
 
     #[test]

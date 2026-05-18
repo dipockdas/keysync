@@ -18,7 +18,7 @@ src/main/java/io/keysync/
   KeySyncError.java              # Error type enum (NOT_FOUND, KEYCHAIN_ERROR, UNSUPPORTED_PLATFORM)
   KeySyncException.java          # Unchecked exception with error code and message
   KeychainProvider.java          # Interface for platform backends
-  Credential.java                # POJO for list results (service + account)
+  Credential.java                # POJO for list results (service + account + environment)
   MacKeychain.java               # macOS: ProcessBuilder -> security CLI
   LinuxKeychain.java             # Linux: ProcessBuilder -> secret-tool CLI
   WindowsKeychain.java           # Windows: JNA -> advapi32.dll CredReadW/CredEnumerateW
@@ -32,11 +32,11 @@ src/test/java/io/keysync/
 - Platform detection checks for "mac", "linux", or "win" substrings
 - `KeySyncError` enum with `getCode()` for error type strings
 - `KeySyncException` (unchecked) for all error conditions
-- Service naming: `keysync/global`, `keysync/project/<name>`
-- Windows: target names use underscores instead of slashes (`keysync_global`, `keysync_project_myapp`)
+- Service naming: `keysync/global`, `keysync/project/<name>`, `keysync/project/<name>/env/<env>`
+- Windows: target names use underscores instead of slashes and strip `/env/` keyword (`keysync_global`, `keysync_project_myapp`, `keysync_project_myapp_dev`)
 - JNA for Windows Win32 API access (CredReadW, CredEnumerateW, CredFree from advapi32.dll)
 - JUnit 5 (`@Test`, `@Nested`, `@DisplayName`) for tests
-- Tests cover service name construction, parsing, error types, env var fallback, platform detection, Windows target conversion, and singleton behavior
+- Tests cover service name construction, parsing, error types, env var fallback, platform detection, Windows target conversion, environment scope, and singleton behavior
 
 ## Important implementation details
 
@@ -58,7 +58,11 @@ String apiKey = client.getSecret("API_KEY");
 // Project-scoped secret (falls back to global if no project match)
 String dbUrl = client.getSecret("DATABASE_URL", "myapp");
 
+// Environment-scoped secret (falls back: env → project → global)
+String stagingDb = client.getSecret("DATABASE_URL", "myapp", "staging");
+
 // List all secrets
 var globals = client.listSecrets();
 var project = client.listSecrets("myapp");
+var staging = client.listSecrets("myapp", "staging");
 ```

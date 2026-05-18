@@ -25,7 +25,7 @@ ctest
 include/keysync/
   keysync.hpp       # Public API (getSecret, listSecrets)
   errors.hpp        # KeySyncError exception, ErrorCode enum
-  credential.hpp    # CredentialEntry struct
+  credential.hpp    # CredentialEntry struct (scope, project, environment, key)
 src/
   keysync.cpp       # Main implementation + platform dispatch (#ifdef guards)
   macos.cpp         # macOS: popen() → security CLI
@@ -48,7 +48,7 @@ CLAUDE.md
 - Platform detection via `#ifdef __APPLE__`, `#ifdef __linux__`, `#ifdef _WIN32`
 - Platform-specific functions in separate `.cpp` files compiled conditionally via CMake
 - `keysync::KeySyncError` thrown on failure (NotFound, KeychainError, UnsupportedPlatform)
-- `keysync::CredentialEntry` struct for listing secrets (scope, project, key)
+- `keysync::CredentialEntry` struct for listing secrets (scope, project, key, environment)
 - `std::string_view` for read-only string parameters, `std::string` for return values
 - C++17 standard, no exceptions for control flow (exceptions only for error cases)
 - Internal helpers in `namespace keysync::internal`
@@ -58,13 +58,14 @@ CLAUDE.md
 
 ## Service Naming
 
-| Scope   | Service Name               |
-|---------|----------------------------|
-| Global  | `keysync/global`           |
-| Project | `keysync/project/<name>`   |
+| Scope       | Service Name                 |
+|-------------|------------------------------|
+| Global      | `keysync/global`             |
+| Project     | `keysync/project/<name>`     |
+| Environment | `keysync/project/<name>/env/<env>` |
 
-On Windows, slashes in service names are replaced with underscores:
-`keysync/global` → `keysync_global`, `keysync/project/my-app` → `keysync_project_my-app`
+On Windows, slashes in service names are replaced with underscores and `/env/` is stripped:
+`keysync/global` → `keysync_global`, `keysync/project/my-app` → `keysync_project_my-app`, `keysync/project/my-app/env/dev` → `keysync_project_my-app_dev`
 
 ## Migration: replacing getenv/SecretManager with keysync
 
@@ -77,19 +78,26 @@ std::string apiKey = keysync::getSecret("API_KEY");
 // Project-scoped secret (falls back to global if no project match)
 std::string dbUrl = keysync::getSecret("DATABASE_URL", "myapp");
 
+// Environment-scoped secret (falls back: env → project → global)
+std::string stagingDb = keysync::getSecret("DATABASE_URL", "myapp", "staging");
+
 // List all global secrets
 auto globals = keysync::listSecrets();
 
 // List project secrets
 auto project = keysync::listSecrets("myapp");
+
+// List environment secrets
+auto staging = keysync::listSecrets("myapp", "staging");
 ```
 
 ## Resolution order (getSecret)
 
 1. Check `std::getenv(key)` first — returns env var value if set
-2. If `project` is provided, try project scope keychain first
-3. Fall back to global scope keychain
-4. Throw `KeySyncError(ErrorCode::NotFound, ...)` if not found in any scope
+2. If `environment` is provided, try environment scope `keysync/project/<project>/env/<env>` first
+3. If `project` is provided, try project scope `keysync/project/<project>` next
+4. Fall back to global scope `keysync/global`
+5. Throw `KeySyncError(ErrorCode::NotFound, ...)` if not found in any scope
 
 ## Platform-specific implementation details
 

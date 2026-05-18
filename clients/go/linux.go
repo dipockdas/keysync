@@ -28,7 +28,7 @@ func linuxGet(service, account string) (string, error) {
 }
 
 // linuxList lists all keysync secrets by searching libsecret.
-func linuxList(scope, project string) ([]SecretEntry, error) {
+func linuxList(scope, project, environment string) ([]SecretEntry, error) {
 	cmd := exec.Command("secret-tool", "search", "service", "keysync")
 	out, err := cmd.Output()
 	if err != nil {
@@ -43,13 +43,15 @@ func linuxList(scope, project string) ([]SecretEntry, error) {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			if currentSvc != "" && currentAcct != "" && strings.HasPrefix(currentSvc, "keysync/") {
-				entryScope, entryProject := parseServiceName(currentSvc)
+				entryScope, entryProject, entryEnvironment := parseServiceName(currentSvc)
 				if (scope == "" || entryScope == scope) &&
-					(project == "" || entryProject == project) {
+					(project == "" || entryProject == project) &&
+					(environment == "" || entryEnvironment == environment) {
 					entries = append(entries, SecretEntry{
-						Scope:   entryScope,
-						Project: entryProject,
-						Key:     currentAcct,
+						Scope:       entryScope,
+						Project:     entryProject,
+						Environment: entryEnvironment,
+						Key:         currentAcct,
 					})
 				}
 			}
@@ -71,13 +73,15 @@ func linuxList(scope, project string) ([]SecretEntry, error) {
 	}
 	// Handle last entry if no trailing blank line
 	if currentSvc != "" && currentAcct != "" && strings.HasPrefix(currentSvc, "keysync/") {
-		entryScope, entryProject := parseServiceName(currentSvc)
+		entryScope, entryProject, entryEnvironment := parseServiceName(currentSvc)
 		if (scope == "" || entryScope == scope) &&
-			(project == "" || entryProject == project) {
+			(project == "" || entryProject == project) &&
+			(environment == "" || entryEnvironment == environment) {
 			entries = append(entries, SecretEntry{
-				Scope:   entryScope,
-				Project: entryProject,
-				Key:     currentAcct,
+				Scope:       entryScope,
+				Project:     entryProject,
+				Environment: entryEnvironment,
+				Key:         currentAcct,
 			})
 		}
 	}

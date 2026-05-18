@@ -23,29 +23,42 @@ func init() {
 }
 
 // credTarget builds the credential target name for Windows Credential Manager.
-// Format: "keysync_<scope>" or "keysync_<scope>_<project>"
-func credTarget(scope, project string) string {
+// Format: "keysync_<scope>" or "keysync_<scope>_<project>" or "keysync_<scope>_<project>_<env>"
+func credTarget(scope, project, environment string) string {
 	if project == "" || scope == "global" {
 		return fmt.Sprintf("keysync_%s", scope)
 	}
-	return fmt.Sprintf("keysync_%s_%s", scope, project)
+	if environment == "" {
+		return fmt.Sprintf("keysync_%s_%s", scope, project)
+	}
+	return fmt.Sprintf("keysync_%s_%s_%s", scope, project, environment)
 }
 
-// parseCredTarget splits a Windows target name back into scope and project.
-func parseCredTarget(target string) (scope, project string) {
+// parseCredTarget splits a Windows target name back into scope, project, and environment.
+// e.g. "keysync_project_myapp_dev" → ("project", "myapp", "dev")
+//      "keysync_project_myapp"     → ("project", "myapp", "")
+//      "keysync_global"            → ("global", "", "")
+func parseCredTarget(target string) (scope, project, environment string) {
 	trimmed := strings.TrimPrefix(target, "keysync_")
 	parts := strings.SplitN(trimmed, "_", 2)
 	if len(parts) == 0 {
-		return "global", ""
+		return "global", "", ""
 	}
 	scope = parts[0]
 	if scope != "global" && scope != "project" {
-		return "global", ""
+		return "global", "", ""
 	}
 	if len(parts) < 2 {
-		return scope, ""
+		return scope, "", ""
 	}
-	return scope, parts[1]
+	// Split the remainder by _; if there are multiple segments, the last is environment
+	restParts := strings.Split(parts[1], "_")
+	if len(restParts) > 1 {
+		environment = restParts[len(restParts)-1]
+		project = strings.Join(restParts[:len(restParts)-1], "_")
+		return scope, project, environment
+	}
+	return scope, parts[1], ""
 }
 
 // windowsGet retrieves a secret from Windows Credential Manager.
@@ -63,14 +76,15 @@ func windowsGet(service, account string) (string, error) {
 }
 
 // windowsList lists all keysync secrets from the cached Credential Manager entries.
-func windowsList(scope, project string) ([]SecretEntry, error) {
+func windowsList(scope, project, environment string) ([]SecretEntry, error) {
 	cacheMu.RLock()
 	defer cacheMu.RUnlock()
 
 	var result []SecretEntry
 	for _, e := range entCache {
 		if (scope == "" || e.Scope == scope) &&
-			(project == "" || e.Project == project) {
+			(project == "" || e.Project == project) &&
+			(environment == "" || e.Environment == environment) {
 			result = append(result, e)
 		}
 	}
@@ -96,20 +110,28 @@ func rebuildCache() {
 		if !strings.HasPrefix(cred.TargetName, "keysync_") {
 			continue
 		}
-		entryScope, entryProject := parseCredTarget(cred.TargetName)
+		entryScope, entryProject, entryEnvironment := parseCredTarget(cred.TargetName)
 		entCache = append(entCache, SecretEntry{
-			Scope:   entryScope,
-			Project: entryProject,
-			Key:     cred.UserName,
+			Scope:       entryScope,
+			Project:     entryProject,
+			Environment: entryEnvironment,
+			Key:         cred.UserName,
 		})
 	}
 }
 
-// targetFromService converts "keysync/global" → "keysync_global"
-// and "keysync/project/my-app" → "keysync_project_my-app"
+// targetFromService converts service names to Windows credential target names.
+// "keysync/global"             → "keysync_global"
+// "keysync/project/my-app"     → "keysync_project_my-app"
+// "keysync/project/myapp/env/dev" → "keysync_project_myapp_dev"
+// The "/env/" segment is stripped as a keyword before replacing / with _.
 func targetFromService(service string) string {
 	if strings.HasPrefix(service, "keysync/") {
-		return "keysync_" + strings.ReplaceAll(service[8:], "/", "_")
+		trimmed := service[8:]
+		// Strip the /env/ keyword: replace "/env/" with "" so it does not
+		// appear as a literal part of the target name.
+		trimmed = strings.ReplaceAll(trimmed, "/env/", "/")
+		return "keysync_" + strings.ReplaceAll(trimmed, "/", "_")
 	}
 	return "keysync_" + service
 }

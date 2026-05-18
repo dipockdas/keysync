@@ -57,9 +57,8 @@ describe("windowsList", () => {
 // Service ↔ target name conversion tests
 // ---------------------------------------------------------------------------
 
-describe("service ↔ target name conversion", () => {
+describe("service --> target name conversion", () => {
   it("converts global service to target", async () => {
-    // Test via the windows module's internal logic
     // Convert "keysync/global" → "keysync_global"
     const result = "keysync/global".replace(/\//g, "_");
     expect(result).toBe("keysync_global");
@@ -68,6 +67,28 @@ describe("service ↔ target name conversion", () => {
   it("converts project service to target", async () => {
     const result = "keysync/project/myapp".replace(/\//g, "_");
     expect(result).toBe("keysync_project_myapp");
+  });
+
+  it("converts project with environment to target", async () => {
+    // "keysync/project/myapp/env/dev" → "keysync_project_myapp_dev"
+    const result = "keysync/project/myapp/env/dev"
+      .replace(/\/env\//g, "_")
+      .replace(/\//g, "_");
+    expect(result).toBe("keysync_project_myapp_dev");
+  });
+
+  it("converts project with environment and hyphens to target", async () => {
+    const result = "keysync/project/my-app/env/staging"
+      .replace(/\/env\//g, "_")
+      .replace(/\//g, "_");
+    expect(result).toBe("keysync_project_my-app_staging");
+  });
+
+  it("converts project with environment and underscores in name to target", async () => {
+    const result = "keysync/project/my_long_app/env/prod"
+      .replace(/\/env\//g, "_")
+      .replace(/\//g, "_");
+    expect(result).toBe("keysync_project_my_long_app_prod");
   });
 
   it("converts project with hyphens to target", async () => {

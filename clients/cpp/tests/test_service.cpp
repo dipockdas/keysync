@@ -53,46 +53,72 @@ static void test_service_name_project_empty_name() {
     std::cout << "  PASS: test_service_name_project_empty_name" << std::endl;
 }
 
+static void test_service_name_environment() {
+    std::string svc = serviceName("project", "my-app", "staging");
+    ASSERT_EQUAL(svc, std::string("keysync/project/my-app/env/staging"));
+    std::cout << "  PASS: test_service_name_environment" << std::endl;
+}
+
+static void test_service_name_environment_global_ignores_env() {
+    std::string svc = serviceName("global", "", "staging");
+    ASSERT_EQUAL(svc, std::string("keysync/global"));
+    std::cout << "  PASS: test_service_name_environment_global_ignores_env" << std::endl;
+}
+
 // ---------------------------------------------------------------------------
 // Service name parsing tests
 // ---------------------------------------------------------------------------
 
 static void test_parse_global() {
-    std::string scope, project;
-    parseServiceName("keysync/global", scope, project);
+    std::string scope, project, environment;
+    parseServiceName("keysync/global", scope, project, environment);
     ASSERT_EQUAL(scope, std::string("global"));
     ASSERT_EQUAL(project, std::string(""));
+    ASSERT_EQUAL(environment, std::string(""));
     std::cout << "  PASS: test_parse_global" << std::endl;
 }
 
 static void test_parse_project() {
-    std::string scope, project;
-    parseServiceName("keysync/project/my-app", scope, project);
+    std::string scope, project, environment;
+    parseServiceName("keysync/project/my-app", scope, project, environment);
     ASSERT_EQUAL(scope, std::string("project"));
     ASSERT_EQUAL(project, std::string("my-app"));
+    ASSERT_EQUAL(environment, std::string(""));
     std::cout << "  PASS: test_parse_project" << std::endl;
 }
 
+static void test_parse_environment() {
+    std::string scope, project, environment;
+    parseServiceName("keysync/project/my-app/env/staging",
+                     scope, project, environment);
+    ASSERT_EQUAL(scope, std::string("project"));
+    ASSERT_EQUAL(project, std::string("my-app"));
+    ASSERT_EQUAL(environment, std::string("staging"));
+    std::cout << "  PASS: test_parse_environment" << std::endl;
+}
+
 static void test_parse_project_deep_path() {
-    std::string scope, project;
-    parseServiceName("keysync/project/my/deep/app", scope, project);
+    std::string scope, project, environment;
+    parseServiceName("keysync/project/my/deep/app", scope, project, environment);
     ASSERT_EQUAL(scope, std::string("project"));
     ASSERT_EQUAL(project, std::string("my/deep/app"));
+    ASSERT_EQUAL(environment, std::string(""));
     std::cout << "  PASS: test_parse_project_deep_path" << std::endl;
 }
 
 static void test_parse_unprefixed() {
-    std::string scope, project;
-    parseServiceName("other/global", scope, project);
+    std::string scope, project, environment;
+    parseServiceName("other/global", scope, project, environment);
     ASSERT_EQUAL(scope, std::string("other"));
     std::cout << "  PASS: test_parse_unprefixed" << std::endl;
 }
 
 static void test_parse_empty() {
-    std::string scope, project;
-    parseServiceName("", scope, project);
+    std::string scope, project, environment;
+    parseServiceName("", scope, project, environment);
     ASSERT_EQUAL(scope, std::string(""));
     ASSERT_EQUAL(project, std::string(""));
+    ASSERT_EQUAL(environment, std::string(""));
     std::cout << "  PASS: test_parse_empty" << std::endl;
 }
 
@@ -118,6 +144,12 @@ static void test_service_to_target_multi_slash() {
     std::cout << "  PASS: test_service_to_target_multi_slash" << std::endl;
 }
 
+static void test_service_to_target_environment() {
+    std::string target = serviceToTarget("keysync/project/my-app/env/dev");
+    ASSERT_EQUAL(target, std::string("keysync_project_my-app_dev"));
+    std::cout << "  PASS: test_service_to_target_environment" << std::endl;
+}
+
 static void test_target_to_service_global() {
     std::string svc = targetToService("keysync_global");
     ASSERT_EQUAL(svc, std::string("keysync/global"));
@@ -126,15 +158,28 @@ static void test_target_to_service_global() {
 
 static void test_target_to_service_project() {
     std::string svc = targetToService("keysync_project_my-app");
-    // After conversion, the first underscore becomes a slash
-    ASSERT_EQUAL(svc, std::string("keysync/project_my-app"));
+    // Two segments: just project
+    ASSERT_EQUAL(svc, std::string("keysync/project/my-app"));
     std::cout << "  PASS: test_target_to_service_project" << std::endl;
+}
+
+static void test_target_to_service_environment() {
+    std::string svc = targetToService("keysync_project_my-app_dev");
+    // Three segments: project + env
+    ASSERT_EQUAL(svc, std::string("keysync/project/my-app/env/dev"));
+    std::cout << "  PASS: test_target_to_service_environment" << std::endl;
 }
 
 static void test_roundtrip_global() {
     std::string svc = "keysync/global";
     ASSERT_EQUAL(targetToService(serviceToTarget(svc)), svc);
     std::cout << "  PASS: test_roundtrip_global" << std::endl;
+}
+
+static void test_roundtrip_environment() {
+    std::string svc = "keysync/project/my-app/env/staging";
+    ASSERT_EQUAL(targetToService(serviceToTarget(svc)), svc);
+    std::cout << "  PASS: test_roundtrip_environment" << std::endl;
 }
 
 // ---------------------------------------------------------------------------
@@ -182,9 +227,12 @@ int test_service_names() {
     test_service_name_project();
     test_service_name_global_ignores_project();
     test_service_name_project_empty_name();
+    test_service_name_environment();
+    test_service_name_environment_global_ignores_env();
 
     test_parse_global();
     test_parse_project();
+    test_parse_environment();
     test_parse_project_deep_path();
     test_parse_unprefixed();
     test_parse_empty();
@@ -192,9 +240,12 @@ int test_service_names() {
     test_service_to_target_global();
     test_service_to_target_project();
     test_service_to_target_multi_slash();
+    test_service_to_target_environment();
     test_target_to_service_global();
     test_target_to_service_project();
+    test_target_to_service_environment();
     test_roundtrip_global();
+    test_roundtrip_environment();
 
     test_trim_trailing_newline();
     test_trim_trailing_spaces();

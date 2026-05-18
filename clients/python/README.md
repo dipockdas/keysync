@@ -32,6 +32,9 @@ from keysync import get_secret, list_secrets, SecretNotFoundError
 # Project-scoped secret with global fallback
 db_url = get_secret("DATABASE_URL", project="my-api")
 
+# Environment-scoped secret (per-environment overrides)
+db_url_dev = get_secret("DATABASE_URL", project="my-api", environment="dev")
+
 # Global-only secret
 api_key = get_secret("GLOBAL_API_KEY")
 
@@ -40,8 +43,9 @@ secrets = list_secrets()
 for s in secrets:
     print(f"{s['scope']}/{s['project'] or ''} => {s['key']}")
 
-# Filter by scope and project
+# Filter by scope, project, and environment
 project_secrets = list_secrets(scope="project", project="my-api")
+dev_secrets = list_secrets(scope="project", project="my-api", environment="dev")
 ```
 
 ## Error handling
@@ -68,6 +72,22 @@ Secrets are stored in the OS keychain with this naming convention:
 |-------|-------------|--------------|
 | Global | `keysync/global` | key name (e.g. `DATABASE_URL`) |
 | Project | `keysync/project/<name>` | key name |
+| Environment | `keysync/project/<name>/env/<env>` | key name |
+
+On Windows, `/env/` is stripped from the target name stored in Credential
+Manager (e.g. `keysync/project/myapp/env/dev` becomes `keysync_project_myapp_dev`).
+
+## Resolution order
+
+`get_secret` searches for a secret in the following order:
+
+1. Environment variable (`os.environ`) -- always checked first
+2. `keysync/project/<project>/env/<environment>` -- if both *project* and *environment* are provided
+3. `keysync/project/<project>` -- if *project* is provided
+4. `keysync/global` -- always falls back to global scope
+
+This allows per-environment overrides while still having a project-level default
+and a global fallback.
 
 The library accesses the OS keychain directly:
 

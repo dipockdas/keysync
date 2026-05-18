@@ -11,6 +11,8 @@ namespace KeySync;
 /// Target name convention:
 ///   <c>"keysync/global"</c> is stored as <c>"keysync_global"</c>
 ///   <c>"keysync/project/my-app"</c> is stored as <c>"keysync_project_my-app"</c>
+///   <c>"keysync/project/my-app/env/dev"</c> is stored as
+///     <c>"keysync_project_my-app_dev"</c> (strips /env/ keyword)
 /// </summary>
 internal sealed class WindowsKeychainProvider : IKeychainProvider
 {
@@ -106,7 +108,14 @@ internal sealed class WindowsKeychainProvider : IKeychainProvider
                 if (account == null)
                     continue;
 
-                results.Add(new CredentialEntry(service, account));
+                // Extract environment from service name for CredentialEntry
+                string? env = null;
+                int envIdx = service.IndexOf("/env/", StringComparison.Ordinal);
+                if (envIdx >= 0)
+                {
+                    env = service[(envIdx + 5)..];
+                }
+                results.Add(new CredentialEntry(service, account, env));
             }
 
             return results;
@@ -165,33 +174,67 @@ internal sealed class WindowsKeychainProvider : IKeychainProvider
 
     /// <summary>
     /// Converts a keysync service name to a Windows Credential Manager
-    /// target name by replacing slashes with underscores.
+    /// target name by stripping the /env/ keyword and replacing slashes
+    /// with underscores.
     /// </summary>
     /// <example>
     /// <c>"keysync/global"</c> → <c>"keysync_global"</c>
     /// <c>"keysync/project/my-app"</c> → <c>"keysync_project_my-app"</c>
+    /// <c>"keysync/project/my-app/env/dev"</c> → <c>"keysync_project_my-app_dev"</c>
     /// </example>
     internal static string ServiceToTarget(string service)
     {
-        if (service.StartsWith("keysync/", StringComparison.Ordinal))
+        // Strip /env/ keyword so environment is just part of the path
+        string processed = service.Replace("/env/", "/");
+        if (processed.StartsWith("keysync/", StringComparison.Ordinal))
         {
-            return "keysync_" + service[8..].Replace('/', '_');
+            return "keysync_" + processed[8..].Replace('/', '_');
         }
-        return "keysync_" + service.Replace('/', '_');
+        return "keysync_" + processed.Replace('/', '_');
     }
 
     /// <summary>
-    /// Converts a Windows target name back to a keysync service name.
+    /// Converts a Windows target name back to a keysync service name,
+    /// inserting /env/ between the project and environment segments
+    /// when there are 3+ path components.
     /// </summary>
     /// <example>
     /// <c>"keysync_global"</c> → <c>"keysync/global"</c>
     /// <c>"keysync_project_my-app"</c> → <c>"keysync/project/my-app"</c>
+    /// <c>"keysync_project_my-app_dev"</c> → <c>"keysync/project/my-app/env/dev"</c>
     /// </example>
     internal static string TargetToService(string target)
     {
         if (target.StartsWith("keysync_", StringComparison.Ordinal))
         {
-            return "keysync/" + target[8..].Replace('_', '/');
+            string remainder = target[8..]; // after "keysync_"
+            int firstUnderscore = remainder.IndexOf('_');
+            if (firstUnderscore < 0)
+            {
+                return "keysync/" + remainder;
+            }
+
+            string scope = remainder[..firstUnderscore];
+            string rest = remainder[(firstUnderscore + 1)..];
+
+            if (scope == "global")
+            {
+                return "keysync/global";
+            }
+
+            // For project scope: check if rest contains another underscore
+            // (indicating 3+ segments: project + env + possibly more)
+            int secondUnderscore = rest.IndexOf('_');
+            if (secondUnderscore >= 0)
+            {
+                // Has 3+ segments: project + env (+ possibly more)
+                string projectPart = rest[..secondUnderscore];
+                string envPart = rest[(secondUnderscore + 1)..].Replace('_', '/');
+                return "keysync/" + scope + "/" + projectPart + "/env/" + envPart;
+            }
+
+            // Only 2 segments: project scope only
+            return "keysync/" + scope + "/" + rest;
         }
         return target;
     }

@@ -31,7 +31,7 @@ keysync = { path = "clients/rust" }
 ## Usage
 
 ```rust
-use keysync::{get_secret, list_secrets, KeySyncError};
+use keysync::{get_secret, get_secret_with_env, list_secrets, list_secrets_with_env, KeySyncError};
 
 fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Retrieve a project-scoped secret (falls back to global scope)
@@ -44,6 +44,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
     // Retrieve a global-only secret
     let api_key = get_secret("GLOBAL_API_KEY", None)?;
 
+    // Retrieve an environment-scoped secret (falls back: env → project → global)
+    let staging_db = get_secret_with_env("DATABASE_URL", "my-api", "staging")?;
+
     // List all secrets
     let entries = list_secrets(None)?;
     for entry in &entries {
@@ -52,6 +55,9 @@ fn main() -> Result<(), Box<dyn std::error::Error>> {
 
     // List only project secrets (includes globals)
     let project_entries = list_secrets(Some("my-api"))?;
+
+    // List environment secrets (includes globals + project)
+    let staging_entries = list_secrets_with_env("my-api", Some("staging"))?;
 
     Ok(())
 }
@@ -65,6 +71,7 @@ Secrets are stored in the OS keychain with this naming convention:
 |---------|-----------------------------|-------------------------------|
 | Global  | `keysync/global`            | key name (e.g. `DATABASE_URL`) |
 | Project | `keysync/project/<name>`    | key name                       |
+| Environment | `keysync/project/<name>/env/<env>` | key name                 |
 
 The library calls the OS keychain tooling directly:
 
@@ -87,11 +94,18 @@ primary path for:
 
 ## Resolution order
 
+For an environment-scoped call `get_secret_with_env("DATABASE_URL", "myapi", "staging")`:
+
+1. Check `DATABASE_URL` environment variable
+2. Check keychain service `keysync/project/myapi/env/staging` for account `DATABASE_URL`
+3. Check keychain service `keysync/project/myapi` for account `DATABASE_URL`
+4. Check keychain service `keysync/global` for account `DATABASE_URL`
+
 For a project-scoped call `get_secret("DATABASE_URL", Some("myapi"))`:
 
 1. Check `DATABASE_URL` environment variable
-2. Check macOS keychain service `keysync/project/myapi` for account `DATABASE_URL`
-3. Check macOS keychain service `keysync/global` for account `DATABASE_URL`
+2. Check keychain service `keysync/project/myapi` for account `DATABASE_URL`
+3. Check keychain service `keysync/global` for account `DATABASE_URL`
 
 ## Testing
 

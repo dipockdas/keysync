@@ -119,7 +119,8 @@ std::string getSecretMacOS(const std::string& service, const std::string& accoun
 }
 
 std::vector<CredentialEntry> listSecretsMacOS(const std::string& scope_filter,
-                                               const std::string& project_filter) {
+                                               const std::string& project_filter,
+                                               const std::string& environment_filter) {
     std::vector<CredentialEntry> entries;
 
     // Dump the keychain and parse generic password entries
@@ -147,14 +148,15 @@ std::vector<CredentialEntry> listSecretsMacOS(const std::string& scope_filter,
             if (svc.size() >= 8 && svc.substr(0, 8) == "keysync/") {
                 std::string acct = findAttrValue(record, "acct");
                 if (!acct.empty()) {
-                    std::string entryScope, entryProject;
-                    parseServiceName(svc, entryScope, entryProject);
+                    std::string entryScope, entryProject, entryEnvironment;
+                    parseServiceName(svc, entryScope, entryProject, entryEnvironment);
 
                     bool scopeMatch = scope_filter.empty() || entryScope == scope_filter;
                     bool projectMatch = project_filter.empty() || entryProject == project_filter;
+                    bool envMatch = environment_filter.empty() || entryEnvironment == environment_filter;
 
-                    if (scopeMatch && projectMatch) {
-                        entries.push_back({entryScope, entryProject, acct});
+                    if (scopeMatch && projectMatch && envMatch) {
+                        entries.push_back({entryScope, entryProject, entryEnvironment, acct});
                     }
                 }
             }

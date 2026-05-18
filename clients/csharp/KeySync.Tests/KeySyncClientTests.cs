@@ -41,66 +41,96 @@ public class ServiceNameTests
     }
 
     [Fact]
+    public void ForScope_Environment_ReturnsWithEnv()
+    {
+        string name = ServiceName.ForScope("project", project: "my-app", environment: "staging");
+        Assert.Equal("keysync/project/my-app/env/staging", name);
+    }
+
+    [Fact]
+    public void ForScope_EnvironmentWithoutProject_ReturnsWithoutEnv()
+    {
+        string name = ServiceName.ForScope("project", project: null, environment: "staging");
+        Assert.Equal("keysync/project", name);
+    }
+
+    [Fact]
     public void Parse_Global_ReturnsScopeOnly()
     {
-        var (scope, project) = ServiceName.Parse("keysync/global");
+        var (scope, project, environment) = ServiceName.Parse("keysync/global");
         Assert.Equal("global", scope);
         Assert.Null(project);
+        Assert.Null(environment);
     }
 
     [Fact]
     public void Parse_Project_ReturnsScopeAndProject()
     {
-        var (scope, project) = ServiceName.Parse("keysync/project/my-app");
+        var (scope, project, environment) = ServiceName.Parse("keysync/project/my-app");
         Assert.Equal("project", scope);
         Assert.Equal("my-app", project);
+        Assert.Null(environment);
     }
 
     [Fact]
     public void Parse_ProjectDeepNesting_ReturnsScopeAndProject()
     {
-        var (scope, project) = ServiceName.Parse("keysync/project/my/deep/app");
+        var (scope, project, environment) = ServiceName.Parse("keysync/project/my/deep/app");
         Assert.Equal("project", scope);
         Assert.Equal("my/deep/app", project);
+        Assert.Null(environment);
+    }
+
+    [Fact]
+    public void Parse_Environment_ReturnsScopeProjectAndEnv()
+    {
+        var (scope, project, environment) = ServiceName.Parse("keysync/project/my-app/env/staging");
+        Assert.Equal("project", scope);
+        Assert.Equal("my-app", project);
+        Assert.Equal("staging", environment);
     }
 
     [Fact]
     public void Parse_JustKeysync_ReturnsGlobal()
     {
-        var (scope, project) = ServiceName.Parse("keysync");
+        var (scope, project, environment) = ServiceName.Parse("keysync");
         Assert.Equal("global", scope);
         Assert.Null(project);
+        Assert.Null(environment);
     }
 
     [Fact]
     public void Parse_UnrecognizedScope_ReturnsScopeWithoutProject()
     {
-        var (scope, project) = ServiceName.Parse("keysync/other/val");
+        var (scope, project, environment) = ServiceName.Parse("keysync/other/val");
         Assert.Equal("other", scope);
         Assert.Null(project);
+        Assert.Null(environment);
     }
 
     [Fact]
     public void Parse_EmptyString_ReturnsGlobal()
     {
-        var (scope, project) = ServiceName.Parse("");
+        var (scope, project, environment) = ServiceName.Parse("");
         Assert.Equal("global", scope);
         Assert.Null(project);
+        Assert.Null(environment);
     }
 
     [Fact]
     public void Parse_Whitespace_ReturnsGlobal()
     {
-        var (scope, project) = ServiceName.Parse("   ");
+        var (scope, project, environment) = ServiceName.Parse("   ");
         Assert.Equal("global", scope);
         Assert.Null(project);
+        Assert.Null(environment);
     }
 
     [Fact]
     public void RoundTrip_Global()
     {
         string built = ServiceName.ForScope("global", null);
-        var (scope, project) = ServiceName.Parse(built);
+        var (scope, project, _) = ServiceName.Parse(built);
         Assert.Equal("global", scope);
         Assert.Null(project);
     }
@@ -109,9 +139,19 @@ public class ServiceNameTests
     public void RoundTrip_Project()
     {
         string built = ServiceName.ForScope("project", "my-app");
-        var (scope, project) = ServiceName.Parse(built);
+        var (scope, project, _) = ServiceName.Parse(built);
         Assert.Equal("project", scope);
         Assert.Equal("my-app", project);
+    }
+
+    [Fact]
+    public void RoundTrip_Environment()
+    {
+        string built = ServiceName.ForScope("project", "my-app", "staging");
+        var (scope, project, env) = ServiceName.Parse(built);
+        Assert.Equal("project", scope);
+        Assert.Equal("my-app", project);
+        Assert.Equal("staging", env);
     }
 }
 
@@ -267,6 +307,13 @@ public class WindowsTargetConversionTests
     }
 
     [Fact]
+    public void ServiceToTarget_Environment()
+    {
+        string result = WindowsKeychainProvider.ServiceToTarget("keysync/project/my-app/env/dev");
+        Assert.Equal("keysync_project_my-app_dev", result);
+    }
+
+    [Fact]
     public void ServiceToTarget_DeeplyNested()
     {
         string result = WindowsKeychainProvider.ServiceToTarget("keysync/project/my/deep/app");
@@ -288,9 +335,25 @@ public class WindowsTargetConversionTests
     }
 
     [Fact]
+    public void TargetToService_Environment()
+    {
+        string result = WindowsKeychainProvider.TargetToService("keysync_project_my-app_dev");
+        Assert.Equal("keysync/project/my-app/env/dev", result);
+    }
+
+    [Fact]
     public void ServiceToTarget_RoundTrip()
     {
         string original = "keysync/project/my-app";
+        string target = WindowsKeychainProvider.ServiceToTarget(original);
+        string back = WindowsKeychainProvider.TargetToService(target);
+        Assert.Equal(original, back);
+    }
+
+    [Fact]
+    public void ServiceToTarget_RoundTrip_Environment()
+    {
+        string original = "keysync/project/my-app/env/staging";
         string target = WindowsKeychainProvider.ServiceToTarget(original);
         string back = WindowsKeychainProvider.TargetToService(target);
         Assert.Equal(original, back);
@@ -330,6 +393,23 @@ public class CredentialEntryTests
         var a = new CredentialEntry("keysync/global", "MY_KEY");
         var b = new CredentialEntry("keysync/global", "OTHER_KEY");
         Assert.NotEqual(a, b);
+    }
+
+    [Fact]
+    public void Records_AreNotEqual_WhenDifferentEnvironment()
+    {
+        var a = new CredentialEntry("keysync/project/myapp", "KEY", Environment: "staging");
+        var b = new CredentialEntry("keysync/project/myapp", "KEY", Environment: "production");
+        Assert.NotEqual(a, b);
+    }
+
+    [Fact]
+    public void Records_StoreEnvironment()
+    {
+        var entry = new CredentialEntry("keysync/project/myapp/env/staging", "DB_URL", Environment: "staging");
+        Assert.Equal("keysync/project/myapp/env/staging", entry.Service);
+        Assert.Equal("DB_URL", entry.Account);
+        Assert.Equal("staging", entry.Environment);
     }
 
     [Fact]

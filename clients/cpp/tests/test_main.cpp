@@ -109,19 +109,27 @@ static void test_env_var_not_set_triggers_keychain() {
 // ---------------------------------------------------------------------------
 
 static void test_credential_entry() {
-    keysync::CredentialEntry entry{"global", "", "API_KEY"};
+    keysync::CredentialEntry entry{"global", "", "", "API_KEY"};
     ASSERT_EQUAL(entry.scope, std::string("global"));
     ASSERT_EQUAL(entry.project, std::string(""));
+    ASSERT_EQUAL(entry.environment, std::string(""));
     ASSERT_EQUAL(entry.key, std::string("API_KEY"));
 
-    keysync::CredentialEntry entry2{"project", "myapp", "DATABASE_URL"};
+    keysync::CredentialEntry entry2{"project", "myapp", "", "DATABASE_URL"};
     ASSERT_EQUAL(entry2.scope, std::string("project"));
     ASSERT_EQUAL(entry2.project, std::string("myapp"));
     ASSERT_EQUAL(entry2.key, std::string("DATABASE_URL"));
 
+    keysync::CredentialEntry entry3{"project", "myapp", "staging", "DB_URL"};
+    ASSERT_EQUAL(entry3.scope, std::string("project"));
+    ASSERT_EQUAL(entry3.project, std::string("myapp"));
+    ASSERT_EQUAL(entry3.environment, std::string("staging"));
+    ASSERT_EQUAL(entry3.key, std::string("DB_URL"));
+
     // Equality
     ASSERT_TRUE(entry == entry);
     ASSERT_TRUE(entry != entry2);
+    ASSERT_TRUE(entry2 != entry3);
 
     std::cout << "  PASS: test_credential_entry" << std::endl;
 }

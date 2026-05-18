@@ -18,17 +18,20 @@ namespace internal {
 #if defined(__APPLE__)
 std::string getSecretMacOS(const std::string& service, const std::string& account);
 std::vector<CredentialEntry> listSecretsMacOS(const std::string& scope_filter,
-                                               const std::string& project_filter);
+                                               const std::string& project_filter,
+                                               const std::string& environment_filter);
 bool isNotFoundMacOS(const std::string& service, const std::string& account);
 #elif defined(__linux__)
 std::string getSecretLinux(const std::string& service, const std::string& account);
 std::vector<CredentialEntry> listSecretsLinux(const std::string& scope_filter,
-                                                const std::string& project_filter);
+                                                const std::string& project_filter,
+                                                const std::string& environment_filter);
 bool isNotFoundLinux(const std::string& service, const std::string& account);
 #elif defined(_WIN32)
 std::string getSecretWindows(const std::string& service, const std::string& account);
 std::vector<CredentialEntry> listSecretsWindows(const std::string& scope_filter,
-                                                  const std::string& project_filter);
+                                                  const std::string& project_filter,
+                                                  const std::string& environment_filter);
 bool isNotFoundWindows(const std::string& service, const std::string& account);
 #endif
 
@@ -38,7 +41,8 @@ bool isNotFoundWindows(const std::string& service, const std::string& account);
 // Public API implementation
 // ---------------------------------------------------------------------------
 
-std::string getSecret(std::string_view key, std::string_view project) {
+std::string getSecret(std::string_view key, std::string_view project,
+                      std::string_view environment) {
 #if !defined(__APPLE__) && !defined(__linux__) && !defined(_WIN32)
     throw KeySyncError(ErrorCode::UnsupportedPlatform,
         "keychain access not available on this platform");
@@ -52,8 +56,28 @@ std::string getSecret(std::string_view key, std::string_view project) {
         return std::string(envVal);
     }
 
-    // Try project scope first when a project is specified
+    // If project is provided, check environment scope first, then project scope
     if (!project.empty()) {
+        // 1. Try environment-scoped (if environment is provided)
+        if (!environment.empty()) {
+            std::string svc = internal::serviceName("project", project, environment);
+            try {
+#if defined(__APPLE__)
+                return internal::getSecretMacOS(svc, keyStr);
+#elif defined(__linux__)
+                return internal::getSecretLinux(svc, keyStr);
+#elif defined(_WIN32)
+                return internal::getSecretWindows(svc, keyStr);
+#endif
+            } catch (const KeySyncError& e) {
+                if (e.code() != ErrorCode::NotFound) {
+                    throw; // Re-throw non-NotFound errors
+                }
+                // Fall through to project scope
+            }
+        }
+
+        // 2. Try project scope
         std::string svc = internal::serviceName("project", project);
         try {
 #if defined(__APPLE__)
@@ -71,7 +95,7 @@ std::string getSecret(std::string_view key, std::string_view project) {
         }
     }
 
-    // Fall back to global scope
+    // 3. Fall back to global scope
     std::string svc = internal::serviceName("global");
 #if defined(__APPLE__)
     return internal::getSecretMacOS(svc, keyStr);
@@ -83,32 +107,32 @@ std::string getSecret(std::string_view key, std::string_view project) {
 #endif // platform check
 }
 
-std::vector<CredentialEntry> listSecrets(std::string_view project) {
+std::vector<CredentialEntry> listSecrets(std::string_view project,
+                                          std::string_view environment) {
 #if !defined(__APPLE__) && !defined(__linux__) && !defined(_WIN32)
     throw KeySyncError(ErrorCode::UnsupportedPlatform,
         "keychain access not available on this platform");
 #else
     std::string projectStr(project);
+    std::string envStr(environment);
 
 #if defined(__APPLE__)
-    // If no project filter, return global scope entries.
-    // If a project filter, return project-scoped entries matching that project.
     if (project.empty()) {
-        return internal::listSecretsMacOS("global", "");
+        return internal::listSecretsMacOS("global", "", "");
     } else {
-        return internal::listSecretsMacOS("project", projectStr);
+        return internal::listSecretsMacOS("project", projectStr, envStr);
     }
 #elif defined(__linux__)
     if (project.empty()) {
-        return internal::listSecretsLinux("global", "");
+        return internal::listSecretsLinux("global", "", "");
     } else {
-        return internal::listSecretsLinux("project", projectStr);
+        return internal::listSecretsLinux("project", projectStr, envStr);
     }
 #elif defined(_WIN32)
     if (project.empty()) {
-        return internal::listSecretsWindows("global", "");
+        return internal::listSecretsWindows("global", "", "");
     } else {
-        return internal::listSecretsWindows("project", projectStr);
+        return internal::listSecretsWindows("project", projectStr, envStr);
     }
 #endif
 #endif // platform check

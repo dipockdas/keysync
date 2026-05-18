@@ -13,21 +13,26 @@ module KeySync
     module_function
 
     # Convert a keysync service name to a Windows Credential Manager
-    # target name suitable for storage.
+    # target name suitable for storage. Strips the /env/ keyword and
+    # replaces slashes with underscores.
     #
-    # "keysync/global"      => "keysync_global"
-    # "keysync/project/app" => "keysync_project_app"
+    # "keysync/global"                    => "keysync_global"
+    # "keysync/project/app"               => "keysync_project_app"
+    # "keysync/project/app/env/staging"   => "keysync_project_app_staging"
     #
     # @param service [String] keysync service name
-    # @return [String] target name with slashes replaced by underscores
+    # @return [String] target name with environment marker removed
     def service_to_target(service)
-      service.tr("/", "_")
+      # Strip /env/ keyword so environment is just part of the path
+      processed = service.gsub("/env/", "/")
+      processed.tr("/", "_")
     end
 
     # Convert a Windows target name back to a keysync service name.
     #
-    # "keysync_global"       => "keysync/global"
-    # "keysync_project_myapp" => "keysync/project/myapp"
+    # "keysync_global"                   => "keysync/global"
+    # "keysync_project_myapp"            => "keysync/project/myapp"
+    # "keysync_project_myapp_staging"    => "keysync/project/myapp/env/staging"
     #
     # @param target [String] the Windows credential target name
     # @return [String, nil] the keysync service name, or nil if not a keysync target
@@ -36,7 +41,13 @@ module KeySync
       if parts.length >= 2 && parts[1] == "global"
         "keysync/global"
       elsif parts.length >= 3 && parts[1] == "project"
-        "keysync/project/#{parts[2..].join('_')}"
+        if parts.length >= 4
+          # 3+ segments: project + env
+          "keysync/project/#{parts[2]}/env/#{parts[3..].join('_')}"
+        else
+          # Exactly 2 segments: just project
+          "keysync/project/#{parts[2]}"
+        end
       end
     end
 

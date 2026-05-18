@@ -15,7 +15,23 @@ std::string serviceName(std::string_view scope, std::string_view project) {
     return result;
 }
 
-void parseServiceName(std::string_view service, std::string& scope, std::string& project) {
+std::string serviceName(std::string_view scope, std::string_view project,
+                         std::string_view environment) {
+    std::string result = "keysync/";
+    result += scope;
+    if (!project.empty() && scope == "project") {
+        result += "/";
+        result += project;
+        if (!environment.empty()) {
+            result += "/env/";
+            result += environment;
+        }
+    }
+    return result;
+}
+
+void parseServiceName(std::string_view service, std::string& scope,
+                       std::string& project, std::string& environment) {
     // Strip "keysync/" prefix
     std::string_view trimmed = service;
     constexpr std::string_view prefix = "keysync/";
@@ -28,18 +44,40 @@ void parseServiceName(std::string_view service, std::string& scope, std::string&
     if (slashPos == std::string_view::npos) {
         scope = trimmed;
         project.clear();
+        environment.clear();
         return;
     }
 
     scope = trimmed.substr(0, slashPos);
-    project = trimmed.substr(slashPos + 1);
+    std::string_view rest = trimmed.substr(slashPos + 1);
+
+    // Check for /env/ segment to detect environment
+    constexpr std::string_view envMarker = "/env/";
+    auto envIdx = rest.find(envMarker);
+    if (envIdx != std::string_view::npos && envIdx > 0) {
+        project = rest.substr(0, envIdx);
+        environment = rest.substr(envIdx + envMarker.size());
+    } else {
+        project = rest;
+        environment.clear();
+    }
 }
 
 std::string serviceToTarget(std::string_view service) {
+    // Strip /env/ keyword before converting
+    std::string processed(service);
+    constexpr std::string_view envMarker = "/env/";
+    size_t pos = processed.find(envMarker);
+    if (pos != std::string::npos) {
+        processed.erase(pos + 1, envMarker.size() - 1); // remove "env" keeping the "/"
+    }
+
     std::string target;
-    if (service.size() >= 8 && service.substr(0, 8) == "keysync/") {
+    constexpr std::string_view svcPrefix = "keysync/";
+    if (processed.size() >= svcPrefix.size() && processed.substr(0, svcPrefix.size()) == svcPrefix) {
         target = "keysync_";
-        std::string_view rest = service.substr(8);
+        std::string_view rest(processed.data() + svcPrefix.size(),
+                              processed.size() - svcPrefix.size());
         for (char ch : rest) {
             if (ch == '/') {
                 target += '_';
@@ -49,7 +87,7 @@ std::string serviceToTarget(std::string_view service) {
         }
     } else {
         target = "keysync_";
-        for (char ch : service) {
+        for (char ch : processed) {
             if (ch == '/') {
                 target += '_';
             } else {
@@ -64,21 +102,38 @@ std::string targetToService(std::string_view target) {
     std::string service;
     constexpr std::string_view prefix = "keysync_";
     if (target.size() >= prefix.size() && target.substr(0, prefix.size()) == prefix) {
-        service = "keysync/";
         std::string_view rest = target.substr(prefix.size());
-        bool firstUnderscore = true;
-        for (char ch : rest) {
-            if (ch == '_' && firstUnderscore) {
-                service += '/';
-                firstUnderscore = false;
-            } else {
-                service += ch;
-            }
+        // Find the first underscore to get the scope
+        auto firstUnderscore = rest.find('_');
+        if (firstUnderscore == std::string_view::npos) {
+            return "keysync/" + std::string(rest);
         }
-    } else {
-        service = target;
+
+        std::string scope(rest.substr(0, firstUnderscore));
+        std::string_view restStr = rest.substr(firstUnderscore + 1);
+
+        if (scope == "global") {
+            return "keysync/global";
+        }
+
+        // For project scope: convert underscores to slashes
+        // Check for 3+ segments (project_env_more => project/env/more)
+        auto secondUnderscore = restStr.find('_');
+        if (secondUnderscore != std::string_view::npos) {
+            // Has 3 segments: project + env + possibly more
+            std::string projectPart(restStr.substr(0, secondUnderscore));
+            std::string envPart(restStr.substr(secondUnderscore + 1));
+            // Replace remaining underscores with slashes in env part
+            std::replace(envPart.begin(), envPart.end(), '_', '/');
+            return "keysync/" + scope + "/" + projectPart + "/env/" + envPart;
+        }
+
+        // Only 2 segments: just project
+        std::string projectPart(restStr);
+        return "keysync/" + scope + "/" + projectPart;
     }
-    return service;
+
+    return std::string(target);
 }
 
 std::string trimTrailing(std::string_view s) {

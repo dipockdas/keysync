@@ -16,8 +16,8 @@ cargo doc --open      # Generate and open documentation
 src/
   lib.rs              # Public API (get_secret, list_secrets), re-exports
   error.rs            # KeySyncError enum, Result type, std::error::Error impl
-  credential.rs       # CredentialEntry struct
-  service.rs          # Service name builders and parsers
+  credential.rs       # CredentialEntry struct (scope, project, environment, account)
+  service.rs          # Service name builders and parsers (with env support)
   macos.rs            # macOS: std::process::Command → security CLI
   linux.rs            # Linux: std::process::Command → secret-tool CLI
   windows.rs          # Windows: windows-sys → Win32 Credential Manager API
@@ -35,7 +35,7 @@ Cargo.toml            # Package config, windows-sys dependency for Windows
 - `KeySyncError` enum with NotFound, KeychainError(String), UnsupportedPlatform variants
 - `KeySyncError` implements std::fmt::Display and std::error::Error
 - `From<std::io::Error>` conversion for seamless `?` operator usage
-- `CredentialEntry` has scope, project, account fields
+- `CredentialEntry` has scope, project, account, environment fields
 - All tests using `#[cfg(test)]` modules in each source file
 - Use `std::env::var` to check environment variables first in get_secret
 
@@ -69,11 +69,17 @@ use keysync::get_secret;
 // let api_key = std::env::var("API_KEY").expect("API_KEY not set");
 
 // After — global secret (shared across projects)
-let api_key = get_secret("API_KEY", None)?;
+let api_key = get_secret("API_KEY", None, None)?;
 
 // Project-scoped secret (falls back to global if no project match)
-let db_url = get_secret("DATABASE_URL", Some("myapp"))?;
+let db_url = get_secret("DATABASE_URL", Some("myapp"), None)?;
+
+// Environment-scoped secret (falls back: env → project → global)
+let staging_db = get_secret("DATABASE_URL", Some("myapp"), Some("staging"))?;
 
 // List all secrets for a project (includes globals)
-let entries = keysync::list_secrets(Some("myapp"))?;
+let entries = keysync::list_secrets(Some("myapp"), None)?;
+
+// List secrets for a project + environment (includes globals)
+let staging_entries = keysync::list_secrets(Some("myapp"), Some("staging"))?;
 ```

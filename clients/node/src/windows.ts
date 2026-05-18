@@ -6,11 +6,36 @@ import { KeySyncError } from "./index.js";
 // ---------------------------------------------------------------------------
 
 /** Convert keysync service name to Windows Credential Manager target name.
- *  "keysync/global"      → "keysync_global"
- *  "keysync/project/app" → "keysync_project_app"
+ *  Strips /env/ keyword, then replaces slashes with underscores.
+ *  "keysync/project/myapp/env/dev" → "keysync_project_myapp_dev"
+ *  "keysync/project/myapp"         → "keysync_project_myapp"
+ *  "keysync/global"                → "keysync_global"
  */
 function serviceToTarget(service: string): string {
-  return service.replace(/\//g, "_");
+  return service.replace(/\/env\//g, "_").replace(/\//g, "_");
+}
+
+/** Convert Windows Credential Manager target back to a keysync service name.
+ *  "keysync_global"                → "keysync/global"
+ *  "keysync_project_myapp"         → "keysync/project/myapp"
+ *  "keysync_project_myapp_dev"     → "keysync/project/myapp/env/dev"
+ */
+function targetToService(target: string): string {
+  const parts = target.split("_");
+  if (parts.length >= 2 && parts[1] === "global") {
+    return "keysync/global";
+  }
+  if (parts.length >= 3 && parts[1] === "project") {
+    const extra = parts.slice(2);
+    if (extra.length >= 2) {
+      // Last part is environment, rest is project name.
+      const env = extra[extra.length - 1];
+      const project = extra.slice(0, -1).join("_");
+      return `keysync/project/${project}/env/${env}`;
+    }
+    return `keysync/project/${extra.join("_")}`;
+  }
+  return target;
 }
 
 // ---------------------------------------------------------------------------
@@ -207,17 +232,8 @@ export async function windowsList(): Promise<
 
     if (!target.startsWith("keysync_")) continue;
 
-    // Convert "keysync_global" → "keysync/global"
-    // Convert "keysync_project_myapp" → "keysync/project/myapp"
-    const parts = target.split("_");
-    let service = "";
-    if (parts.length >= 2 && parts[1] === "global") {
-      service = "keysync/global";
-    } else if (parts.length >= 3 && parts[1] === "project") {
-      service = `keysync/project/${parts.slice(2).join("_")}`;
-    } else {
-      continue;
-    }
+    const service = targetToService(target);
+    if (!service) continue;
 
     results.push({ service, account: userName });
   }

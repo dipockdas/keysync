@@ -37,36 +37,47 @@ else:
     _platform_list = lambda scope, project: []
 
 
-def _service_name(scope: str, project: str | None = None) -> str:
-    """Build a keychain service name from scope and project.
+def _service_name(scope: str, project: str | None = None, environment: str | None = None) -> str:
+    """Build a keychain service name from scope, project, and environment.
     Global:  "keysync/global"
     Project: "keysync/project/<name>"
+    Project with env: "keysync/project/<name>/env/<env>"
     """
     if not project or scope == "global":
         return f"keysync/{scope}"
+    if environment:
+        return f"keysync/{scope}/{project}/env/{environment}"
     return f"keysync/{scope}/{project}"
 
 
-def _parse_service_name(svc: str) -> tuple[str, str | None]:
-    """Parse a service name into (scope, project)."""
+def _parse_service_name(svc: str) -> tuple[str, str | None, str | None]:
+    """Parse a service name into (scope, project, environment)."""
     if not svc.startswith("keysync/"):
-        return ("global", None)
+        return ("global", None, None)
     trimmed = svc.removeprefix("keysync/")
     if "/" not in trimmed:
-        return (trimmed or "global", None)
+        return (trimmed or "global", None, None)
     scope, rest = trimmed.split("/", 1)
     if scope != "project":
-        return (scope, None)
-    return (scope, rest)
+        return (scope, None, None)
+    # Check for /env/ segment
+    if "/env/" in rest:
+        project, env = rest.split("/env/", 1)
+        return (scope, project, env)
+    return (scope, rest, None)
 
 
-def get_secret(key: str, project: str | None = None) -> str:
+def get_secret(key: str, project: str | None = None, environment: str | None = None) -> str:
     """Retrieve a secret from the OS keychain.
 
-    If *project* is provided, checks project scope first, then falls back
-    to global scope. If *project* is None, only global scope is checked.
+    Resolution order:
+    1. Check environment variable first
+    2. If *environment* is provided, try keysync/project/<project>/env/<env>
+    3. Try keysync/project/<project> (project scope, no env)
+    4. Fall back to keysync/global
 
     Raises SecretNotFoundError if the secret doesn't exist.
+    Raises KeySyncError if the platform is unsupported.
     """
     # Primary path: check environment variable first.
     # In local dev the user runs eval $(keysync export) at shell startup;
@@ -75,7 +86,15 @@ def get_secret(key: str, project: str | None = None) -> str:
     if val is not None:
         return val
 
-    # Try project scope first
+    # Try project + environment scope first
+    if project and environment:
+        svc = _service_name("project", project, environment)
+        try:
+            return _platform_get(svc, key)
+        except SecretNotFoundError:
+            pass  # fall through to project scope
+
+    # Try project scope (no env)
     if project:
         svc = _service_name("project", project)
         try:
@@ -91,26 +110,33 @@ def get_secret(key: str, project: str | None = None) -> str:
         raise SecretNotFoundError(key)
 
 
-def list_secrets(scope: str | None = None, project: str | None = None) -> list[dict]:
+def list_secrets(scope: str | None = None, project: str | None = None, environment: str | None = None) -> list[dict]:
     """List all stored secret entries.
 
     Returns a list of dicts with keys: scope, project, key.
+    If an environment is present, 'environment' key is also included.
 
     Keyword arguments:
         scope -- filter by scope ("global" or "project")
         project -- filter by project name
+        environment -- filter by environment name
     """
     entries = _platform_list()
     results = []
     for entry in entries:
-        entry_scope, entry_project = _parse_service_name(entry["service"])
+        entry_scope, entry_project, entry_env = _parse_service_name(entry["service"])
         if scope and entry_scope != scope:
             continue
         if project and entry_project != project:
             continue
-        results.append({
+        if environment and entry_env != environment:
+            continue
+        item = {
             "scope": entry_scope,
             "project": entry_project,
             "key": entry["account"],
-        })
+        }
+        if entry_env:
+            item["environment"] = entry_env
+        results.append(item)
     return results

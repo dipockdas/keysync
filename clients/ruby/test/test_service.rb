@@ -22,39 +22,57 @@ class TestService < Minitest::Test
       KeySync::Service.service_name("project")
   end
 
+  def test_environment_service_name
+    assert_equal "keysync/project/my-app/env/staging",
+      KeySync::Service.service_name("project", "my-app", "staging")
+  end
+
   def test_parse_global
-    scope, project = KeySync::Service.parse_service_name("keysync/global")
+    scope, project, env = KeySync::Service.parse_service_name("keysync/global")
     assert_equal "global", scope
     assert_nil project
+    assert_nil env
   end
 
   def test_parse_project
-    scope, project = KeySync::Service.parse_service_name("keysync/project/my-app")
+    scope, project, env = KeySync::Service.parse_service_name("keysync/project/my-app")
     assert_equal "project", scope
     assert_equal "my-app", project
+    assert_nil env
+  end
+
+  def test_parse_environment
+    scope, project, env = KeySync::Service.parse_service_name("keysync/project/my-app/env/staging")
+    assert_equal "project", scope
+    assert_equal "my-app", project
+    assert_equal "staging", env
   end
 
   def test_parse_project_deep
-    scope, project = KeySync::Service.parse_service_name("keysync/project/my/deep/app")
+    scope, project, env = KeySync::Service.parse_service_name("keysync/project/my/deep/app")
     assert_equal "project", scope
     assert_equal "my/deep/app", project
+    assert_nil env
   end
 
   def test_parse_unprefixed
-    scope, project = KeySync::Service.parse_service_name("other/global")
+    scope, project, env = KeySync::Service.parse_service_name("other/global")
     assert_equal "global", scope
     assert_nil project
+    assert_nil env
   end
 
   def test_parse_empty
-    scope, project = KeySync::Service.parse_service_name("")
+    scope, project, env = KeySync::Service.parse_service_name("")
     assert_equal "global", scope
     assert_nil project
+    assert_nil env
   end
 
   def test_parse_just_keysync
-    scope, project = KeySync::Service.parse_service_name("keysync")
+    scope, project, env = KeySync::Service.parse_service_name("keysync")
     assert_equal "global", scope
     assert_nil project
+    assert_nil env
   end
 end

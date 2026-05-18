@@ -130,7 +130,8 @@ std::string getSecretWindows(const std::string& service, const std::string& acco
 }
 
 std::vector<CredentialEntry> listSecretsWindows(const std::string& scope_filter,
-                                                  const std::string& project_filter) {
+                                                  const std::string& project_filter,
+                                                  const std::string& environment_filter) {
     std::vector<CredentialEntry> entries;
 
     DWORD count = 0;
@@ -156,16 +157,18 @@ std::vector<CredentialEntry> listSecretsWindows(const std::string& scope_filter,
         std::string target = fromWide(wtarget.c_str());
         std::string svc = targetToService(target);
 
-        std::string entryScope, entryProject;
-        parseServiceName(svc, entryScope, entryProject);
+        std::string entryScope, entryProject, entryEnvironment;
+        parseServiceName(svc, entryScope, entryProject, entryEnvironment);
 
         bool scopeMatch = scope_filter.empty() || entryScope == scope_filter;
         bool projectMatch = project_filter.empty() || entryProject == project_filter;
+        bool envMatch = environment_filter.empty() || entryEnvironment == environment_filter;
 
-        if (scopeMatch && projectMatch) {
+        if (scopeMatch && projectMatch && envMatch) {
             std::string userName = fromWide(cred->UserName);
             if (!userName.empty()) {
-                entries.push_back({entryScope, entryProject, userName});
+                entries.push_back({entryScope, entryProject,
+                                   entryEnvironment, userName});
             }
         }
     }

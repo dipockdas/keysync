@@ -51,11 +51,17 @@ string apiKey = KeySyncClient.GetSecret("API_KEY");
 // Get a project-scoped secret (falls back to global)
 string dbUrl = KeySyncClient.GetSecret("DATABASE_URL", "myapp");
 
+// Get an environment-scoped secret (falls back: env → project → global)
+string stagingDb = KeySyncClient.GetSecret("DATABASE_URL", "myapp", "staging");
+
 // List all global secrets
 List<CredentialEntry> globals = KeySyncClient.ListSecrets();
 
 // List project secrets (includes global fallback)
 List<CredentialEntry> project = KeySyncClient.ListSecrets("myapp");
+
+// List environment secrets (includes globals + project)
+List<CredentialEntry> staging = KeySyncClient.ListSecrets("myapp", "staging");
 ```
 
 ## Error handling
@@ -97,6 +103,7 @@ Secrets are stored in the OS keychain with this naming convention:
 |-------|-------------|--------------|
 | Global | `keysync/global` | key name (e.g. `DATABASE_URL`) |
 | Project | `keysync/project/<name>` | key name |
+| Environment | `keysync/project/<name>/env/<env>` | key name |
 
 The library accesses the OS keychain directly:
 
@@ -119,6 +126,8 @@ Every `GetSecret` call follows this order:
 
 1. Check environment variable first (`Environment.GetEnvironmentVariable(key)`)
    -- for cloud/CI where the platform injects env vars directly.
-2. If `project` is provided, check the project-scoped service
+2. If `environment` is provided, check the environment-scoped service
+   (`keysync/project/<name>/env/<env>`). Use for environment-specific overrides.
+3. If `project` is provided, check the project-scoped service
    (`keysync/project/<name>`).
-3. Fall back to the global-scoped service (`keysync/global`).
+4. Fall back to the global-scoped service (`keysync/global`).

@@ -150,4 +150,73 @@ class TestClient < Minitest::Test
   ensure
     KeySync.platform_get = nil
   end
+
+  def test_get_secret_with_environment_falls_back
+    ENV.delete("TEST_KEY")
+
+    calls = []
+    mock_get = ->(svc, acct) {
+      calls << [svc, acct]
+      if svc == "keysync/project/myapp/env/staging"
+        "staging-value"
+      else
+        raise KeySync::SecretNotFoundError, "#{svc}/#{acct}"
+      end
+    }
+    KeySync.platform_get = mock_get
+
+    result = KeySync.get_secret("TEST_KEY", project: "myapp", environment: "staging")
+    assert_equal "staging-value", result
+    assert_equal ["keysync/project/myapp/env/staging", "TEST_KEY"], calls.first
+  ensure
+    KeySync.platform_get = nil
+  end
+
+  def test_get_secret_with_environment_falls_back_to_project
+    ENV.delete("TEST_KEY")
+
+    calls = []
+    mock_get = ->(svc, acct) {
+      calls << [svc, acct]
+      if svc == "keysync/project/myapp"
+        "project-value"
+      else
+        raise KeySync::SecretNotFoundError, "#{svc}/#{acct}"
+      end
+    }
+    KeySync.platform_get = mock_get
+
+    result = KeySync.get_secret("TEST_KEY", project: "myapp", environment: "staging")
+    assert_equal "project-value", result
+    # Should try env scope first, then project
+    assert_equal 2, calls.length
+    assert_equal ["keysync/project/myapp/env/staging", "TEST_KEY"], calls[0]
+    assert_equal ["keysync/project/myapp", "TEST_KEY"], calls[1]
+  ensure
+    KeySync.platform_get = nil
+  end
+
+  def test_list_secrets_with_environment_filter_includes_env_entries
+    entries = [
+      { "service" => "keysync/global", "account" => "API_KEY" },
+      { "service" => "keysync/project/myapp", "account" => "DB_URL" },
+      { "service" => "keysync/project/myapp/env/staging", "account" => "STAGING_DB" },
+      { "service" => "keysync/project/myapp/env/production", "account" => "PROD_DB" },
+    ]
+
+    KeySync.platform_list = -> { entries }
+
+    results = KeySync.list_secrets(project: "myapp", environment: "staging")
+    # Should include global, project (no env), and staging env entries
+    # but NOT production env entries
+    result_services = results.map(&:service).sort
+    expected = %w[
+      keysync/global
+      keysync/project/myapp
+      keysync/project/myapp/env/staging
+    ].sort
+    assert_equal expected, result_services
+  ensure
+    KeySync.platform_list = nil
+  end
 end

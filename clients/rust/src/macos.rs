@@ -67,8 +67,8 @@ pub(crate) fn list_secrets() -> Result<Vec<CredentialEntry>> {
             continue;
         }
 
-        let (scope, project) = parse_service_name(svc);
-        entries.push(CredentialEntry::new(scope, project, acct));
+        let (scope, project, env) = parse_service_name(svc);
+        entries.push(CredentialEntry::new(scope, project, env, acct));
     }
 
     Ok(entries)

@@ -19,7 +19,7 @@ IKeychainProvider.cs             # Interface for platform backends
 MacKeychainProvider.cs           # macOS: Process.Start → security CLI
 LinuxKeychainProvider.cs         # Linux: Process.Start → secret-tool CLI
 WindowsKeychainProvider.cs       # Windows: P/Invoke to advapi32.dll
-CredentialEntry.cs               # Record type for list results
+CredentialEntry.cs               # Record type for list results (Service, Account, Environment)
 KeySync.Tests/                   # xUnit test project
   KeySync.Tests.csproj
   KeySyncClientTests.cs          # Service name, error types, env var, Windows target, struct layout tests
@@ -33,7 +33,7 @@ KeySync.Tests/                   # xUnit test project
 - `KeySyncClient` is a static class (no need for instantiation)
 - `IKeychainProvider` interface for platform abstraction
 - `KeySyncException` with `ErrorCode` property for pattern matching
-- Service naming: `keysync/global`, `keysync/project/<name>`
+- Service naming: `keysync/global`, `keysync/project/<name>`, `keysync/project/<name>/env/<env>`
 
 ### Windows P/Invoke
 
@@ -42,7 +42,7 @@ KeySync.Tests/                   # xUnit test project
 - `CredReadW` for single credential retrieval
 - `CredEnumerateW` for listing
 - `CredFree` to release allocated memory
-- Target names: `keysync_global`, `keysync_project_myapp`
+- Target names: `keysync_global`, `keysync_project_myapp`, `keysync_project_myapp_dev` (strips `/env/`)
 
 ### Platform-specific notes
 
@@ -64,7 +64,11 @@ string apiKey = KeySyncClient.GetSecret("API_KEY");
 // Project-scoped secret (falls back to global if no project match)
 string dbUrl = KeySyncClient.GetSecret("DATABASE_URL", "myapp");
 
+// Environment-scoped secret (falls back: env → project → global)
+string stagingDb = KeySyncClient.GetSecret("DATABASE_URL", "myapp", "staging");
+
 // List all secrets
 var globals = KeySyncClient.ListSecrets();
 var project = KeySyncClient.ListSecrets("myapp");
+var staging = KeySyncClient.ListSecrets("myapp", "staging");
 ```

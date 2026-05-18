@@ -10,4 +10,7 @@ namespace KeySync;
 /// <param name="Account">
 /// The account/key name (e.g. <c>"DATABASE_URL"</c>).
 /// </param>
-public record CredentialEntry(string Service, string Account);
+/// <param name="Environment">
+/// The environment name (e.g. <c>"staging"</c>), or null if not set.
+/// </param>
+public record CredentialEntry(string Service, string Account, string? Environment = null);

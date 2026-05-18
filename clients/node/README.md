@@ -28,14 +28,20 @@ const dbUrl = await getSecret("DATABASE_URL", "my-api");
 // Global-only secret
 const apiKey = await getSecret("GLOBAL_API_KEY");
 
+// Environment-specific secret (checks env scope first, then project, then global)
+const apiUrl = await getSecret("API_URL", "my-api", "production");
+
 // List all secrets
 const secrets = await listSecrets();
 for (const s of secrets) {
-  console.log(`${s.scope}/${s.project ?? ""} => ${s.key}`);
+  console.log(`${s.scope}/${s.project ?? ""}/${s.environment ?? ""} => ${s.key}`);
 }
 
 // Filter by scope and project
 const projectSecrets = await listSecrets("project", "my-api");
+
+// Filter by environment
+const prodSecrets = await listSecrets("project", "my-api", "production");
 ```
 
 ## Error handling
@@ -70,6 +76,7 @@ Secrets are stored in the OS keychain with this naming convention:
 |-------|-------------|--------------|
 | Global | `keysync/global` | key name (e.g. `DATABASE_URL`) |
 | Project | `keysync/project/<name>` | key name |
+| Project + Environment | `keysync/project/<name>/env/<env>` | key name |
 
 The library shells out to the OS keychain tooling directly:
 

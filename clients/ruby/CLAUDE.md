@@ -22,9 +22,9 @@ lib/
   keysync/
     version.rb          # VERSION constant
     errors.rb           # KeySyncError, SecretNotFoundError
-    client.rb           # KeySync::Client -- get_secret, list_secrets with env var fallback
-    credential.rb       # CredentialEntry Struct
-    service.rb          # Service name helpers (build + parse)
+    client.rb           # KeySync::Client -- get_secret, list_secrets with env var fallback + env scope
+    credential.rb       # CredentialEntry Struct (service, account, scope, project, environment)
+    service.rb          # Service name helpers (build + parse, env-aware)
     macos.rb            # macOS: Open3.capture3 → security CLI
     linux.rb            # Linux: Open3.capture3 → secret-tool CLI
     windows.rb          # Windows: PowerShell with inline C# (CredReadW from advapi32.dll)
@@ -44,7 +44,7 @@ test/
 - `SecretNotFoundError < KeySyncError` with `key` attr for the missing key
 - `Client` module implements resolution: ENV first, then project scope, then global scope
 - `Open3.capture3` for subprocess execution (returns stdout, stderr, status)
-- `CredentialEntry` is a Struct with service, account, scope, project
+- `CredentialEntry` is a Struct with service, account, scope, project, environment
 - No native gem dependencies -- pure Ruby with system CLI calls
 - Minitest for testing (assert_* style)
 - Module methods via `module_function` for stateless platform backends
@@ -81,9 +81,13 @@ api_key = KeySync.get_secret("API_KEY")
 # Project-scoped secret (falls back to global if no project match)
 db_url = KeySync.get_secret("DATABASE_URL", project: "myapp")
 
+# Environment-scoped secret (falls back: env → project → global)
+staging_db = KeySync.get_secret("DATABASE_URL", project: "myapp", environment: "staging")
+
 # List all secrets
-globals = KeySync.list_secrets                         # everything
-project = KeySync.list_secrets(project: "myapp")       # globals + myapp
+globals = KeySync.list_secrets                                                    # everything
+project = KeySync.list_secrets(project: "myapp")                                  # globals + myapp
+staging = KeySync.list_secrets(project: "myapp", environment: "staging")          # globals + myapp + staging
 ```
 
 ## Adding new platforms

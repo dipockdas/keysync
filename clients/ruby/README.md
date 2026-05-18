@@ -33,11 +33,17 @@ api_key = KeySync.get_secret("API_KEY")
 # Get a project-scoped secret (falls back to global if not found)
 db_url = KeySync.get_secret("DATABASE_URL", project: "myapp")
 
+# Get an environment-scoped secret (falls back: env → project → global)
+staging_db = KeySync.get_secret("DATABASE_URL", project: "myapp", environment: "staging")
+
 # List all global secrets
 globals = KeySync.list_secrets
 
 # List project secrets (includes global fallback)
 project = KeySync.list_secrets(project: "myapp")
+
+# List environment secrets (includes globals + project)
+staging = KeySync.list_secrets(project: "myapp", environment: "staging")
 ```
 
 ## Secret Resolution Order
@@ -45,8 +51,9 @@ project = KeySync.list_secrets(project: "myapp")
 Every `get_secret` call follows this order:
 
 1. **Environment variable** (`ENV[key]`) -- for cloud/CI where the platform injects env vars
-2. **Project scope** (if project is provided) -- `keysync/project/<name>`
-3. **Global scope** -- `keysync/global`
+2. **Environment scope** (if environment is provided) -- `keysync/project/<name>/env/<env>`. Use for environment-specific overrides (e.g., staging vs. production).
+3. **Project scope** (if project is provided) -- `keysync/project/<name>`
+4. **Global scope** -- `keysync/global`
 
 ## Error Types
 

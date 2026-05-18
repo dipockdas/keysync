@@ -29,7 +29,7 @@ func darwinGet(service, account string) (string, error) {
 }
 
 // darwinList lists all keysync secrets by scanning the keychain.
-func darwinList(scope, project string) ([]SecretEntry, error) {
+func darwinList(scope, project, environment string) ([]SecretEntry, error) {
 	cmd := exec.Command("security", "dump-keychain")
 	out, err := cmd.Output()
 	if err != nil {
@@ -47,17 +47,19 @@ func darwinList(scope, project string) ([]SecretEntry, error) {
 		if !strings.HasPrefix(svc, "keysync/") {
 			continue
 		}
-		entryScope, entryProject := parseServiceName(svc)
+		entryScope, entryProject, entryEnvironment := parseServiceName(svc)
 		acct := findAttrValue(rec, "acct")
 		if acct == "" {
 			continue
 		}
 		if (scope == "" || entryScope == scope) &&
-			(project == "" || entryProject == project) {
+			(project == "" || entryProject == project) &&
+			(environment == "" || entryEnvironment == environment) {
 			entries = append(entries, SecretEntry{
-				Scope:   entryScope,
-				Project: entryProject,
-				Key:     acct,
+				Scope:       entryScope,
+				Project:     entryProject,
+				Environment: entryEnvironment,
+				Key:         acct,
 			})
 		}
 	}

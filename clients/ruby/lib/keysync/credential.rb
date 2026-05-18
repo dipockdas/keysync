@@ -11,16 +11,16 @@ module KeySync
   #   @return [String] parsed scope ("global" or "project")
   # @!attribute [r] project
   #   @return [String, nil] parsed project name or nil for global scope
-  CredentialEntry = Struct.new(:service, :account, :scope, :project) do
+  CredentialEntry = Struct.new(:service, :account, :scope, :project, :environment) do
     # Create a CredentialEntry from raw service + account strings.
-    # Scope and project are auto-parsed from the service name.
+    # Scope, project, and environment are auto-parsed from the service name.
     #
     # @param service [String] the raw keychain service name
     # @param account [String] the account/key name
     # @return [CredentialEntry]
     def self.from_raw(service, account)
-      scope, project = Service.parse_service_name(service)
-      new(service, account, scope, project)
+      scope, project, environment = Service.parse_service_name(service)
+      new(service, account, scope, project, environment)
     end
   end
 end

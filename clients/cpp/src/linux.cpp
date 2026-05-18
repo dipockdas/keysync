@@ -76,7 +76,8 @@ std::string getSecretLinux(const std::string& service, const std::string& accoun
 }
 
 std::vector<CredentialEntry> listSecretsLinux(const std::string& scope_filter,
-                                               const std::string& project_filter) {
+                                               const std::string& project_filter,
+                                               const std::string& environment_filter) {
     std::vector<CredentialEntry> entries;
 
     // Search for all keysync entries
@@ -116,14 +117,16 @@ std::vector<CredentialEntry> listSecretsLinux(const std::string& scope_filter,
         if (line.empty()) {
             if (!currentService.empty() && !currentAccount.empty() &&
                 currentService.size() >= 8 && currentService.substr(0, 8) == "keysync/") {
-                std::string entryScope, entryProject;
-                parseServiceName(currentService, entryScope, entryProject);
+                std::string entryScope, entryProject, entryEnvironment;
+                parseServiceName(currentService, entryScope, entryProject, entryEnvironment);
 
                 bool scopeMatch = scope_filter.empty() || entryScope == scope_filter;
                 bool projectMatch = project_filter.empty() || entryProject == project_filter;
+                bool envMatch = environment_filter.empty() || entryEnvironment == environment_filter;
 
-                if (scopeMatch && projectMatch) {
-                    entries.push_back({entryScope, entryProject, currentAccount});
+                if (scopeMatch && projectMatch && envMatch) {
+                    entries.push_back({entryScope, entryProject,
+                                       entryEnvironment, currentAccount});
                 }
             }
             currentService.clear();
@@ -151,14 +154,16 @@ std::vector<CredentialEntry> listSecretsLinux(const std::string& scope_filter,
     // Handle last entry if no trailing blank line
     if (!currentService.empty() && !currentAccount.empty() &&
         currentService.size() >= 8 && currentService.substr(0, 8) == "keysync/") {
-        std::string entryScope, entryProject;
-        parseServiceName(currentService, entryScope, entryProject);
+        std::string entryScope, entryProject, entryEnvironment;
+        parseServiceName(currentService, entryScope, entryProject, entryEnvironment);
 
         bool scopeMatch = scope_filter.empty() || entryScope == scope_filter;
         bool projectMatch = project_filter.empty() || entryProject == project_filter;
+        bool envMatch = environment_filter.empty() || entryEnvironment == environment_filter;
 
-        if (scopeMatch && projectMatch) {
-            entries.push_back({entryScope, entryProject, currentAccount});
+        if (scopeMatch && projectMatch && envMatch) {
+            entries.push_back({entryScope, entryProject,
+                               entryEnvironment, currentAccount});
         }
     }
 

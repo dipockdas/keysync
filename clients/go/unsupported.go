@@ -9,7 +9,7 @@ func init() {
 	platformGet = func(_, _ string) (string, error) {
 		return "", fmt.Errorf("keysync client: unsupported platform (only macOS, Linux, and Windows are supported)")
 	}
-	platformList = func(_, _ string) ([]SecretEntry, error) {
+	platformList = func(_, _, _ string) ([]SecretEntry, error) {
 		return nil, fmt.Errorf("keysync client: unsupported platform (only macOS, Linux, and Windows are supported)")
 	}
 }

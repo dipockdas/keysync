@@ -61,9 +61,16 @@ def _load_win32():
 
 
 def _target_name(service: str) -> str:
-    """Convert "keysync/global" to "keysync_global" for Win32."""
+    """Convert a keysync service name to a Win32 Credential Manager target.
+
+    Regular:  "keysync/global"        → "keysync_global"
+    Regular:  "keysync/project/X"     → "keysync_project_X"
+    With env: "keysync/project/X/env/Y" → "keysync_project_X_Y"  (env keyword stripped)
+    """
     if service.startswith("keysync/"):
-        return "keysync_" + service[8:].replace("/", "_")
+        # Strip /env/ keyword then replace remaining / with _
+        path = service[8:].replace("/env/", "/")
+        return "keysync_" + path.replace("/", "_")
     return "keysync_" + service
 
 
@@ -108,7 +115,19 @@ def windows_list() -> list[dict]:
             svc = cred.TargetName
             if not svc or not svc.startswith("keysync_"):
                 continue
-            entries.append({"service": svc.replace("keysync_", "keysync/", 1).replace("_", "/", 1), "account": cred.UserName})
+            # Reverse the _target_name conversion.
+            # 4+ underscore parts: last part is environment.
+            parts = svc.split("_")
+            if len(parts) >= 4:
+                # keysync_project_myapp_dev → keysync/project/myapp/env/dev
+                name = "/".join(parts[:2]) + "/" + "/".join(parts[2:-1]) + "/env/" + parts[-1]
+            elif len(parts) >= 3:
+                # keysync_project_myapp → keysync/project/myapp
+                name = "/".join(parts[:2]) + "/" + "/".join(parts[2:])
+            else:
+                # keysync_global → keysync/global
+                name = "/".join(parts)
+            entries.append({"service": name, "account": cred.UserName})
         return entries
     finally:
         advapi32.CredFree(pcred_array)

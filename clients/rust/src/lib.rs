@@ -15,16 +15,22 @@
 //! use keysync::{get_secret, list_secrets};
 //!
 //! // Retrieve a global secret
-//! let api_key = get_secret("API_KEY", None).unwrap();
+//! let api_key = get_secret("API_KEY", None, None).unwrap();
 //!
 //! // Retrieve a project-scoped secret (falls back to global)
-//! let db_url = get_secret("DATABASE_URL", Some("myapp")).unwrap();
+//! let db_url = get_secret("DATABASE_URL", Some("myapp"), None).unwrap();
+//!
+//! // Retrieve an environment-scoped secret
+//! let staging_db = get_secret("DATABASE_URL", Some("myapp"), Some("staging")).unwrap();
 //!
 //! // List all global secrets
-//! let globals = list_secrets(None).unwrap();
+//! let globals = list_secrets(None, None).unwrap();
 //!
-//! // List project secrets
-//! let entries = list_secrets(Some("myapp")).unwrap();
+//! // List project secrets + globals
+//! let entries = list_secrets(Some("myapp"), None).unwrap();
+//!
+//! // List environment-scoped secrets + globals
+//! let staging = list_secrets(Some("myapp"), Some("staging")).unwrap();
 //! ```
 
 mod error;
@@ -33,12 +39,6 @@ mod service;
 
 pub use error::{KeySyncError, Result};
 pub use credential::CredentialEntry;
-
-// Platform-specific modules are included via cfg attributes.
-// Each platform module exports three functions:
-//   get_secret(service, account) -> Result<String>
-//   list_secrets() -> Result<Vec<CredentialEntry>>
-//   is_not_found(&KeySyncError) -> bool
 
 #[cfg(target_os = "macos")]
 mod macos;
@@ -63,13 +63,13 @@ use unsupported as platform;
 /// Retrieve a secret.
 ///
 /// Checks the environment variable identified by `key` first. If set, returns
-/// it immediately without touching the OS keychain. This is the primary path
-/// for both local development (where secrets are injected via
-/// `eval $(keysync export)`) and cloud deployments (where platforms inject
-/// environment variables directly).
+/// it immediately without touching the OS keychain.
 ///
-/// If the env var is not set, falls back to the OS keychain. When `project`
-/// is non-empty, it checks project scope first, then global scope.
+/// If the env var is not set, falls back to the OS keychain with this
+/// resolution order:
+/// 1. Environment-scoped: `keysync/project/<project>/env/<environment>`
+/// 2. Project-scoped: `keysync/project/<project>`
+/// 3. Global: `keysync/global`
 ///
 /// # Examples
 ///
@@ -77,58 +77,68 @@ use unsupported as platform;
 /// use keysync::get_secret;
 ///
 /// // Global secret
-/// let api_key = get_secret("API_KEY", None).unwrap();
+/// let api_key = get_secret("API_KEY", None, None).unwrap();
 ///
 /// // Project-scoped secret (falls back to global)
-/// let db_url = get_secret("DATABASE_URL", Some("myapp")).unwrap();
+/// let db_url = get_secret("DATABASE_URL", Some("myapp"), None).unwrap();
+///
+/// // Environment-scoped secret (falls back to project, then global)
+/// let staging_db = get_secret("DATABASE_URL", Some("myapp"), Some("staging")).unwrap();
 /// ```
 ///
 /// # Errors
 ///
 /// Returns `KeySyncError::NotFound` if the secret doesn't exist in any
 /// checked scope. Returns `KeySyncError::KeychainError` if the keychain
-/// tooling fails. Returns `KeySyncError::UnsupportedPlatform` on
-/// unsupported platforms.
-pub fn get_secret(key: &str, project: Option<&str>) -> Result<String> {
+/// tooling fails.
+pub fn get_secret(
+    key: &str,
+    project: Option<&str>,
+    environment: Option<&str>,
+) -> Result<String> {
     // Primary path: check environment variable first.
-    // In local dev the user runs `eval $(keysync export)` at shell startup;
-    // in cloud/CI the platform injects env vars directly.
     if let Ok(val) = std::env::var(key) {
         return Ok(val);
     }
 
-    // Try project scope first
-    if let Some(project) = project {
-        if !project.is_empty() {
-            let svc = service::service_name("project", project);
-            match platform::get_secret(&svc, key) {
+    let project = project.unwrap_or("");
+    let environment = environment.unwrap_or("");
+
+    if !project.is_empty() {
+        // 1. Try environment-scoped
+        if !environment.is_empty() {
+            let env_svc = service::service_name("project", project, environment);
+            match platform::get_secret(&env_svc, key) {
                 Ok(val) => return Ok(val),
-                Err(e) if platform::is_not_found(&e) => {
-                    // Fall through to global scope
-                }
+                Err(e) if platform::is_not_found(&e) => {}
                 Err(e) => return Err(e),
             }
         }
+
+        // 2. Try project scope
+        let svc = service::service_name("project", project, "");
+        match platform::get_secret(&svc, key) {
+            Ok(val) => return Ok(val),
+            Err(e) if platform::is_not_found(&e) => {}
+            Err(e) => return Err(e),
+        }
     }
 
-    // Fall back to global scope
-    let svc = service::service_name("global", "");
+    // 3. Fall back to global scope
+    let svc = service::service_name("global", "", "");
     match platform::get_secret(&svc, key) {
         Ok(val) => Ok(val),
-        Err(e) if platform::is_not_found(&e) => {
-            Err(KeySyncError::NotFound)
-        }
+        Err(e) if platform::is_not_found(&e) => Err(KeySyncError::NotFound),
         Err(e) => Err(e),
     }
 }
 
-/// List all stored secrets matching the given project filter.
+/// List all stored secrets matching the given project and/or environment filter.
 ///
-/// When `project` is `None`, returns all global secrets plus all
-/// project-scoped entries from any project.
-///
-/// When `project` is `Some(name)`, returns project-scoped entries
-/// for that project plus all global entries.
+/// When no filters are provided, returns all entries.
+/// When `project` is provided, returns that project's entries plus globals.
+/// When both `project` and `environment` are provided, returns matching
+/// environment-scoped entries plus globals.
 ///
 /// # Examples
 ///
@@ -136,35 +146,48 @@ pub fn get_secret(key: &str, project: Option<&str>) -> Result<String> {
 /// use keysync::list_secrets;
 ///
 /// // List all secrets across all scopes
-/// let all = list_secrets(None).unwrap();
+/// let all = list_secrets(None, None).unwrap();
 ///
-/// // List only project-specific secrets + globals
-/// let project = list_secrets(Some("myapp")).unwrap();
+/// // List project-scoped + globals
+/// let project = list_secrets(Some("myapp"), None).unwrap();
+///
+/// // List environment-scoped + globals
+/// let staging = list_secrets(Some("myapp"), Some("staging")).unwrap();
 /// ```
 ///
 /// # Errors
 ///
 /// Returns `KeySyncError::KeychainError` if the keychain tooling fails.
-/// Returns `KeySyncError::UnsupportedPlatform` on unsupported platforms.
-pub fn list_secrets(project: Option<&str>) -> Result<Vec<CredentialEntry>> {
+pub fn list_secrets(
+    project: Option<&str>,
+    environment: Option<&str>,
+) -> Result<Vec<CredentialEntry>> {
     let entries = platform::list_secrets()?;
 
-    if let Some(project_filter) = project {
-        if !project_filter.is_empty() {
-            // Return project-scoped entries for the given project
-            // plus all global entries
-            let filtered: Vec<CredentialEntry> = entries
-                .into_iter()
-                .filter(|e| {
-                    e.scope == "global" || (e.scope == "project" && e.project == project_filter)
-                })
-                .collect();
-            return Ok(filtered);
-        }
+    let project_filter = project.unwrap_or("");
+    let env_filter = environment.unwrap_or("");
+
+    if project_filter.is_empty() && env_filter.is_empty() {
+        return Ok(entries);
     }
 
-    // No filter — return all entries
-    Ok(entries)
+    let filtered: Vec<CredentialEntry> = entries
+        .into_iter()
+        .filter(|e| {
+            if e.scope == "global" {
+                return true;
+            }
+            if e.scope == "project" && e.project == project_filter {
+                if !env_filter.is_empty() {
+                    return e.environment == env_filter || e.environment.is_empty();
+                }
+                return true;
+            }
+            false
+        })
+        .collect();
+
+    Ok(filtered)
 }
 
 #[cfg(test)]
@@ -173,9 +196,8 @@ mod tests {
 
     #[test]
     fn test_get_secret_env_var() {
-        // Set an env var and verify get_secret returns it
         std::env::set_var("KEY_SYNC_TEST_VAR", "test_value_123");
-        let result = get_secret("KEY_SYNC_TEST_VAR", None);
+        let result = get_secret("KEY_SYNC_TEST_VAR", None, None);
         std::env::remove_var("KEY_SYNC_TEST_VAR");
         assert_eq!(result.unwrap(), "test_value_123");
     }
@@ -183,33 +205,32 @@ mod tests {
     #[test]
     fn test_get_secret_env_var_with_project() {
         std::env::set_var("KEY_SYNC_TEST_VAR", "from_env");
-        // Env var should take priority even when project is provided
-        let result = get_secret("KEY_SYNC_TEST_VAR", Some("myapp"));
+        let result = get_secret("KEY_SYNC_TEST_VAR", Some("myapp"), Some("staging"));
         std::env::remove_var("KEY_SYNC_TEST_VAR");
         assert_eq!(result.unwrap(), "from_env");
     }
 
     #[test]
     fn test_get_secret_not_found() {
-        // Without a keysync keychain entry, this should return NotFound
-        let result = get_secret("NONEXISTENT_SECRET_12345", None);
+        let result = get_secret("NONEXISTENT_SECRET_12345", None, None);
         match result {
-            Err(KeySyncError::NotFound) => {
-                // Expected — no keychain entry exists for this
-            }
-            Err(KeySyncError::KeychainError(_)) => {
-                // Also acceptable — the keychain tooling might not be available
-            }
-            other => {
-                panic!("Expected NotFound or KeychainError, got: {:?}", other);
-            }
+            Err(KeySyncError::NotFound) | Err(KeySyncError::KeychainError(_)) => {}
+            other => panic!("Expected NotFound or KeychainError, got: {:?}", other),
         }
     }
 
     #[test]
     fn test_get_secret_with_project() {
-        // Without any keychain entries, this should return NotFound
-        let result = get_secret("NONEXISTENT_SECRET", Some("myapp"));
+        let result = get_secret("NONEXISTENT_SECRET", Some("myapp"), None);
+        match result {
+            Err(KeySyncError::NotFound) | Err(KeySyncError::KeychainError(_)) => {}
+            other => panic!("Expected NotFound or KeychainError, got: {:?}", other),
+        }
+    }
+
+    #[test]
+    fn test_get_secret_with_env() {
+        let result = get_secret("NONEXISTENT_ENV_SECRET", Some("myapp"), Some("staging"));
         match result {
             Err(KeySyncError::NotFound) | Err(KeySyncError::KeychainError(_)) => {}
             other => panic!("Expected NotFound or KeychainError, got: {:?}", other),
@@ -218,9 +239,7 @@ mod tests {
 
     #[test]
     fn test_get_secret_empty_project() {
-        // Empty project should act like no project
-        // Should fall through to global scope directly
-        let result = get_secret("NONEXISTENT_SECRET", Some(""));
+        let result = get_secret("NONEXISTENT_SECRET", Some(""), None);
         match result {
             Err(KeySyncError::NotFound) | Err(KeySyncError::KeychainError(_)) => {}
             other => panic!("Expected NotFound or KeychainError, got: {:?}", other),
@@ -229,11 +248,9 @@ mod tests {
 
     #[test]
     fn test_list_secrets_no_filter() {
-        let result = list_secrets(None);
-        // This may succeed (return empty list) or fail depending on keychain state
+        let result = list_secrets(None, None);
         match result {
             Ok(entries) => {
-                // Entries might exist if keychain has keysync data, or be empty
                 for entry in &entries {
                     assert!(
                         entry.scope == "global" || entry.scope == "project",
@@ -241,16 +258,14 @@ mod tests {
                     );
                 }
             }
-            Err(KeySyncError::KeychainError(_)) => {
-                // Acceptable if keychain tooling is unavailable
-            }
+            Err(KeySyncError::KeychainError(_)) => {}
             Err(e) => panic!("Unexpected error: {:?}", e),
         }
     }
 
     #[test]
     fn test_list_secrets_with_project() {
-        let result = list_secrets(Some("myapp"));
+        let result = list_secrets(Some("myapp"), None);
         match result {
             Ok(entries) => {
                 for entry in &entries {
@@ -265,8 +280,29 @@ mod tests {
     }
 
     #[test]
+    fn test_list_secrets_with_env_filter() {
+        let result = list_secrets(Some("myapp"), Some("staging"));
+        match result {
+            Ok(entries) => {
+                for entry in &entries {
+                    assert!(
+                        entry.scope == "global"
+                            || (entry.scope == "project"
+                                && entry.project == "myapp"
+                                && (entry.environment == "staging"
+                                    || entry.environment.is_empty())),
+                        "unexpected entry: {:?}", entry
+                    );
+                }
+            }
+            Err(KeySyncError::KeychainError(_)) => {}
+            Err(e) => panic!("Unexpected error: {:?}", e),
+        }
+    }
+
+    #[test]
     fn test_list_secrets_empty_project() {
-        let result = list_secrets(Some(""));
+        let result = list_secrets(Some(""), None);
         match result {
             Ok(_entries) => {}
             Err(KeySyncError::KeychainError(_)) => {}
@@ -289,26 +325,19 @@ mod tests {
 
     #[test]
     fn test_key_sync_error_debug() {
-        // Just verify that Debug formatting works and contains the variant name
         let debug_str = format!("{:?}", KeySyncError::NotFound);
         assert!(debug_str.contains("NotFound"));
 
-        let debug_str = format!(
-            "{:?}",
-            KeySyncError::KeychainError("some error".to_string())
-        );
+        let debug_str = format!("{:?}", KeySyncError::KeychainError("some error".to_string()));
         assert!(debug_str.contains("KeychainError"));
         assert!(debug_str.contains("some error"));
     }
 
     #[test]
     fn test_key_sync_error_is_std_error() {
-        // Verify KeySyncError implements std::error::Error
         fn check_is_error<T: std::error::Error>(_: &T) {}
         let err = KeySyncError::NotFound;
         check_is_error(&err);
-
-        // source() should return None (we don't chain errors)
         assert!(std::error::Error::source(&err).is_none());
     }
 
@@ -326,9 +355,8 @@ mod tests {
 
     #[test]
     fn test_get_secret_env_var_empty_string() {
-        // An empty env var is still "set" and should be returned
         std::env::set_var("KEY_SYNC_TEST_EMPTY", "");
-        let result = get_secret("KEY_SYNC_TEST_EMPTY", None);
+        let result = get_secret("KEY_SYNC_TEST_EMPTY", None, None);
         std::env::remove_var("KEY_SYNC_TEST_EMPTY");
         assert_eq!(result.unwrap(), "");
     }

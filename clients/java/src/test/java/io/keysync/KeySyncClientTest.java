@@ -61,6 +61,20 @@ class KeySyncClientTest {
             String name = KeySyncClient.serviceName("project", "");
             assertEquals("keysync/project", name);
         }
+
+        @Test
+        @DisplayName("environment scope returns 'keysync/project/<name>/env/<env>'")
+        void environmentScope() {
+            String name = KeySyncClient.serviceName("project", "my-app", "staging");
+            assertEquals("keysync/project/my-app/env/staging", name);
+        }
+
+        @Test
+        @DisplayName("environment scope with null env returns project scope only")
+        void environmentScopeNullEnv() {
+            String name = KeySyncClient.serviceName("project", "my-app", null);
+            assertEquals("keysync/project/my-app", name);
+        }
     }
 
     // --- Service name parsing ---
@@ -75,6 +89,7 @@ class KeySyncClientTest {
             String[] result = KeySyncClient.parseServiceName("keysync/global");
             assertEquals("global", result[0]);
             assertNull(result[1]);
+            assertNull(result[2]);
         }
 
         @Test
@@ -83,6 +98,7 @@ class KeySyncClientTest {
             String[] result = KeySyncClient.parseServiceName("keysync/project/my-app");
             assertEquals("project", result[0]);
             assertEquals("my-app", result[1]);
+            assertNull(result[2]);
         }
 
         @Test
@@ -92,6 +108,27 @@ class KeySyncClientTest {
                     "keysync/project/my/deep/app");
             assertEquals("project", result[0]);
             assertEquals("my/deep/app", result[1]);
+            assertNull(result[2]);
+        }
+
+        @Test
+        @DisplayName("parses 'keysync/project/my-app/env/staging'")
+        void parseEnvironment() {
+            String[] result = KeySyncClient.parseServiceName(
+                    "keysync/project/my-app/env/staging");
+            assertEquals("project", result[0]);
+            assertEquals("my-app", result[1]);
+            assertEquals("staging", result[2]);
+        }
+
+        @Test
+        @DisplayName("parses 'keysync/project/my-app/env/prod/v2'")
+        void parseEnvironmentDeep() {
+            String[] result = KeySyncClient.parseServiceName(
+                    "keysync/project/my-app/env/prod/v2");
+            assertEquals("project", result[0]);
+            assertEquals("my-app", result[1]);
+            assertEquals("prod/v2", result[2]);
         }
 
         @Test
@@ -100,6 +137,7 @@ class KeySyncClientTest {
             String[] result = KeySyncClient.parseServiceName("other/global");
             assertEquals("global", result[0]);
             assertNull(result[1]);
+            assertNull(result[2]);
         }
 
         @Test
@@ -108,6 +146,7 @@ class KeySyncClientTest {
             String[] result = KeySyncClient.parseServiceName(null);
             assertEquals("global", result[0]);
             assertNull(result[1]);
+            assertNull(result[2]);
         }
 
         @Test
@@ -116,6 +155,7 @@ class KeySyncClientTest {
             String[] result = KeySyncClient.parseServiceName("");
             assertEquals("global", result[0]);
             assertNull(result[1]);
+            assertNull(result[2]);
         }
 
         @Test
@@ -124,6 +164,7 @@ class KeySyncClientTest {
             String[] result = KeySyncClient.parseServiceName("keysync/other/val");
             assertEquals("other", result[0]);
             assertNull(result[1]);
+            assertNull(result[2]);
         }
     }
 
@@ -187,6 +228,17 @@ class KeySyncClientTest {
             Credential c = new Credential("keysync/global", "API_KEY");
             assertEquals("keysync/global", c.getService());
             assertEquals("API_KEY", c.getAccount());
+            assertNull(c.getEnvironment());
+        }
+
+        @Test
+        @DisplayName("stores service, account, and environment")
+        void storesFieldsWithEnvironment() {
+            Credential c = new Credential("keysync/project/myapp/env/staging",
+                    "DB_URL", "staging");
+            assertEquals("keysync/project/myapp/env/staging", c.getService());
+            assertEquals("DB_URL", c.getAccount());
+            assertEquals("staging", c.getEnvironment());
         }
 
         @Test
@@ -206,6 +258,14 @@ class KeySyncClientTest {
         }
 
         @Test
+        @DisplayName("equals differentiates by environment")
+        void equalsDifferentiatesEnvironment() {
+            Credential a = new Credential("keysync/project/myapp", "KEY", "staging");
+            Credential b = new Credential("keysync/project/myapp", "KEY", "production");
+            assertNotEquals(a, b);
+        }
+
+        @Test
         @DisplayName("hashCode is consistent with equals")
         void hashCodeConsistent() {
             Credential a = new Credential("keysync/global", "API_KEY");
@@ -220,6 +280,14 @@ class KeySyncClientTest {
             String s = c.toString();
             assertTrue(s.contains("keysync/global"));
             assertTrue(s.contains("API_KEY"));
+        }
+
+        @Test
+        @DisplayName("toString contains environment when set")
+        void toStringContainsEnvironment() {
+            Credential c = new Credential("keysync/project/myapp", "KEY", "staging");
+            String s = c.toString();
+            assertTrue(s.contains("staging"));
         }
     }
 
@@ -355,6 +423,53 @@ class KeySyncClientTest {
         }
     }
 
+    // --- Environment resolution ---
+
+    @Nested
+    @DisplayName("Environment resolution")
+    class EnvironmentResolutionTests {
+
+        @Test
+        @DisplayName("getSecret with environment returns env scoped value when set as env var")
+        void environmentScopedEnvVar() {
+            // When the env var is set, it's returned regardless of environment param
+            String home = System.getenv("HOME");
+            if (home == null) home = System.getenv("USERPROFILE");
+            if (home != null) {
+                try {
+                    String result = KeySyncClient.getInstance()
+                            .getSecret("HOME", "myapp", "staging");
+                    assertEquals(home, result);
+                } catch (KeySyncException e) {
+                    if (e.getError() != KeySyncError.NOT_FOUND
+                            && e.getError() != KeySyncError.KEYCHAIN_ERROR) {
+                        throw e;
+                    }
+                }
+            }
+        }
+
+        @Test
+        @DisplayName("getSecret with environment but no project acts like no environment")
+        void environmentWithoutProject() {
+            String home = System.getenv("HOME");
+            if (home == null) home = System.getenv("USERPROFILE");
+            if (home != null) {
+                try {
+                    // null project with environment should skip env scope directly
+                    String result = KeySyncClient.getInstance()
+                            .getSecret("HOME", null, "staging");
+                    assertEquals(home, result);
+                } catch (KeySyncException e) {
+                    if (e.getError() != KeySyncError.NOT_FOUND
+                            && e.getError() != KeySyncError.KEYCHAIN_ERROR) {
+                        throw e;
+                    }
+                }
+            }
+        }
+    }
+
     // --- Windows target conversion tests ---
 
     @Nested
@@ -385,6 +500,14 @@ class KeySyncClientTest {
         }
 
         @Test
+        @DisplayName("serviceToTarget strips /env/ keyword")
+        void serviceToTargetEnvironment() {
+            String target = WindowsKeychain.serviceToTarget(
+                    "keysync/project/myapp/env/dev");
+            assertEquals("keysync_project_myapp_dev", target);
+        }
+
+        @Test
         @DisplayName("targetToService converts 'keysync_global'")
         void targetToServiceGlobal() {
             String service = WindowsKeychain.targetToService("keysync_global");
@@ -400,17 +523,34 @@ class KeySyncClientTest {
         }
 
         @Test
+        @DisplayName("targetToService converts 'keysync_project_myapp_dev'")
+        void targetToServiceEnvironment() {
+            String service = WindowsKeychain.targetToService(
+                    "keysync_project_myapp_dev");
+            assertEquals("keysync/project/myapp/env/dev", service);
+        }
+
+        @Test
         @DisplayName("targetToService converts 'keysync_project_my_deep_app'")
         void targetToServiceDeep() {
             String service = WindowsKeychain.targetToService(
                     "keysync_project_my_deep_app");
-            assertEquals("keysync/project/my/deep/app", service);
+            assertEquals("keysync/project/my/env/deep/app", service);
         }
 
         @Test
         @DisplayName("round-trip service→target→service")
         void roundTrip() {
             String original = "keysync/project/my-app";
+            String roundTripped = WindowsKeychain.targetToService(
+                    WindowsKeychain.serviceToTarget(original));
+            assertEquals(original, roundTripped);
+        }
+
+        @Test
+        @DisplayName("round-trip service→target→service with environment")
+        void roundTripEnvironment() {
+            String original = "keysync/project/my-app/env/staging";
             String roundTripped = WindowsKeychain.targetToService(
                     WindowsKeychain.serviceToTarget(original));
             assertEquals(original, roundTripped);

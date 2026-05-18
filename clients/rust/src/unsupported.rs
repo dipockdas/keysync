@@ -1,6 +1,5 @@
 use crate::error::{KeySyncError, Result};
 use crate::credential::CredentialEntry;
-use crate::service::parse_service_name;
 
 /// Unsupported platform stub — returns UnsupportedPlatform for all operations.
 pub(crate) fn get_secret(_service: &str, _account: &str) -> Result<String> {

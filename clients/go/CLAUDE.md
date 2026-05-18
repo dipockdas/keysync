@@ -35,15 +35,17 @@ keysync_test.go     # Tests
 import "github.com/dipockdas/keysync/clients/go"
 
 // Global secret (shared across projects)
-val, err := keysync.GetGlobal("API_KEY")
+val, err := keysync.GetSecret("API_KEY", "", "")
 
 // Project-scoped secret (falls back to global if no project match)
-val, err := keysync.GetSecret("myapp", "DATABASE_URL")
+val, err := keysync.GetSecret("DATABASE_URL", "myapp", "")
+
+// Environment-scoped secret (falls back to project, then global)
+val, err := keysync.GetSecret("DATABASE_URL", "myapp", "production")
 
 // With context
 val, err := keysync.GetGlobalContext(ctx, "API_KEY")
 
 // List all secrets for a scope
-secrets, err := keysync.ListSecrets("myapp") // project-scoped including globals
-secrets, err := keysync.ListGlobals()        // global only
+secrets, err := keysync.ListSecrets("project", "myapp", "production")
 ```

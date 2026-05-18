@@ -47,8 +47,8 @@ pub(crate) fn list_secrets() -> Result<Vec<CredentialEntry>> {
         if line.is_empty() {
             // End of a record block
             if !current_svc.is_empty() && !current_acct.is_empty() && current_svc.starts_with("keysync/") {
-                let (scope, project) = parse_service_name(&current_svc);
-                entries.push(CredentialEntry::new(scope, project, &current_acct));
+                let (scope, project, env) = parse_service_name(&current_svc);
+                entries.push(CredentialEntry::new(scope, project, env, &current_acct));
             }
             current_svc.clear();
             current_acct.clear();
@@ -68,8 +68,8 @@ pub(crate) fn list_secrets() -> Result<Vec<CredentialEntry>> {
 
     // Handle last entry if no trailing blank line
     if !current_svc.is_empty() && !current_acct.is_empty() && current_svc.starts_with("keysync/") {
-        let (scope, project) = parse_service_name(&current_svc);
-        entries.push(CredentialEntry::new(scope, project, &current_acct));
+        let (scope, project, env) = parse_service_name(&current_svc);
+        entries.push(CredentialEntry::new(scope, project, env, &current_acct));
     }
 
     Ok(entries)

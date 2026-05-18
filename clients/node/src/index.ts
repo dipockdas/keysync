@@ -59,15 +59,18 @@ const platform: PlatformImpl = selectPlatform();
  * `eval $(keysync export)`) and cloud deployments (where platforms inject
  * environment variables directly).
  *
- * If the env var is not set, falls back to the OS keychain. When `project` is
- * provided, checks project scope first, then global scope.
+ * If the env var is not set, falls back to the OS keychain. Resolution order:
+ * 1. Environment-specific project scope (`keysync/project/<name>/env/<env>`)
+ * 2. Project scope (`keysync/project/<name>`)
+ * 3. Global scope (`keysync/global`)
  *
  * @param key - The secret key name (e.g. "DATABASE_URL").
  * @param project - Optional project name for project-scoped secrets.
+ * @param environment - Optional environment name for environment-specific overrides.
  * @returns The secret value.
  * @throws {KeySyncError} with code "notFound" if the secret doesn't exist.
  */
-export async function getSecret(key: string, project?: string): Promise<string> {
+export async function getSecret(key: string, project?: string, environment?: string): Promise<string> {
   // Primary path: check environment variable first.
   // In local dev the user runs eval $(keysync export) at shell startup;
   // in cloud/CI the platform injects env vars directly.
@@ -76,8 +79,21 @@ export async function getSecret(key: string, project?: string): Promise<string> 
     return envVal;
   }
 
-  // Try project scope first
   if (project) {
+    // If environment is provided, try project/env scope first.
+    if (environment) {
+      const envSvc = serviceName("project", project, environment);
+      try {
+        return await platform.get(envSvc, key);
+      } catch (err) {
+        if (err instanceof KeySyncError && err.code !== "notFound") {
+          throw err;
+        }
+        // Fall through to project scope without environment.
+      }
+    }
+
+    // Try project scope without environment.
     const svc = serviceName("project", project);
     try {
       return await platform.get(svc, key);
@@ -85,11 +101,11 @@ export async function getSecret(key: string, project?: string): Promise<string> 
       if (err instanceof KeySyncError && err.code !== "notFound") {
         throw err;
       }
-      // Fall through to global scope
+      // Fall through to global scope.
     }
   }
 
-  // Fall back to global scope
+  // Fall back to global scope.
   const svc = serviceName("global");
   return await platform.get(svc, key);
 }
@@ -99,21 +115,24 @@ export async function getSecret(key: string, project?: string): Promise<string> 
  *
  * @param scope - Filter by scope ("global" or "project").
  * @param project - Filter by project name.
- * @returns Array of { scope, project?, key } tuples.
+ * @param environment - Filter by environment name.
+ * @returns Array of { scope, project?, environment?, key } tuples.
  */
 export async function listSecrets(
   scope?: string,
-  project?: string
-): Promise<Array<{ scope: string; project?: string; key: string }>> {
+  project?: string,
+  environment?: string
+): Promise<Array<{ scope: string; project?: string; environment?: string; key: string }>> {
   const entries = await platform.list();
   return entries
     .map((entry) => {
       const parsed = parseServiceName(entry.service);
-      return { scope: parsed.scope, project: parsed.project, key: entry.account };
+      return { scope: parsed.scope, project: parsed.project, environment: parsed.environment, key: entry.account };
     })
     .filter((entry) => {
       if (scope && entry.scope !== scope) return false;
       if (project && entry.project !== project) return false;
+      if (environment && entry.environment !== environment) return false;
       return true;
     });
 }

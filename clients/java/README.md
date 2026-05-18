@@ -48,13 +48,19 @@ String apiKey = client.getSecret("API_KEY");
 // Read a project-scoped secret (falls back to global if no project match)
 String dbUrl = client.getSecret("DATABASE_URL", "myapp");
 
+// Read an environment-scoped secret (falls back: env → project → global)
+String stagingDb = client.getSecret("DATABASE_URL", "myapp", "staging");
+
 // List all global secrets
 List<Credential> globals = client.listSecrets();
 
 // List secrets for a project (includes global fallback)
 List<Credential> project = client.listSecrets("myapp");
 
-for (Credential c : project) {
+// List secrets for a project + environment (includes globals + project)
+List<Credential> staging = client.listSecrets("myapp", "staging");
+
+for (Credential c : staging) {
     System.out.println(c.getService() + " -> " + c.getAccount());
 }
 ```
@@ -65,9 +71,11 @@ Every `getSecret` call follows this order:
 
 1. **Environment variable** -- `System.getenv(key)` is checked first. If the environment variable is set, the value is returned immediately without touching the keychain. This is the primary path for cloud/CI deployments where platforms inject environment variables directly, and for local development where secrets are exported via `eval $(keysync export)`.
 
-2. **Project-scoped keychain** (if a project is provided) -- looks up the secret under `keysync/project/<name>`.
+2. **Environment-scoped keychain** (if an environment is provided) -- looks up the secret under `keysync/project/<name>/env/<env>`. Use this for environment-specific overrides (e.g., a different `DATABASE_URL` for staging vs. production).
 
-3. **Global keychain fallback** -- looks up the secret under `keysync/global`.
+3. **Project-scoped keychain** (if a project is provided) -- looks up the secret under `keysync/project/<name>`.
+
+4. **Global keychain fallback** -- looks up the secret under `keysync/global`.
 
 ## Error handling
 
@@ -114,6 +122,7 @@ Secrets are stored in the keychain with service names that encode scope and proj
 |-------|-------------|
 | Global | `keysync/global` |
 | Project | `keysync/project/<name>` |
+| Environment | `keysync/project/<name>/env/<env>` |
 
 ## License
 

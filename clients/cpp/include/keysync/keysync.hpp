@@ -14,6 +14,9 @@
 /// // Get a project-scoped secret (falls back to global)
 /// std::string dbUrl = keysync::getSecret("DATABASE_URL", "myapp");
 ///
+/// // Get an environment-scoped secret (falls back to project, then global)
+/// std::string stagingDb = keysync::getSecret("DATABASE_URL", "myapp", "staging");
+///
 /// // List all global secrets
 /// auto globals = keysync::listSecrets();
 ///
@@ -24,6 +27,7 @@
 #include <string>
 #include <string_view>
 #include <vector>
+#include <optional>
 
 #include "credential.hpp"
 #include "errors.hpp"
@@ -39,28 +43,35 @@ namespace keysync {
 /// environment variables directly).
 ///
 /// If the env var is not set, falls back to the OS keychain. When `project` is
-/// provided, checks project scope first, then global scope.
+/// provided, checks project scope first, then global scope. When `environment`
+/// is also provided, checks environment scope before project scope.
 ///
 /// Service naming:
-///   Global:  "keysync/global"
-///   Project: "keysync/project/<name>"
+///   Global:       "keysync/global"
+///   Project:      "keysync/project/<name>"
+///   Environment:  "keysync/project/<name>/env/<env>"
 ///
 /// @param key The secret key name (e.g. "DATABASE_URL").
 /// @param project Optional project name for project-scoped secrets.
+/// @param environment Optional environment name (e.g. "staging", "production").
 /// @return The secret value as a string.
 /// @throws KeySyncError with ErrorCode::NotFound if the secret doesn't exist
 ///         in any scope.
 /// @throws KeySyncError with ErrorCode::KeychainError on OS-level failures.
 /// @throws KeySyncError with ErrorCode::UnsupportedPlatform if the platform
 ///         is not supported.
-std::string getSecret(std::string_view key, std::string_view project = "");
+std::string getSecret(std::string_view key,
+                      std::string_view project = "",
+                      std::string_view environment = "");
 
 /// List all stored secrets matching the given scope and/or project.
 ///
 /// @param project Optional project filter. If empty, lists global secrets only.
+/// @param environment Optional environment filter.
 /// @return A vector of CredentialEntry structs.
 /// @throws KeySyncError on platform failures.
-std::vector<CredentialEntry> listSecrets(std::string_view project = "");
+std::vector<CredentialEntry> listSecrets(std::string_view project = "",
+                                          std::string_view environment = "");
 
 } // namespace keysync
 

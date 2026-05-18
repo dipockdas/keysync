@@ -10,6 +10,15 @@
 
 Keysync replaces scattered `.env` files and manual secret management with a single workflow: secrets live in your OS keychain locally and are synced to GitHub Secrets and your deployment platforms on push.
 
+## When to use keysync
+
+Keysync is designed for **developer-level secret management** — local development, CI/CD pipelines, and small-to-medium team workflows. It leverages your operating system's built-in credential store (macOS Keychain, Linux libsecret, Windows Credential Manager), which developers already trust for SSH keys, GPG keys, and browser passwords.
+
+- **Good fit**: Individual developers, small teams, side projects, startup workflows. Anywhere you're currently using `.env` files and want something better.
+- **Production secrets**: For large-scale production deployments, organizations should evaluate dedicated secrets managers (AWS Secrets Manager, HashiCorp Vault, etc.) as an additional layer appropriate to their security requirements. keysync's client libraries check environment variables first — so migrating from keysync to a managed secrets service later requires no app code changes.
+
+**Why the OS keychain is not a single point of failure**: If your OS keychain is compromised, your system faces broader security issues beyond what any application can mitigate. The keychain is the OS-rooted secret storage solution — relying on it aligns with established security practices for developer workstations.
+
 ## Features
 
 - **OS-native secret storage** — macOS Keychain, Linux libsecret, Windows Credential Manager
@@ -89,13 +98,13 @@ Lowest:   Global (no project, no environment)
 |---------|----------|
 | `keysync set -p my-api MY_API_KEY=def456` | Each project has its own API key. Isolation between projects while keeping environments consistent within a project. |
 
-**Environment** — a secret scoped to a specific project *and* environment (e.g. `production`, `staging`, `development`).
+**Environment** — a secret scoped to a specific project *and* environment (e.g. `dev`, `staging`, `production`). Note: environment scoping is currently available via the keysync CLI and export pipeline, but not yet in client libraries — only global and project scopes are available when reading secrets directly from the keychain at runtime.
 
 | Example | Use case |
 |---------|----------|
-| `keysync set -p my-api DB_URL=postgres://prod-host/db --env production` | Different database URLs for production vs staging vs development. Environment-specific credentials for security and separation of concerns. |
+| `keysync set -p my-api DB_URL=postgres://prod-host/db --env production` | Different database URLs per environment. Environment-specific credentials for security and separation of concerns. |
 | `keysync set -p my-api DB_URL=postgres://staging-host/db --env staging` | |
-| `keysync set -p my-api DB_URL=postgres://dev-host/db --env development` | |
+| `keysync set -p my-api DB_URL=postgres://dev-host/db --env dev` | |
 
 ### Sync pipeline
 
@@ -247,9 +256,9 @@ source <(keysync export --project my-app)
 |------|-------------|
 | `--config` | Path to `.keysync.json` (auto-searches parent directories) |
 | `-p, --project` | Project name (from `.keysync.json`) |
-| `-e, --env` | Environment name (default `production`). Used for environment-scoped secrets |
+| `-e, --env` | Environment name (default `dev`). Used for environment-scoped secrets |
 | `--repo` | GitHub repository (`owner/repo`), used with `sync` as an alternative to `--project` |
-| `--store` | Secret store backend (`"fallback"` to use NaCl-encrypted file instead of OS keychain). Also settable via `KEYSYNC_STORE` env var |
+| `--store` | Secret store backend (`"fallback"` skips OS keychain and uses NaCl-encrypted file at `~/.config/keysync/store.json`). Opt-in — requires explicit `--store fallback` or `KEYSYNC_STORE=fallback`. Also settable via `KEYSYNC_STORE` env var |
 
 ---
 
@@ -365,8 +374,13 @@ Retrieve secrets at runtime in your application. Client libraries check environm
 |----------|----------|-------|-------|---------|--------|
 | **Go** | `clients/go/` | security CLI | secret-tool CLI | wincred library | Ready |
 | **Python** | `clients/python/` | security CLI | secret-tool CLI | ctypes Win32 API | Ready |
-| **TypeScript** | `clients/node/` | security CLI | secret-tool CLI | — | Ready (macOS/Linux) |
-| **Swift** | `clients/swift/` | Security.framework | secret-tool CLI | — | Ready (macOS/Linux) |
+| **TypeScript** | `clients/node/` | security CLI | secret-tool CLI | PowerShell + Win32 | Ready (macOS/Linux) |
+| **Swift** | `clients/swift/` | Security.framework | secret-tool CLI | Not planned | Ready (macOS/Linux) |
+| **Java** | `clients/java/` | security CLI | secret-tool CLI | JNA → Win32 API | Available (Windows: not fully tested) |
+| **C# (.NET)** | `clients/csharp/` | security CLI | secret-tool CLI | P/Invoke → Win32 API | Available (Windows: not fully tested) |
+| **Rust** | `clients/rust/` | security CLI | secret-tool CLI | windows-sys crate | Available (Windows: not fully tested) |
+| **C++** | `clients/cpp/` | security CLI | secret-tool CLI | Win32 API (wincred.h) | Available (Windows: not fully tested) |
+| **Ruby** | `clients/ruby/` | security CLI | secret-tool CLI | PowerShell + inline C# | Available (Windows: not fully tested) |
 
 ```go
 // Go
