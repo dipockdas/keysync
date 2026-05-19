@@ -52,8 +52,8 @@ Write-Host "[5/8] Node.js" -ForegroundColor Cyan
 Install-Winget -Name "Node.js" -Id "OpenJS.NodeJS.LTS"
 
 # ─── 6. Ruby ───
-Write-Host "[6/8] Ruby" -ForegroundColor Cyan
-Install-Winget -Name "Ruby" -Id "RubyInstaller.Ruby.3.2"
+Write-Host "[6/9] Ruby" -ForegroundColor Cyan
+Install-Winget -Name "Ruby" -Id "RubyInstallerTeam.Ruby.4.0"
 
 # ─── 7. Maven ───
 Write-Host "[7/9] Maven" -ForegroundColor Cyan
