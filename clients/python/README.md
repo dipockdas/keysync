@@ -96,3 +96,14 @@ The library accesses the OS keychain directly:
 - **Windows**: `CredReadW` / `CredEnumerateW` via ctypes (no DLLs required)
 
 No dependency on the `keysync` binary. Read operations work standalone.
+
+## Testing
+
+Tested on macOS (ARM64), Windows ARM64, and Windows AMD64 (x86-64). 28 tests,
+all passing. Run with:
+
+```bash
+cd clients/python
+pip install pytest
+PYTHONPATH=src pytest
+```

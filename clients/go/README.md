@@ -100,3 +100,13 @@ target name (e.g. `keysync_project_myapp_production`).
 No subprocess chain, no dependency on the keysync CLI. Read operations work
 standalone as long as secrets have been stored (via `keysync set` or any other
 method that writes to the same keychain entries).
+
+## Testing
+
+Tested on macOS (ARM64), Windows ARM64, and Windows AMD64 (x86-64). 30 tests,
+all passing. Run with:
+
+```bash
+cd clients/go
+go test ./... -v
+```

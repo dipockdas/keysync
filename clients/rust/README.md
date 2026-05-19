@@ -126,3 +126,8 @@ Then run the tests:
 cd clients/rust
 cargo test
 ```
+
+## Testing
+
+Tested on macOS (ARM64), Windows ARM64, and Windows AMD64 (x86-64). 45 unit
+tests + 3 doc-tests, all passing.

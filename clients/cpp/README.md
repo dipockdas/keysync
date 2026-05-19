@@ -115,3 +115,16 @@ which provides an error code:
 - macOS: no additional dependencies
 - Linux: `libsecret-tools` installed (`apt install libsecret-tools` or equivalent)
 - Windows: no additional dependencies (uses Win32 API directly)
+
+## Testing
+
+Tested on macOS (ARM64), Windows ARM64, and Windows AMD64 (x86-64). 27 test
+functions across 2 test files, all passing. Build and run with:
+
+```bash
+cd clients/cpp
+mkdir -p build && cd build
+cmake ..
+cmake --build . --config Debug
+ctest -C Debug
+```

@@ -131,3 +131,13 @@ Every `GetSecret` call follows this order:
 3. If `project` is provided, check the project-scoped service
    (`keysync/project/<name>`).
 4. Fall back to the global-scoped service (`keysync/global`).
+
+## Testing
+
+Tested on Windows ARM64 and Windows AMD64 (x86-64). 34 xUnit tests across
+6 test classes, all passing. Run with:
+
+```bash
+cd clients/csharp
+dotnet test
+```

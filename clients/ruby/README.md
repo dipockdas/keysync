@@ -117,6 +117,11 @@ bundle exec rake test
 ruby -Ilib -Itest test/test_*.rb
 ```
 
+## Testing
+
+Tested on macOS (ARM64), Windows ARM64, and Windows AMD64 (x86-64). 10 runs
+with 29 assertions, all passing.
+
 ## License
 
 MIT

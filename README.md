@@ -374,13 +374,13 @@ Retrieve secrets at runtime in your application. Client libraries check environm
 |----------|----------|-------|-------|---------|--------|
 | **Go** | `clients/go/` | security CLI | secret-tool CLI | wincred library | Ready |
 | **Python** | `clients/python/` | security CLI | secret-tool CLI | ctypes Win32 API | Ready |
-| **TypeScript** | `clients/node/` | security CLI | secret-tool CLI | PowerShell + Win32 | Ready (macOS/Linux) |
+| **TypeScript** | `clients/node/` | security CLI | secret-tool CLI | PowerShell + Win32 | Ready |
 | **Swift** | `clients/swift/` | Security.framework | secret-tool CLI | Not planned | Ready (macOS/Linux) |
-| **Java** | `clients/java/` | security CLI | secret-tool CLI | JNA → Win32 API | Available (Windows: not fully tested) |
-| **C# (.NET)** | `clients/csharp/` | security CLI | secret-tool CLI | P/Invoke → Win32 API | Available (Windows: not fully tested) |
-| **Rust** | `clients/rust/` | security CLI | secret-tool CLI | windows-sys crate | Available (Windows: not fully tested) |
-| **C++** | `clients/cpp/` | security CLI | secret-tool CLI | Win32 API (wincred.h) | Available (Windows: not fully tested) |
-| **Ruby** | `clients/ruby/` | security CLI | secret-tool CLI | PowerShell + inline C# | Available (Windows: not fully tested) |
+| **Java** | `clients/java/` | security CLI | secret-tool CLI | JNA → Win32 API | Ready |
+| **C# (.NET)** | `clients/csharp/` | security CLI | secret-tool CLI | P/Invoke → Win32 API | Ready |
+| **Rust** | `clients/rust/` | security CLI | secret-tool CLI | windows-sys crate | Ready |
+| **C++** | `clients/cpp/` | security CLI | secret-tool CLI | Win32 API (wincred.h) | Ready |
+| **Ruby** | `clients/ruby/` | security CLI | secret-tool CLI | PowerShell + inline C# | Ready |
 
 ```go
 // Go
@@ -573,6 +573,23 @@ make test-platform
 # Clean build artifacts
 make clean
 ```
+
+---
+
+## Testing
+
+All client libraries have been tested across macOS (ARM64), Windows ARM64, and Windows AMD64 (x86-64) via CI and manual VM testing. See `test-results/` for full logs.
+
+| Platform | Architecture | Status |
+|----------|-------------|--------|
+| macOS | ARM64 (Apple Silicon) | All tests pass (Go, C++, Rust, Node, Python, Java, Ruby, Swift) |
+| Windows | ARM64 | All tests pass (C#, Go, Rust, Node, Python, Java, Ruby, C++) |
+| Windows | AMD64 (x86-64) | All tests pass (C#, Go, Rust, Node, Python, Java, Ruby, C++) |
+| Linux | x86-64 | Core CLI tested; client libraries verified via CI |
+
+Swift is macOS-only. All other clients pass on all three platforms.
+
+See [test-all.ps1](test-all.ps1) for the automated test runner and [cookbook-for-testing-Windows-ARM-apps.md](docs/cookbook-for-testing-Windows-ARM-apps.md) for the Windows VM setup guide.
 
 ---
 

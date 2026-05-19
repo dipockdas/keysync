@@ -105,3 +105,13 @@ never leaves your process's address space.
 
 On **Linux**, it shells out to `secret-tool lookup` since there's no native
 Swift binding for libsecret. This matches what the keysync CLI itself does.
+
+## Testing
+
+Tested on macOS (ARM64). 19 tests, all passing. Swift is macOS/Linux only;
+not available on Windows. Run with:
+
+```bash
+cd clients/swift
+swift test
+```

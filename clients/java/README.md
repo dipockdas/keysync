@@ -124,6 +124,16 @@ Secrets are stored in the keychain with service names that encode scope and proj
 | Project | `keysync/project/<name>` |
 | Environment | `keysync/project/<name>/env/<env>` |
 
+## Testing
+
+Tested on macOS (ARM64), Windows ARM64, and Windows AMD64 (x86-64). 52 tests
+(2 skipped on non-macOS for platform detection), all passing. Run with:
+
+```bash
+cd clients/java
+mvn test
+```
+
 ## License
 
 MIT

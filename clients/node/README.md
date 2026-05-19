@@ -87,3 +87,14 @@ The library shells out to the OS keychain tooling directly:
 No dependency on the `keysync` binary. Read operations work standalone as long
 as secrets have been stored (via `keysync set` or any other method that writes
 to the same keychain entries).
+
+## Testing
+
+Tested on macOS (ARM64), Windows ARM64, and Windows AMD64 (x86-64). 36 tests
+across 3 test files, all passing. Run with:
+
+```bash
+cd clients/node
+npm install
+npm test
+```
