@@ -49,16 +49,13 @@ fn parse_target(target: &str) -> (&str, &str, &str) {
         return ("global", "", "");
     }
 
-    // For project scope: look for 3+ segments
-    // Split into project and env parts (using _ as separator)
-    let rest_parts: Vec<&str> = rest.splitn(2, '_').collect();
-    if rest_parts.len() == 2 {
-        // Two segments: project_env => project + env
-        return ("project", rest_parts[0], rest_parts[1]);
-    }
-
-    // Only one segment: just project, no env
-    ("project", rest_parts.get(0).unwrap_or(&""), "")
+    // For project scope: split into project and env parts
+    // Using the last underscore-delimited segment as env (e.g. "my_app_dev" -> project="my_app", env="dev")
+    let (project, env) = match rest.rsplitn(2, '_').collect::<Vec<&str>>() {
+        parts if parts.len() == 2 => (parts[1], parts[0]),
+        _ => (rest, ""),
+    };
+    ("project", project, env)
 }
 
 /// Read a UTF-16 wide string starting at `ptr` up to `len` characters.
@@ -265,11 +262,11 @@ mod tests {
 
     #[test]
     fn test_parse_target_project_with_underscore() {
-        // Project names can contain underscores; only split on the first two
+        // Last underscore segment is treated as env (matching Go client behavior)
         let (scope, project, env) = parse_target("keysync_project_my_app_name");
         assert_eq!(scope, "project");
-        assert_eq!(project, "my_app_name");
-        assert_eq!(env, "");
+        assert_eq!(project, "my_app");
+        assert_eq!(env, "name");
     }
 
     #[test]
