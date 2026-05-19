@@ -99,24 +99,101 @@ if (Test-Path $vsWhere) {
     Write-Host "  vswhere not found. Install C++ workload manually via Visual Studio Installer." -ForegroundColor Yellow
 }
 
-# ─── Maven (manual, not on winget) ───
+# ─── Fix PATH for the current session ───
 Write-Host ""
 Write-Host "========================================================" -ForegroundColor Cyan
-Write-Host "  Final Steps" -ForegroundColor Cyan
+Write-Host "  Setting up PATH for this session" -ForegroundColor Cyan
 Write-Host "========================================================" -ForegroundColor Cyan
 Write-Host ""
 
-Write-Host "Maven: not on winget. To install manually:" -ForegroundColor Yellow
-Write-Host "  1. Download from https://maven.apache.org/download.cgi" -ForegroundColor Gray
-Write-Host "  2. Extract to C:\Program Files\Apache\maven" -ForegroundColor Gray
-Write-Host "  3. Add to PATH (system environment variables)" -ForegroundColor Gray
-Write-Host ""
+# Rust/Cargo
+$cargoPaths = @(
+    "$env:USERPROFILE\.cargo\bin",
+    "$env:LOCALAPPDATA\.cargo\bin"
+)
+foreach ($p in $cargoPaths) {
+    if (Test-Path "$p\cargo.exe" -and $env:Path -notlike "*$p*") {
+        $env:Path += ";$p"
+        Write-Host "  Added Cargo to PATH: $p" -ForegroundColor Green
+        break
+    }
+}
 
-Write-Host "Ruby: if winget install failed, download from https://rubyinstaller.org/" -ForegroundColor Yellow
-Write-Host ""
+# Maven — search common locations
+$mavenDirs = @(
+    "$env:USERPROFILE\Downloads\apache-maven-*",
+    "C:\Program Files\Apache\maven",
+    "C:\Program Files\Maven",
+    "$env:USERPROFILE\apache-maven-*"
+)
+$found = $false
+foreach ($pattern in $mavenDirs) {
+    $matches = Get-ChildItem -Path $pattern -Directory -ErrorAction SilentlyContinue
+    if ($matches) {
+        $mvnHome = $matches[0].FullName
+        $mvnBin = Join-Path $mvnHome "bin"
+        if (Test-Path "$mvnBin\mvn.cmd" -and $env:Path -notlike "*$mvnBin*") {
+            $env:Path += ";$mvnBin"
+            Write-Host "  Added Maven to PATH: $mvnBin" -ForegroundColor Green
+            $found = $true
+            break
+        }
+    }
+}
+if (-not $found) {
+    Write-Host "  Maven not found. To add it later:" -ForegroundColor Yellow
+    Write-Host '    $env:Path += ";C:\path\to\apache-maven-x.x.x\bin"' -ForegroundColor Gray
+}
 
-Write-Host "After installing all tools, restart PowerShell, then:" -ForegroundColor Cyan
+# Ruby
+$rubyPaths = @(
+    "$env:ProgramFiles\Ruby\*\bin",
+    "${env:ProgramFiles(x86)}\Ruby\*\bin",
+    "$env:LOCALAPPDATA\Ruby\*\bin"
+)
+$found = $false
+foreach ($pattern in $rubyPaths) {
+    $matches = Get-ChildItem -Path $pattern -Directory -ErrorAction SilentlyContinue
+    if ($matches) {
+        $rubyBin = $matches[0].FullName
+        if ($env:Path -notlike "*$rubyBin*") {
+            $env:Path += ";$rubyBin"
+            Write-Host "  Added Ruby to PATH: $rubyBin" -ForegroundColor Green
+            $found = $true
+            break
+        }
+    }
+}
+if (-not $found) {
+    Write-Host "  Ruby not auto-detected. Install from https://rubyinstaller.org/ if needed." -ForegroundColor DarkGray
+}
+
+# ─── Persist PATH changes to machine scope (admin only) ───
+if ($isAdmin) {
+    Write-Host ""
+    Write-Host "Would you like to save these PATH changes permanently? (y/n)" -ForegroundColor Yellow
+    $answer = Read-Host
+    if ($answer -eq "y") {
+        $oldPath = [Environment]::GetEnvironmentVariable("Path", "Machine")
+        $newPath = $oldPath
+        foreach ($p in $env:Path.Split(';')) {
+            if ($p -and $oldPath -notlike "*$p*") {
+                $newPath += ";$p"
+            }
+        }
+        [Environment]::SetEnvironmentVariable("Path", $newPath, "Machine")
+        Write-Host "  PATH saved permanently." -ForegroundColor Green
+    }
+}
+
+Write-Host ""
+Write-Host "========================================================" -ForegroundColor Cyan
+Write-Host "  Setup complete! Restart PowerShell, then:" -ForegroundColor Cyan
+Write-Host "========================================================" -ForegroundColor Cyan
+Write-Host ""
 Write-Host "  cd keysync" -ForegroundColor White
 Write-Host "  git pull" -ForegroundColor White
 Write-Host '  powershell -ExecutionPolicy Bypass -File .\test-all.ps1' -ForegroundColor White
+Write-Host "  git add test-results/ && git commit -m "test results: Windows"" -ForegroundColor White
+Write-Host "  git push" -ForegroundColor White
 Write-Host ""
