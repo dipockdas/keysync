@@ -1,23 +1,21 @@
-# Binaries
-/bin/
-/keysync
-*.exe
 
-# Environment files (never commit secrets)
+.DS_Store
 .env
 .env.local
-.env.test
 .env.production
-
-# OS secret store index
-~/.config/keysync/
-
-# IDE
+.env.test
 .idea/
 .vscode/
-*.swp
+*.exe
 *.swo
-
+*.swp
+/bin/
+/keysync
+# Binaries
+# Environment files (never commit secrets)
+# IDE
 # OS
-.DS_Store
+# OS secret store index
+~/.config/keysync/
+test-results/*
 Thumbs.db
