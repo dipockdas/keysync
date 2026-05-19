@@ -146,15 +146,8 @@ Write-Log ""
 # ====== C# ======
 if ($tools.dotnet) {
     Run-Tests -Name "C# (.NET)" -Dir "clients/csharp" -Script {
-        # List all discovered tests, then run them
-        dotnet test --no-restore --list-tests 2>&1
-        Write-Host ""
-        dotnet test --no-restore 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            dotnet restore 2>&1 | Out-Null
-            dotnet test --list-tests 2>&1
-            dotnet test 2>&1
-        }
+        # Run tests for the test project explicitly with all streams captured
+        dotnet test KeySync.Tests/KeySync.Tests.csproj *>&1
     }
 } else { Skip-Tests "C# (.NET)" }
 
