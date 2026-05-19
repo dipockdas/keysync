@@ -50,7 +50,7 @@ function Skip-Tests {
     param([string]$Name)
 
     Write-Host "`n----------------------------------------" -ForegroundColor Gray
-    Write-Host "  $Name — skipped (tool not found)" -ForegroundColor Gray
+    Write-Host "  $Name - skipped (tool not found)" -ForegroundColor Gray
     $script:totalSkipped++
     $results += [PSCustomObject]@{ Client = $Name; Result = "SKIP" }
 }
@@ -75,8 +75,8 @@ $tools = @{
 
 Write-Host "Available tools:" -ForegroundColor Yellow
 foreach ($kv in $tools.GetEnumerator()) {
-    if ($kv.Value) { Write-Host "  ✓ $($kv.Key)" -ForegroundColor Green }
-    else           { Write-Host "  ✗ $($kv.Key)" -ForegroundColor DarkGray }
+    if ($kv.Value) { Write-Host "  [ok] $($kv.Key)" -ForegroundColor Green }
+    else           { Write-Host "  [--] $($kv.Key)" -ForegroundColor DarkGray }
 }
 Write-Host ""
 
