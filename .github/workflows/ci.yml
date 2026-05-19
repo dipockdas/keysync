@@ -3,6 +3,13 @@ name: CI
 on:
   push:
     branches: [main]
+    paths:
+      - '**.go'
+      - 'cmd/**'
+      - 'internal/**'
+      - 'go.mod'
+      - 'go.sum'
+      - '.github/workflows/ci.yml'
   pull_request:
     branches: [main]
 
