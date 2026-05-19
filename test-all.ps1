@@ -1,4 +1,4 @@
-#!/usr/bin/env pwsh
+﻿#!/usr/bin/env pwsh
 <#
 .SYNOPSIS
     Run all keysync client library tests.
@@ -56,7 +56,7 @@ function Skip-Tests {
 }
 
 Write-Host "======================================================================" -ForegroundColor Cyan
-Write-Host "  keysync — Running All Client Library Tests" -ForegroundColor Cyan
+Write-Host "  keysync - Running All Client Library Tests" -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan
 Write-Host ""
 
@@ -80,7 +80,7 @@ foreach ($kv in $tools.GetEnumerator()) {
 }
 Write-Host ""
 
-# ─── C# ───
+# --- C# ---
 if ($tools.dotnet) {
     Run-Tests -Name "C# (.NET)" -Dir "clients/csharp" -Script {
         dotnet test --no-restore 2>&1
@@ -91,28 +91,28 @@ if ($tools.dotnet) {
     }
 } else { Skip-Tests "C# (.NET)" }
 
-# ─── Rust ───
+# --- Rust ---
 if ($tools.cargo) {
     Run-Tests -Name "Rust" -Dir "clients/rust" -Script {
         cargo test 2>&1
     }
 } else { Skip-Tests "Rust" }
 
-# ─── Go (core) ───
+# --- Go (core) ---
 if ($tools.go) {
     Run-Tests -Name "Go (core)" -Dir "." -Script {
         go test ./internal/... -v -count=1 2>&1
     }
 } else { Skip-Tests "Go (core)" }
 
-# ─── Go (client) ───
+# --- Go (client) ---
 if ($tools.go) {
     Run-Tests -Name "Go (client)" -Dir "clients/go" -Script {
         go test ./... -v -count=1 2>&1
     }
 } else { Skip-Tests "Go (client)" }
 
-# ─── Node ───
+# --- Node ---
 if ($tools.node -and $tools.npm) {
     Run-Tests -Name "Node/TypeScript" -Dir "clients/node" -Script {
         npm install 2>&1
@@ -120,26 +120,26 @@ if ($tools.node -and $tools.npm) {
     }
 } else { Skip-Tests "Node/TypeScript" }
 
-# ─── Python ───
+# --- Python ---
 if ($tools.python) {
     Run-Tests -Name "Python" -Dir "clients/python" -Script {
-        python -m pytest tests\ -v 2>&1
+        python -m pytest tests/ -v 2>&1
         if ($LASTEXITCODE -ne 0) {
             Write-Host "Retrying with pytest install..." -ForegroundColor Yellow
             pip install pytest -q 2>&1 | Out-Null
-            python -m pytest tests\ -v 2>&1
+            python -m pytest tests/ -v 2>&1
         }
     }
 } else { Skip-Tests "Python" }
 
-# ─── Java ───
+# --- Java ---
 if ($tools.mvn) {
     Run-Tests -Name "Java" -Dir "clients/java" -Script {
         mvn test 2>&1
     }
 } else { Skip-Tests "Java" }
 
-# ─── Swift ───
+# --- Swift (macOS only) ---
 if ($env:OS -eq "Windows_NT") {
     Skip-Tests "Swift (macOS only)"
 } else {
@@ -151,14 +151,14 @@ if ($env:OS -eq "Windows_NT") {
     } else { Skip-Tests "Swift" }
 }
 
-# ─── Ruby ───
+# --- Ruby ---
 if ($tools.ruby) {
     Run-Tests -Name "Ruby" -Dir "clients/ruby" -Script {
-        ruby -Ilib -Itest test\test_*.rb 2>&1
+        ruby -Ilib -Itest test/test_*.rb 2>&1
     }
 } else { Skip-Tests "Ruby" }
 
-# ─── C++ ───
+# --- C++ ---
 if ($tools.cmake) {
     Run-Tests -Name "C++" -Dir "clients/cpp" -Script {
         if (-not (Test-Path build)) { New-Item -ItemType Directory -Path build | Out-Null }
@@ -170,7 +170,7 @@ if ($tools.cmake) {
     }
 } else { Skip-Tests "C++" }
 
-# ─── Summary ───
+# --- Summary ---
 Write-Host "`n======================================================================" -ForegroundColor Cyan
 Write-Host "  Results Summary" -ForegroundColor Cyan
 Write-Host "======================================================================" -ForegroundColor Cyan
@@ -178,9 +178,8 @@ Write-Host ""
 $results | Format-Table -AutoSize
 
 Write-Host ""
-Write-Host "  Passed:  $totalPassed   Failed:  $totalFailed   Skipped:  $totalSkipped" -ForegroundColor (
-    if ($totalFailed -gt 0) { "Red" } elseif ($totalSkipped -gt 0) { "Yellow" } else { "Green" }
-)
+$color = if ($totalFailed -gt 0) { "Red" } elseif ($totalSkipped -gt 0) { "Yellow" } else { "Green" }
+Write-Host "  Passed: $totalPassed   Failed: $totalFailed   Skipped: $totalSkipped" -ForegroundColor $color
 Write-Host ""
 
 if ($totalFailed -gt 0) {
