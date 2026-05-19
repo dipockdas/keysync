@@ -589,7 +589,7 @@ All client libraries have been tested across macOS (ARM64), Windows ARM64, and W
 
 Swift is macOS-only. All other clients pass on all three platforms.
 
-See [test-all.ps1](test-all.ps1) for the automated test runner and [cookbook-for-testing-Windows-ARM-apps.md](docs/cookbook-for-testing-Windows-ARM-apps.md) for the Windows VM setup guide.
+See [test-all.ps1](test-all.ps1) for the automated test runner.
 
 ---
 
