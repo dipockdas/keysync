@@ -86,6 +86,39 @@ Write-Log "  Log file: $logFile" -ForegroundColor Cyan
 Write-Log "======================================================================" -ForegroundColor Cyan
 Write-Log ""
 
+# ====== Auto-fix PATH for common install locations ======
+$null = @(
+    # Cargo/Rust
+    @("$env:USERPROFILE\.cargo\bin", "cargo.exe"),
+    @("$env:LOCALAPPDATA\.cargo\bin", "cargo.exe"),
+    # Maven
+    @("$env:USERPROFILE\Downloads\apache-maven-*\bin", "mvn.cmd"),
+    @("$env:ProgramFiles\Apache\maven\bin", "mvn.cmd"),
+    @("${env:ProgramFiles(x86)}\Apache\maven\bin", "mvn.cmd"),
+    # CMake
+    @("${env:ProgramFiles}\CMake\bin", "cmake.exe"),
+    @("${env:ProgramFiles(x86)}\CMake\bin", "cmake.exe"),
+    # Ruby
+    @("$env:ProgramFiles\Ruby\*\bin", "ruby.exe"),
+    @("${env:ProgramFiles(x86)}\Ruby\*\bin", "ruby.exe"),
+    @("$env:LOCALAPPDATA\Ruby\*\bin", "ruby.exe"),
+    # Go
+    @("$env:ProgramFiles\Go\bin", "go.exe"),
+    @("${env:ProgramFiles(x86)}\Go\bin", "go.exe")
+) | ForEach-Object {
+    $dirPattern = $_[0]
+    $exe = $_[1]
+    $matches = Get-ChildItem -Path $dirPattern -Directory -ErrorAction SilentlyContinue | Where-Object {
+        Test-Path (Join-Path $_.FullName $exe)
+    }
+    if ($matches) {
+        $binDir = $matches[0].FullName
+        if ($env:Path -notlike "*$binDir*") {
+            $env:Path = "$binDir;$env:Path"
+        }
+    }
+}
+
 # ====== Detect available tools ======
 $tools = @{
     dotnet   = Get-Command dotnet   -ErrorAction SilentlyContinue
