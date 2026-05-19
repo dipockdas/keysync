@@ -149,12 +149,11 @@ if ($tools.node -and $tools.npm) {
 # ====== Python ======
 if ($tools.python) {
     Run-Tests -Name "Python" -Dir "clients/python" -Script {
+        # Install package in dev mode + pytest if needed
+        pip install -e . 2>&1 | Out-Null
+        pip install pytest -q 2>&1 | Out-Null
+        $env:PYTHONPATH = "src"
         python -m pytest tests/ -v 2>&1
-        if ($LASTEXITCODE -ne 0) {
-            Write-Log "Retrying with pytest install..." -ForegroundColor Yellow
-            pip install pytest -q 2>&1 | Out-Null
-            python -m pytest tests/ -v 2>&1
-        }
     }
 } else { Skip-Tests "Python" }
 
