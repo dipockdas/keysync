@@ -7,7 +7,6 @@
 #include "keysync/keysync.hpp"
 #include "keysync/errors.hpp"
 #include "keysync/credential.hpp"
-
 // Simple assertion macro – no external test framework needed.
 static int g_failures = 0;
 
@@ -27,16 +26,16 @@ static int g_failures = 0;
         } \
     } while (0)
 
-#define ASSERT_THROWS_CODE(expr, code) \
+#define ASSERT_THROWS_CODE(expr, expected_code) \
     do { \
         bool caught = false; \
         try { \
             expr; \
         } catch (const keysync::KeySyncError& e) { \
             caught = true; \
-            if (e.code() != code) { \
+            if (static_cast<int>(e.code()) != static_cast<int>(expected_code)) { \
                 std::cerr << "FAIL [" << __LINE__ << "]: expected error code " \
-                          << static_cast<int>(code) << ", got " \
+                          << static_cast<int>(expected_code) << ", got " \
                           << static_cast<int>(e.code()) << " (" << e.what() << ")" << std::endl; \
                 ++g_failures; \
             } \
@@ -79,16 +78,33 @@ static void test_error_unsupported_platform() {
 // Env var fallback test
 // ---------------------------------------------------------------------------
 
+#ifdef _WIN32
+// Windows/MSVC: _putenv_s instead of POSIX setenv/unsetenv
+static void portable_setenv(const char* key, const char* value) {
+    _putenv_s(key, value);
+}
+static void portable_unsetenv(const char* key) {
+    _putenv_s(key, "");
+}
+#else
+static void portable_setenv(const char* key, const char* value) {
+    setenv(key, value, 1);
+}
+static void portable_unsetenv(const char* key) {
+    unsetenv(key);
+}
+#endif
+
 static void test_env_var_fallback() {
     // Set an environment variable
-    setenv("KEYSYNC_TEST_VAR", "env_value", 1);
+    portable_setenv("KEYSYNC_TEST_VAR", "env_value");
 
     // getSecret should pick up the env var first
     std::string result = keysync::getSecret("KEYSYNC_TEST_VAR");
     ASSERT_EQUAL(result, std::string("env_value"));
 
     // Clean up
-    unsetenv("KEYSYNC_TEST_VAR");
+    portable_unsetenv("KEYSYNC_TEST_VAR");
     std::cout << "  PASS: test_env_var_fallback" << std::endl;
 }
 

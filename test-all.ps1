@@ -93,8 +93,10 @@ $null = @(
     @("$env:LOCALAPPDATA\.cargo\bin", "cargo.exe"),
     # Maven
     @("$env:USERPROFILE\Downloads\apache-maven-*\bin", "mvn.cmd"),
+    @("$env:USERPROFILE\Tools\apache-maven-*\bin", "mvn.cmd"),
     @("$env:ProgramFiles\Apache\maven\bin", "mvn.cmd"),
     @("${env:ProgramFiles(x86)}\Apache\maven\bin", "mvn.cmd"),
+    @("$env:ProgramFiles\Maven\apache-maven-*\bin", "mvn.cmd"),
     # CMake
     @("${env:ProgramFiles}\CMake\bin", "cmake.exe"),
     @("${env:ProgramFiles(x86)}\CMake\bin", "cmake.exe"),
@@ -102,6 +104,7 @@ $null = @(
     @("$env:ProgramFiles\Ruby\*\bin", "ruby.exe"),
     @("${env:ProgramFiles(x86)}\Ruby\*\bin", "ruby.exe"),
     @("$env:LOCALAPPDATA\Ruby\*\bin", "ruby.exe"),
+    @("$env:USERPROFILE\.local\share\Ruby\*\bin", "ruby.exe"),
     # Go
     @("$env:ProgramFiles\Go\bin", "go.exe"),
     @("${env:ProgramFiles(x86)}\Go\bin", "go.exe")
@@ -222,8 +225,8 @@ if ($tools.cmake) {
         if (-not (Test-Path build)) { New-Item -ItemType Directory -Path build | Out-Null }
         Push-Location build
         cmake .. 2>&1
-        cmake --build . 2>&1
-        ctest --output-on-failure 2>&1
+        cmake --build . --config Debug 2>&1
+        ctest --output-on-failure -C Debug 2>&1
         Pop-Location
     }
 } else { Skip-Tests "C++" }

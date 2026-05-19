@@ -20,6 +20,14 @@ pub(crate) fn get_secret(service: &str, account: &str) -> Result<String> {
     let stdout = String::from_utf8_lossy(&output.stdout).trim().to_string();
     let stderr = String::from_utf8_lossy(&output.stderr).trim().to_string();
 
+    // On some macOS versions, `security` returns the error message as stdout
+    // with exit code 0 when the item is not found, instead of exit code 44.
+    // Detect this and return NotFound.
+    let not_found_msg = "SecKeychainSearchCopyNext: The specified item could not be found in the keychain.";
+    if stdout.contains(not_found_msg) || stderr.contains(not_found_msg) {
+        return Err(KeySyncError::NotFound);
+    }
+
     if !stdout.is_empty() {
         return Ok(stdout);
     }
@@ -80,7 +88,7 @@ pub(crate) fn is_not_found(err: &KeySyncError) -> bool {
 }
 
 /// Extract an attribute value from a dump-keychain record line.
-fn find_attr_value(record: &str, attr_name: &str) -> &str {
+fn find_attr_value<'a>(record: &'a str, attr_name: &str) -> &'a str {
     let needle = format!("\"{}\"", attr_name);
     let idx = match record.find(&needle) {
         Some(i) => i,
