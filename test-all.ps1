@@ -146,10 +146,10 @@ Write-Log ""
 # ====== C# ======
 if ($tools.dotnet) {
     Run-Tests -Name "C# (.NET)" -Dir "clients/csharp" -Script {
-        dotnet test --no-restore 2>&1
+        dotnet test --no-restore --verbosity detailed 2>&1
         if ($LASTEXITCODE -ne 0) {
             dotnet restore 2>&1 | Out-Null
-            dotnet test 2>&1
+            dotnet test --verbosity detailed 2>&1
         }
     }
 } else { Skip-Tests "C# (.NET)" }
@@ -227,7 +227,15 @@ if ($tools.cmake) {
         Push-Location build
         cmake .. 2>&1
         cmake --build . --config Debug 2>&1
-        ctest --output-on-failure -C Debug 2>&1
+        # Run test executable directly for detailed output per test function
+        if (Test-Path "tests\Debug\keysync_tests.exe") {
+            .\tests\Debug\keysync_tests.exe 2>&1
+        } elseif (Test-Path "tests\Release\keysync_tests.exe") {
+            .\tests\Release\keysync_tests.exe 2>&1
+        } else {
+            # Fallback: try running from ctest
+            ctest --output-on-failure -C Debug 2>&1
+        }
         Pop-Location
     }
 } else { Skip-Tests "C++" }
