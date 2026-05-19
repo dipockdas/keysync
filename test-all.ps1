@@ -146,10 +146,10 @@ Write-Log ""
 # ====== C# ======
 if ($tools.dotnet) {
     Run-Tests -Name "C# (.NET)" -Dir "clients/csharp" -Script {
-        dotnet test --no-restore --verbosity detailed 2>&1
+        dotnet test --no-restore --logger "console;verbosity=detailed" 2>&1
         if ($LASTEXITCODE -ne 0) {
             dotnet restore 2>&1 | Out-Null
-            dotnet test --verbosity detailed 2>&1
+            dotnet test --logger "console;verbosity=detailed" 2>&1
         }
     }
 } else { Skip-Tests "C# (.NET)" }
