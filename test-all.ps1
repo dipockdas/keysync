@@ -105,6 +105,7 @@ $null = @(
     @("${env:ProgramFiles(x86)}\Ruby\*\bin", "ruby.exe"),
     @("$env:LOCALAPPDATA\Ruby\*\bin", "ruby.exe"),
     @("$env:USERPROFILE\.local\share\Ruby\*\bin", "ruby.exe"),
+    @("C:\Ruby*\bin", "ruby.exe"),
     # Go
     @("$env:ProgramFiles\Go\bin", "go.exe"),
     @("${env:ProgramFiles(x86)}\Go\bin", "go.exe")

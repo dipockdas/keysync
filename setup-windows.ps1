@@ -55,12 +55,16 @@ Install-Winget -Name "Node.js" -Id "OpenJS.NodeJS.LTS"
 Write-Host "[6/8] Ruby" -ForegroundColor Cyan
 Install-Winget -Name "Ruby" -Id "RubyInstaller.Ruby.3.2"
 
-# ─── 7. CMake ───
-Write-Host "[7/8] CMake" -ForegroundColor Cyan
+# ─── 7. Maven ───
+Write-Host "[7/9] Maven" -ForegroundColor Cyan
+Install-Winget -Name "Maven" -Id "Apache.Maven"
+
+# ─── 8. CMake ───
+Write-Host "[8/9] CMake" -ForegroundColor Cyan
 Install-Winget -Name "CMake" -Id "Kitware.CMake"
 
 # ─── 8. Visual Studio Build Tools ───
-Write-Host "[8/8] Visual Studio Build Tools (for Rust/C++)" -ForegroundColor Cyan
+Write-Host "[9/9] Visual Studio Build Tools (for Rust/C++)" -ForegroundColor Cyan
 Install-Winget -Name "VS Build Tools 2022" -Id "Microsoft.VisualStudio.2022.BuildTools"
 
 Write-Host ""
@@ -121,17 +125,17 @@ foreach ($p in $cargoPaths) {
 
 # Maven — search common locations
 $mavenDirs = @(
-    "$env:USERPROFILE\Downloads\apache-maven-*",
-    "C:\Program Files\Apache\maven",
-    "C:\Program Files\Maven",
-    "$env:USERPROFILE\apache-maven-*"
+    "$env:USERPROFILE\Downloads\apache-maven-*\bin",
+    "C:\Program Files\Apache\maven\bin",
+    "C:\Program Files\Maven\apache-maven-*\bin",
+    "${env:ProgramFiles(x86)}\Maven\apache-maven-*\bin",
+    "$env:USERPROFILE\apache-maven-*\bin"
 )
 $found = $false
 foreach ($pattern in $mavenDirs) {
     $matches = Get-ChildItem -Path $pattern -Directory -ErrorAction SilentlyContinue
     if ($matches) {
-        $mvnHome = $matches[0].FullName
-        $mvnBin = Join-Path $mvnHome "bin"
+        $mvnBin = $matches[0].FullName
         if (Test-Path "$mvnBin\mvn.cmd" -and $env:Path -notlike "*$mvnBin*") {
             $env:Path += ";$mvnBin"
             Write-Host "  Added Maven to PATH: $mvnBin" -ForegroundColor Green
@@ -149,7 +153,9 @@ if (-not $found) {
 $rubyPaths = @(
     "$env:ProgramFiles\Ruby\*\bin",
     "${env:ProgramFiles(x86)}\Ruby\*\bin",
-    "$env:LOCALAPPDATA\Ruby\*\bin"
+    "$env:LOCALAPPDATA\Ruby\*\bin",
+    "$env:USERPROFILE\.local\share\Ruby\*\bin",
+    "C:\Ruby*\bin"
 )
 $found = $false
 foreach ($pattern in $rubyPaths) {
