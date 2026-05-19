@@ -92,6 +92,7 @@ $null = @(
     @("$env:USERPROFILE\.cargo\bin", "cargo.exe"),
     @("$env:LOCALAPPDATA\.cargo\bin", "cargo.exe"),
     # Maven
+    @("C:\Tools\apache-maven-*\bin", "mvn.cmd"),
     @("$env:USERPROFILE\Downloads\apache-maven-*\bin", "mvn.cmd"),
     @("$env:USERPROFILE\Tools\apache-maven-*\bin", "mvn.cmd"),
     @("$env:ProgramFiles\Apache\maven\bin", "mvn.cmd"),
@@ -146,8 +147,11 @@ Write-Log ""
 # ====== C# ======
 if ($tools.dotnet) {
     Run-Tests -Name "C# (.NET)" -Dir "clients/csharp" -Script {
-        # Run tests for the test project explicitly with all streams captured
-        dotnet test KeySync.Tests/KeySync.Tests.csproj *>&1
+        dotnet test --no-restore 2>&1
+        if ($LASTEXITCODE -ne 0) {
+            dotnet restore 2>&1 | Out-Null
+            dotnet test 2>&1
+        }
     }
 } else { Skip-Tests "C# (.NET)" }
 

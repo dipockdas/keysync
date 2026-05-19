@@ -25,47 +25,64 @@ function Install-Winget {
     Write-Host "  Installing $Name..." -ForegroundColor Yellow
     winget install --accept-source-agreements --accept-package-agreements --exact -h "$Id" 2>&1 | Out-Null
     if ($LASTEXITCODE -eq 0) {
-        Write-Host "    $Name installed." -ForegroundColor Green
+        Write-Host "    $Name installed." -foreground Green
     } else {
-        Write-Host "    $Name may already be installed or failed." -ForegroundColor DarkGray
+        Write-Host "    $Name may already be installed or failed." -foreground DarkGray
     }
 }
 
 # ─── 1. Go ───
-Write-Host "[1/8] Go" -ForegroundColor Cyan
+Write-Host "[1/9] Go" -ForegroundColor Cyan
 Install-Winget -Name "Go" -Id "GoLang.Go"
 
 # ─── 2. Rust ───
-Write-Host "[2/8] Rust" -ForegroundColor Cyan
+Write-Host "[2/9] Rust" -ForegroundColor Cyan
 Install-Winget -Name "Rustup" -Id "Rustlang.Rustup"
 
 # ─── 3. Java (Temurin JDK 21) ───
-Write-Host "[3/8] Java (JDK 21)" -ForegroundColor Cyan
+Write-Host "[3/9] Java (JDK 21)" -ForegroundColor Cyan
 Install-Winget -Name "Java Temurin JDK 21" -Id "EclipseAdoptium.Temurin.21.JDK"
 
 # ─── 4. Python ───
-Write-Host "[4/8] Python 3.14" -ForegroundColor Cyan
+Write-Host "[4/9] Python 3.14" -ForegroundColor Cyan
 Install-Winget -Name "Python 3.14" -Id "Python.Python.3.14"
 
 # ─── 5. Node.js ───
-Write-Host "[5/8] Node.js" -ForegroundColor Cyan
+Write-Host "[5/9] Node.js" -ForegroundColor Cyan
 Install-Winget -Name "Node.js" -Id "OpenJS.NodeJS.LTS"
 
 # ─── 6. Ruby ───
 Write-Host "[6/9] Ruby" -ForegroundColor Cyan
 Install-Winget -Name "Ruby" -Id "RubyInstallerTeam.Ruby.4.0"
 
-# ─── 7. Maven ───
-Write-Host "[7/9] Maven" -ForegroundColor Cyan
-Install-Winget -Name "Maven" -Id "Apache.Maven"
-
-# ─── 8. CMake ───
-Write-Host "[8/9] CMake" -ForegroundColor Cyan
+# ─── 7. CMake ───
+Write-Host "[7/9] CMake" -ForegroundColor Cyan
 Install-Winget -Name "CMake" -Id "Kitware.CMake"
 
 # ─── 8. Visual Studio Build Tools ───
-Write-Host "[9/9] Visual Studio Build Tools (for Rust/C++)" -ForegroundColor Cyan
+Write-Host "[8/9] Visual Studio Build Tools (for Rust/C++)" -ForegroundColor Cyan
 Install-Winget -Name "VS Build Tools 2022" -Id "Microsoft.VisualStudio.2022.BuildTools"
+
+# ─── 9. Maven (manual download — not available on winget) ───
+Write-Host "[9/9] Maven" -ForegroundColor Cyan
+$mvnZip = "$env:TEMP\maven.zip"
+$mvnDest = "C:\Tools"
+$mvnDir = "$mvnDest\apache-maven-3.9.16"
+if (Test-Path "$mvnDir\bin\mvn.cmd") {
+    Write-Host "  Maven already installed at $mvnDir" -foreground Green
+} else {
+    Write-Host "  Downloading Maven 3.9.16..." -ForegroundColor Yellow
+    try {
+        Invoke-WebRequest -Uri "https://dlcdn.apache.org/maven/maven-3/3.9.16/binaries/apache-maven-3.9.16-bin.zip" -OutFile $mvnZip -ErrorAction Stop
+        if (-not (Test-Path $mvnDest)) { New-Item -ItemType Directory -Path $mvnDest -Force | Out-Null }
+        Expand-Archive -Path $mvnZip -DestinationPath $mvnDest -Force
+        Write-Host "  Maven installed at $mvnDir" -foreground Green
+        Remove-Item $mvnZip -Force
+    } catch {
+        Write-Host "  Maven download failed: $_" -foreground Yellow
+        Write-Host "  Download manually from https://maven.apache.org/download.cgi" -foreground Yellow
+    }
+}
 
 Write-Host ""
 Write-Host "========================================================" -ForegroundColor Cyan
@@ -93,7 +110,8 @@ if (Test-Path $vsWhere) {
     $vsPath = & $vsWhere -latest -property installationPath
     $vsInstaller = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
     if ($vsPath -and (Test-Path $vsInstaller)) {
-        $workload = "Microsoft.VisualStudio.Workload.NativeDesktop"
+        # Use VCTools for Build Tools (NativeDesktop is for the full IDE only)
+        $workload = "Microsoft.VisualStudio.Workload.VCTools"
         Start-Process -Wait -FilePath $vsInstaller -ArgumentList "modify --installPath `"$vsPath`" --add $workload --quiet"
         Write-Host "  C++ workload installed." -ForegroundColor Green
     } else {
@@ -125,6 +143,7 @@ foreach ($p in $cargoPaths) {
 
 # Maven — search common locations
 $mavenDirs = @(
+    "C:\Tools\apache-maven-*\bin",
     "$env:USERPROFILE\Downloads\apache-maven-*\bin",
     "C:\Program Files\Apache\maven\bin",
     "C:\Program Files\Maven\apache-maven-*\bin",
