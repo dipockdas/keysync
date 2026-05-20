@@ -28,7 +28,7 @@ Keysync is designed for **developer-level secret management** — local developm
 - **GitHub Actions integration** — auto-sync secrets on push to `main`
 - **Secret rotation** — generate cryptographically random secrets and update everywhere
 - **Migration** — import from `.env` files or pull from Vercel/Railway/Supabase CLIs
-- **Client libraries** — Go, Python, TypeScript, Swift (read secrets at runtime without the keysync binary)
+- **Client libraries** — Go, Python, TypeScript, Swift, Java, C#, Rust, C++, Ruby (read secrets at runtime without the keysync binary)
 - **Cross-platform** — macOS, Linux, Windows
 
 ## For AI coding assistants
