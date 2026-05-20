@@ -196,14 +196,14 @@ keysync set SUPABASE_TOKEN=...
 
 For CI/CD environments where the keychain is unavailable, the tokens fall back to environment variables (`VERCEL_TOKEN`, `RAILWAY_TOKEN`, `SUPABASE_TOKEN`).
 
-## Sync secrets
+## Push secrets
 
 ```bash
 # Sync all configured platforms + GitHub
-keysync sync -p my-app
+keysync push -p my-app
 
 # Sync specific platforms only
-keysync sync -p my-app --platforms vercel,railway
+keysync push -p my-app --platforms vercel,railway
 ```
 
 When syncing, secrets are resolved with three-level precedence:

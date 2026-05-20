@@ -14,20 +14,20 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var syncPlatforms string
+var pushPlatforms string
 
-func newSyncCmd() *cobra.Command {
+func newPushCmd() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:   "sync --project name [--env name] [--platforms vercel,railway,supabase]",
+		Use:   "push --project name [--env name] [--platforms vercel,railway,supabase]",
 		Short: "Push secrets to GitHub Secrets and deployment platforms",
 		Long: F(`Pushes secrets from the local OS secret store to {u}GitHub Secrets{/u}
 and deployment platforms (Vercel, Railway, Supabase).
 
-Provide either {c}--project{/c} or {c}--repo{/c} to identify which repo to sync:
+Provide either {c}--project{/c} or {c}--repo{/c} to identify which repo to push to:
   • {c}--project{/c} looks up the repo in {c}.keysync.json{/c}
   • {c}--repo{/c} uses the repo directly
 
-Secrets synced:
+Secrets pushed:
   • Project-scoped secrets — always included for the matching project
   • Environment-scoped secrets — included if {c}--env{/c} is provided
   • Global secrets — only those listed in the repo's {c}"globals"{/c} config
@@ -42,14 +42,14 @@ via {c}platforms.Register(){/c}. See {c}internal/platforms/example_test.go{/c} f
 copyable template.
 
 {b}Examples:{/b}
-  {c}keysync sync --project my-app{/c}                              # repo from config
-  {c}keysync sync --repo org/my-app{/c}                             # repo directly
-  {c}keysync sync --project my-app --env production{/c}             # production env
-  {c}keysync sync --project my-app --platforms vercel,railway{/c}   # specific platforms
+  {c}keysync push --project my-app{/c}                              # repo from config
+  {c}keysync push --repo org/my-app{/c}                             # repo directly
+  {c}keysync push --project my-app --env production{/c}             # production env
+  {c}keysync push --project my-app --platforms vercel,railway{/c}   # specific platforms
 
 {b}See also:{/b}
   Custom platform template: {u}https://github.com/dipockdas/keysync/blob/main/internal/platforms/example_test.go{/u}
-  Syncing secrets: {u}https://github.com/dipockdas/keysync#syncing-secrets{/u}`),
+  Pushing secrets: {u}https://github.com/dipockdas/keysync#pushing-secrets{/u}`),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			ctx := cobraCmd.Context()
 
@@ -78,23 +78,23 @@ copyable template.
 				return nil
 			}
 
-			fmt.Printf("Syncing %d secrets for repo %q (project: %s, env: %s)\n", len(secrets), repoKey, project, envFlag)
+			fmt.Printf("Pushing %d secrets to repo %q (project: %s, env: %s)\n", len(secrets), repoKey, project, envFlag)
 
-			// Determine which platforms to sync
+			// Determine which platforms to push to
 			var platformNames []string
-			if syncPlatforms != "" {
-				platformNames = strings.Split(syncPlatforms, ",")
+			if pushPlatforms != "" {
+				platformNames = strings.Split(pushPlatforms, ",")
 			} else {
 				platformNames = configuredPlatforms(platformsCfg)
 			}
 
 			// Push to GitHub
-			if err := syncToGitHub(repoKey, secrets); err != nil {
-				fmt.Fprintf(os.Stderr, "warning: GitHub sync: %v\n", err)
+			if err := pushToGitHub(repoKey, secrets); err != nil {
+				fmt.Fprintf(os.Stderr, "warning: GitHub push: %v\n", err)
 			}
 
-			// Sync to each platform
-			var syncErrors int
+			// Push to each platform
+			var pushErrors int
 			for _, name := range platformNames {
 				name = strings.TrimSpace(name)
 				platformCfg := getPlatformConfigJSON(platformsCfg, name)
@@ -106,7 +106,7 @@ copyable template.
 				p, err := platforms.Get(ctx, name, platformCfg, secretSt)
 				if err != nil {
 					fmt.Fprintf(os.Stderr, "  SKIP: %s (%v)\n", name, err)
-					syncErrors++
+					pushErrors++
 					continue
 				}
 
@@ -114,24 +114,31 @@ copyable template.
 				for key, value := range secrets {
 					if err := p.Upsert(key, value); err != nil {
 						fmt.Fprintf(os.Stderr, "    FAIL: %s: %v\n", key, err)
-						syncErrors++
+						pushErrors++
 					} else {
 						fmt.Printf("    ✓ %s\n", key)
 					}
 				}
 			}
 
-			if syncErrors > 0 {
-				fmt.Fprintf(os.Stderr, "\n%d error(s) during sync.\n", syncErrors)
+			if pushErrors > 0 {
+				fmt.Fprintf(os.Stderr, "\n%d error(s) during push.\n", pushErrors)
 			} else {
-				fmt.Println("\nSync complete.")
+				fmt.Println("\nPush complete.")
 			}
 
 			return nil
 		},
 	}
 
-	cmd.Flags().StringVar(&syncPlatforms, "platforms", "", "comma-separated platforms (vercel,railway,supabase)")
+	cmd.Flags().StringVar(&pushPlatforms, "platforms", "", "comma-separated platforms (vercel,railway,supabase)")
+	return cmd
+}
+
+// newSendCmd is an alias for newPushCmd for backward compatibility and flexibility.
+func newSendCmd() *cobra.Command {
+	cmd := newPushCmd()
+	cmd.Use = "send --project name [--env name] [--platforms vercel,railway,supabase]"
 	return cmd
 }
 
@@ -245,8 +252,8 @@ func getPlatformConfigJSON(pc any, platformName string) string {
 	return string(cfg)
 }
 
-// syncToGitHub pushes all secrets to GitHub Secrets for the given repo.
-func syncToGitHub(repoKey string, secrets map[string]string) error {
+// pushToGitHub pushes all secrets to GitHub Secrets for the given repo.
+func pushToGitHub(repoKey string, secrets map[string]string) error {
 	gh, err := github.NewClient(repoKey)
 	if err != nil {
 		return err

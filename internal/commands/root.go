@@ -70,7 +70,8 @@ See {u}https://github.com/dipockdas/keysync{/u} for full documentation and tutor
 	cmd.AddCommand(newRmCmd())
 	cmd.AddCommand(newPullCmd())
 	// cmd.AddCommand(newInjectCmd()) // disabled: see inject.go
-	cmd.AddCommand(newSyncCmd())
+	cmd.AddCommand(newPushCmd())
+	cmd.AddCommand(newSendCmd())
 	cmd.AddCommand(newRotateCmd())
 	cmd.AddCommand(newDoctorCmd())
 	cmd.AddCommand(newTestSecretsCmd())

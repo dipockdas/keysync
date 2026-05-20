@@ -827,7 +827,7 @@ func printMigrationInstructions(keys []migratedKey) {
 	fmt.Println("## Cleanup checklist")
 	fmt.Println("1. Remove .env from source control: `echo \".env*\" >> .gitignore`")
 	fmt.Println("2. Remove dotenv/config imports from entry points")
-	fmt.Println("3. Push secrets to GitHub and platforms: run `keysync sync --project <name>` locally")
+	fmt.Println("3. Push secrets to GitHub and platforms: run `keysync push --project <name>` locally")
 
 	fmt.Println("---INSTRUCTIONS_END---")
 }

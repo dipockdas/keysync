@@ -103,7 +103,7 @@ Create a `.keysync.json` in your project root:
 Then push your secrets to GitHub Secrets and deployment platforms:
 
 ```bash
-keysync sync --project my-project
+keysync push --project my-project
 ```
 
 This reads secrets from your OS keychain and pushes them to:
@@ -132,7 +132,7 @@ jobs:
 Each team member:
 1. Runs `keysync migrate --file .env` on their machine
 2. Or uses `keysync pull` to download secrets from GitHub Secrets
-3. Runs `keysync sync` when they add/change secrets locally
+3. Runs `keysync push` when they add/change secrets locally
 
 ## Rolling back
 

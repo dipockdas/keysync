@@ -142,12 +142,12 @@ func TestMyHandler(t *testing.T) {
 }
 ```
 
-## Step 5: Sync secrets to GitHub
+## Step 5: Push secrets to GitHub
 
 Push your local secrets to GitHub Secrets so they're available in CI:
 
 ```bash
-keysync sync -p my-api
+keysync push -p my-api
 ```
 
 This reads secrets from your OS keychain and pushes them to:
@@ -210,7 +210,7 @@ keysync set VERCEL_TOKEN=your_vercel_token
 Then sync to GitHub and all platforms:
 
 ```bash
-keysync sync -p my-api
+keysync push -p my-api
 ```
 
 ## Migration from `.env`

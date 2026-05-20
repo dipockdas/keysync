@@ -44,7 +44,7 @@ make clean          # rm -rf ./bin/
 
 ## Open-source safety
 
-The `keysync sync` command includes validation to prevent users from accidentally syncing secrets to the keysync repository itself:
+The `keysync push` command includes validation to prevent users from accidentally syncing secrets to the keysync repository itself:
 
 - Rejects repo names matching `dipockdas/keysync` (internal/commands/sync.go)
 - Rejects placeholder values like `YOUR_ORG/YOUR_REPO`

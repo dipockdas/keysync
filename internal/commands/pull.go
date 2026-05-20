@@ -29,7 +29,7 @@ If {c}--env{/c} is also provided, environment-scoped secrets are checked too.
 
 {b}See also:{/b}
   {c}keysync set --help{/c}
-  {c}keysync sync --help{/c}`),
+  {c}keysync push --help{/c}`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 

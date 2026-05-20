@@ -8,7 +8,7 @@
 
 **Unified secret management CLI** — store and sync secrets across local OS keychains, GitHub Secrets, and deployment platforms (Vercel, Railway, Supabase).
 
-Keysync replaces scattered `.env` files and manual secret management with a single workflow: secrets live in your OS keychain locally and sync to GitHub Secrets and deployment platforms when you run `keysync sync`.
+Keysync replaces scattered `.env` files and manual secret management with a single workflow: secrets live in your OS keychain locally and push to GitHub Secrets and deployment platforms when you run `keysync push`.
 
 ## When to use keysync
 
@@ -63,14 +63,14 @@ Client libraries check environment variables before touching the OS keychain:
 | Environment | How secrets get into env vars | App reads via |
 |---|---|---|
 | **Local dev** | `eval $(keysync export)` in shell profile or service launch script | `os.environ` (no keychain call) |
-| **Cloud (Vercel, Railway, Supabase, AWS)** | Platform injects env vars (set via `keysync sync`) | `os.environ` (no keychain call) |
+| **Cloud (Vercel, Railway, Supabase, AWS)** | Platform injects env vars (set via `keysync push`) | `os.environ` (no keychain call) |
 | **CI/CD** | GitHub Actions injects env vars from GitHub Secrets | `os.environ` (no keychain call) |
 
 The keychain is touched only by the CLI during setup and management — never at application runtime. This means:
 
 - **Local dev**: One `eval $(keysync export)` at shell startup, zero prompts for the rest of the session
 - **CI/CD**: Platform injects env vars, no keychain involved at all
-- **Cloud deployment**: Platform injects env vars via `keysync sync`, app reads from `os.environ` — exactly as it works today
+- **Cloud deployment**: Platform injects env vars via `keysync push`, app reads from `os.environ` — exactly as it works today
 - **No .env files anywhere**: The entire chain is `keychain → export → env var`, no plaintext files
 
 ### Three scope levels
@@ -107,7 +107,7 @@ Lowest:   Global (no project, no environment)
 
 ### Sync pipeline
 
-When you run `keysync sync`, secrets are collected at all three scope levels (with higher precedence overriding lower) and pushed to:
+When you run `keysync push`, secrets are collected at all three scope levels (with higher precedence overriding lower) and pushed to:
 
 1. **GitHub Secrets** — via the `gh` CLI
 2. **Deployment platforms** — via their REST/GraphQL APIs
@@ -207,7 +207,7 @@ See [Configuration](#configuration) for all available fields.
 ### 5. Sync to GitHub and deployment platforms
 
 ```bash
-keysync sync -p my-app
+keysync push -p my-app
 ```
 
 This reads secrets from the keychain at all three scope levels and pushes them to GitHub Secrets, Vercel, Railway, and Supabase.
@@ -242,7 +242,7 @@ source <(keysync export --project my-app)
 | `keysync get KEY` | Copy a secret to the clipboard (`-u`/`--unmask` to print to stdout) |
 | `keysync list` | List stored secrets (`--unmask` to show values) |
 | `keysync export` | Print secrets as `export KEY=VALUE` lines |
-| `keysync sync` | Push secrets to configured platforms + GitHub (`--platforms` to select specific ones) |
+| `keysync push` | Push secrets to configured platforms + GitHub (`--platforms` to select specific ones) |
 | `keysync pull` | Reconcile local secrets with GitHub secret names |
 | `keysync rotate KEY` | Generate a new random secret and update everywhere |
 | `keysync migrate` | Import secrets from `.env` or cloud platform CLI (`--dry-run` to preview) |
@@ -486,14 +486,14 @@ exec my-app
 
 ---
 
-## Syncing Secrets
+## Pushing Secrets
 
-The `keysync sync` command pushes secrets from your OS keychain to GitHub Secrets and deployment platforms in a single operation. This command runs **locally on your machine** — it reads from your keychain and pushes to remote services.
+The `keysync push` command pushes secrets from your OS keychain to GitHub Secrets and deployment platforms in a single operation. This command runs **locally on your machine** — it reads from your keychain and pushes to remote services.
 
 ### How it works
 
 ```bash
-keysync sync --project my-app
+keysync push --project my-app
 ```
 
 This command:
@@ -501,9 +501,9 @@ This command:
 2. Pushes all secrets to GitHub Secrets (via `gh` CLI)
 3. Pushes all secrets to configured platforms (Vercel, Railway, Supabase)
 
-### When to run sync
+### When to run push
 
-Run `keysync sync` whenever you want to update remote secrets:
+Run `keysync push` whenever you want to update remote secrets:
 - After adding new secrets with `keysync set`
 - After rotating secrets with `keysync rotate`
 - After updating secret values in your keychain
@@ -516,10 +516,10 @@ Run `keysync sync` whenever you want to update remote secrets:
 keysync set -p my-app DATABASE_URL=postgres://...
 
 # Sync to GitHub and platforms
-keysync sync --project my-app
+keysync push --project my-app
 
 # Or sync to specific platforms only
-keysync sync --project my-app --platforms vercel,railway
+keysync push --project my-app --platforms vercel,railway
 ```
 
 **Platform tokens**: The sync command reads platform API tokens from your keychain as global secrets (`VERCEL_TOKEN`, `RAILWAY_TOKEN`, `SUPABASE_TOKEN`). These tokens can also be provided as environment variables.

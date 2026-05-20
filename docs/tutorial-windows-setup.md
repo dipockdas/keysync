@@ -207,7 +207,7 @@ The Go client uses `github.com/danieljoos/wincred` which calls the Win32 API via
 
 ## Step 7: Using secrets in GitHub Actions
 
-After syncing secrets locally with `keysync sync`, they're available in GitHub Actions:
+After pushing secrets locally with `keysync push`, they're available in GitHub Actions:
 
 ```yaml
 name: CI
@@ -234,7 +234,7 @@ jobs:
           go build ./...
 ```
 
-> **Note**: Run `keysync sync` locally to push secrets to GitHub Secrets. They're then available as `${{ secrets.NAME }}` in all workflows.
+> **Note**: Run `keysync push` locally to push secrets to GitHub Secrets. They're then available as `${{ secrets.NAME }}` in all workflows.
 
 ## Troubleshooting
 
