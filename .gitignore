@@ -22,3 +22,6 @@ Thumbs.db
 # Test artifacts
 test-results/
 *.test.txt
+
+# Internal/draft documents
+docs/blog-post.md
