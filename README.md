@@ -1,14 +1,13 @@
 # keysync
 
 [![CI](https://github.com/dipockdas/keysync/actions/workflows/ci.yml/badge.svg)](https://github.com/dipockdas/keysync/actions/workflows/ci.yml)
-[![Sync Secrets](https://github.com/dipockdas/keysync/actions/workflows/sync-secrets.yml/badge.svg)](https://github.com/dipockdas/keysync/actions/workflows/sync-secrets.yml)
 [![Release](https://img.shields.io/github/v/release/dipockdas/keysync)](https://github.com/dipockdas/keysync/releases)
 [![Go Report](https://goreportcard.com/badge/github.com/dipockdas/keysync)](https://goreportcard.com/report/github.com/dipockdas/keysync)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
 
 **Unified secret management CLI** — store and sync secrets across local OS keychains, GitHub Secrets, and deployment platforms (Vercel, Railway, Supabase).
 
-Keysync replaces scattered `.env` files and manual secret management with a single workflow: secrets live in your OS keychain locally and are synced to GitHub Secrets and your deployment platforms on push.
+Keysync replaces scattered `.env` files and manual secret management with a single workflow: secrets live in your OS keychain locally and sync to GitHub Secrets and deployment platforms when you run `keysync sync`.
 
 ## When to use keysync
 
@@ -23,9 +22,8 @@ Keysync is designed for **developer-level secret management** — local developm
 
 - **OS-native secret storage** — macOS Keychain, Linux libsecret, Windows Credential Manager
 - **Three scope levels** — global, project-scoped, and environment-scoped secrets with automatic fallback
-- **Platform sync** — push secrets to Vercel, Railway, and Supabase via their APIs
+- **Platform sync** — push secrets to GitHub, Vercel, Railway, and Supabase from your local machine
 - **Platform tokens in keychain** — API tokens stored as global secrets, never in plaintext files
-- **GitHub Actions integration** — auto-sync secrets on push to `main`
 - **Secret rotation** — generate cryptographically random secrets and update everywhere
 - **Migration** — import from `.env` files or pull from Vercel/Railway/Supabase CLIs
 - **Client libraries** — Go, Python, TypeScript, Swift, Java, C#, Rust, C++, Ruby (read secrets at runtime without the keysync binary)
@@ -98,7 +96,7 @@ Lowest:   Global (no project, no environment)
 |---------|----------|
 | `keysync set -p my-api MY_API_KEY=def456` | Each project has its own API key. Isolation between projects while keeping environments consistent within a project. |
 
-**Environment** — a secret scoped to a specific project *and* environment (e.g. `dev`, `staging`, `production`). Note: environment scoping is currently available via the keysync CLI and export pipeline, but not yet in client libraries — only global and project scopes are available when reading secrets directly from the keychain at runtime.
+**Environment** — a secret scoped to a specific project *and* environment (e.g. `dev`, `staging`, `production`).
 
 | Example | Use case |
 |---------|----------|
@@ -487,38 +485,45 @@ exec my-app
 
 ---
 
-## GitHub Actions Integration
+## Syncing Secrets
 
-The included workflow at `.github/workflows/sync-secrets.yml` syncs secrets on every push to `main`:
+The `keysync sync` command pushes secrets from your OS keychain to GitHub Secrets and deployment platforms in a single operation. This command runs **locally on your machine** — it reads from your keychain and pushes to remote services.
 
-```yaml
-name: Sync Secrets
-on:
-  workflow_dispatch:
-  push:
-    branches: [main]
+### How it works
 
-jobs:
-  sync:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - name: Setup Go
-        uses: actions/setup-go@v5
-        with:
-          go-version: '1.22'
-      - name: Build keysync
-        run: go build -o ./bin/keysync ./cmd/keysync
-      - name: Sync all platforms
-        run: ./bin/keysync sync --repo ${{ github.repository }} --store fallback
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          SUPABASE_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+```bash
+keysync sync --project my-app
 ```
 
-Add the platform API tokens as repository secrets in your GitHub repo settings for this to work. In CI, the tokens are passed as environment variables since the OS keychain is not available.
+This command:
+1. Reads secrets from your OS keychain (global + project + environment scopes)
+2. Pushes all secrets to GitHub Secrets (via `gh` CLI)
+3. Pushes all secrets to configured platforms (Vercel, Railway, Supabase)
+
+### When to run sync
+
+Run `keysync sync` whenever you want to update remote secrets:
+- After adding new secrets with `keysync set`
+- After rotating secrets with `keysync rotate`
+- After updating secret values in your keychain
+- When setting up a new deployment environment
+
+### Example workflow
+
+```bash
+# Add a new secret locally
+keysync set -p my-app DATABASE_URL=postgres://...
+
+# Sync to GitHub and platforms
+keysync sync --project my-app
+
+# Or sync to specific platforms only
+keysync sync --project my-app --platforms vercel,railway
+```
+
+**Platform tokens**: The sync command reads platform API tokens from your keychain as global secrets (`VERCEL_TOKEN`, `RAILWAY_TOKEN`, `SUPABASE_TOKEN`). These tokens can also be provided as environment variables.
+
+**Note:** Sync is a local operation. There is no CI/CD workflow that syncs from GitHub Secrets to platforms — all syncing happens from your machine.
 
 ---
 

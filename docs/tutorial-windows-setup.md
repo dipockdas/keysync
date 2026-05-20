@@ -205,16 +205,18 @@ func main() {
 
 The Go client uses `github.com/danieljoos/wincred` which calls the Win32 API via `golang.org/x/sys/windows` — no CGo, cross-compilation friendly.
 
-## Step 7: CI/CD with GitHub Actions on Windows
+## Step 7: Using secrets in GitHub Actions
+
+After syncing secrets locally with `keysync sync`, they're available in GitHub Actions:
 
 ```yaml
-name: Sync Secrets
+name: CI
 on:
   push:
     branches: [main]
 
 jobs:
-  sync:
+  build:
     runs-on: windows-latest
     steps:
       - uses: actions/checkout@v4
@@ -222,19 +224,17 @@ jobs:
         uses: actions/setup-go@v5
         with:
           go-version: '1.25'
-      - name: Build keysync
-        run: go build -o ./bin/keysync.exe ./cmd/keysync
-      - name: Sync all platforms
-        run: ./bin/keysync sync
-        shell: pwsh
+
+      - name: Build and test
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          SUPABASE_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: |
+          go test ./...
+          go build ./...
 ```
 
-> **Note**: In GitHub Actions, the platform tokens are provided as environment variables since there is no OS keychain available in CI runners.
+> **Note**: Run `keysync sync` locally to push secrets to GitHub Secrets. They're then available as `${{ secrets.NAME }}` in all workflows.
 
 ## Troubleshooting
 

@@ -13,11 +13,12 @@ Supabase).
 CLI (cobra) → Store (OS keychain) → GitHub Sync → Platform Sync
 ```
 
-Secrets have two scopes:
+Secrets have three scopes (with precedence from lowest to highest):
 - **Global**: shared across all projects (`keysync/global`)
 - **Project**: scoped to a specific project (`keysync/project/<name>`)
+- **Environment**: scoped to a project + environment (`keysync/project/<name>/env/<env>`)
 
-Project scope overrides global when both exist with the same key.
+Higher scopes override lower scopes when the same key exists at multiple levels.
 
 ## Client libraries
 

@@ -1,3 +1,8 @@
+---
+name: keysync-setup
+description: Guide for setting up keysync from source, verifying required CLIs, authenticating supported platforms, and learning the initial CLI workflow for storing and retrieving secrets.
+---
+
 # keysync Setup
 
 Guide for setting up [keysync](https://github.com/dipockdas/keysync) — a unified secret management CLI that stores secrets in OS-native keychains and syncs them to GitHub Secrets and deployment platforms (Vercel, Railway, Supabase).
@@ -160,8 +165,9 @@ Edit `.keysync.json` to add platform integrations:
 
 ```json
 {
-  "projects": {
-    "my-app": {
+  "repos": {
+    "yourorg/my-app": {
+      "project": "my-app",
       "platforms": {
         "vercel": {
           "projectId": "prj_xxxxx",
@@ -248,14 +254,19 @@ This runs all unit tests (currently 97+ tests) covering the store backends, cryp
 
 ## Client libraries
 
-Keysync has native client libraries that read secrets directly from the OS keychain with no dependency on the keysync binary:
+Keysync has 9 native client libraries that read secrets directly from the OS keychain with no dependency on the keysync binary:
 
 | Language | Location | macOS | Linux | Windows |
 |----------|----------|-------|-------|---------|
-| **Go** | `clients/go/` | security CLI | secret-tool CLI | wincred |
+| **Go** | `clients/go/` | security CLI | secret-tool CLI | wincred library |
 | **Python** | `clients/python/` | security CLI | secret-tool CLI | ctypes Win32 API |
-| **TypeScript** | `clients/node/` | security CLI | secret-tool CLI | Planned |
-| **Swift** | `clients/swift/` | Security.framework | secret-tool CLI | Stub |
+| **TypeScript/Node** | `clients/node/` | security CLI | secret-tool CLI | PowerShell + Win32 |
+| **Swift** | `clients/swift/` | Security.framework | secret-tool CLI | Not planned |
+| **Java** | `clients/java/` | security CLI | secret-tool CLI | JNA → Win32 API |
+| **C# (.NET)** | `clients/csharp/` | security CLI | secret-tool CLI | P/Invoke → Win32 API |
+| **Rust** | `clients/rust/` | security CLI | secret-tool CLI | windows-sys → Win32 API |
+| **C++** | `clients/cpp/` | security CLI | secret-tool CLI | Win32 API (wincred.h) |
+| **Ruby** | `clients/ruby/` | security CLI | secret-tool CLI | PowerShell + inline C# |
 
 Example usage:
 

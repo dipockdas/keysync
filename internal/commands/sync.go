@@ -49,7 +49,7 @@ copyable template.
 
 {b}See also:{/b}
   Custom platform template: {u}https://github.com/dipockdas/keysync/blob/main/internal/platforms/example_test.go{/u}
-  GitHub Actions workflow: {u}https://github.com/dipockdas/keysync#github-actions-integration{/u}`),
+  Syncing secrets: {u}https://github.com/dipockdas/keysync#syncing-secrets{/u}`),
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
 			ctx := cobraCmd.Context()
 
@@ -57,6 +57,15 @@ copyable template.
 			repoKey, project, globals, platformsCfg, err := resolveRepoConfig()
 			if err != nil {
 				return err
+			}
+
+			// Safety check: prevent syncing to the keysync repo itself
+			if strings.ToLower(repoKey) == "dipockdas/keysync" {
+				return fmt.Errorf("refusing to sync to the keysync repo itself\n\nPlease update .keysync.json with YOUR repository name (e.g., \"yourorg/yourrepo\")\nSee the example at: https://github.com/dipockdas/keysync#quick-start")
+			}
+			// Also prevent the placeholder value
+			if strings.Contains(strings.ToUpper(repoKey), "YOUR_ORG") || strings.Contains(strings.ToUpper(repoKey), "YOUR_REPO") {
+				return fmt.Errorf("please update .keysync.json with your actual repository name\n\nReplace \"YOUR_ORG/YOUR_REPO\" with your GitHub repository (e.g., \"yourorg/yourrepo\")")
 			}
 
 			// Read secrets from local store (only specified globals + project-scoped)

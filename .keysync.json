@@ -1,7 +1,14 @@
 {
   "repos": {
-    "dipockdas/keysync": {
-      "project": "keysync"
+    "YOUR_ORG/YOUR_REPO": {
+      "project": "your-project-name",
+      "globals": ["EXAMPLE_GLOBAL_KEY"],
+      "platforms": {
+        "vercel": {
+          "projectId": "prj_xxxxx",
+          "target": ["production", "preview"]
+        }
+      }
     }
   }
 }

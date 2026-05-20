@@ -2,7 +2,7 @@
 
 This tutorial walks through adding keysync to an existing Go application —
 storing secrets in the OS keychain, retrieving them at runtime, and syncing
-them to GitHub Actions and deployment platforms.
+them to GitHub Secrets and deployment platforms from your local machine.
 
 ## What you'll end up with
 
@@ -10,8 +10,7 @@ them to GitHub Actions and deployment platforms.
   Windows Credential Manager), never in `.env` files
 - Runtime secret retrieval via Go client library — your app reads secrets
   directly from the OS keychain on startup
-- Secrets synced to GitHub Actions on push, accessible as environment variables
-  in CI
+- Secrets synced to GitHub Secrets from your local machine, accessible as `${{ secrets.NAME }}` in GitHub Actions workflows
 - Secrets pushed to Vercel, Railway, or Supabase for deployment
 
 ## Prerequisites
@@ -38,8 +37,9 @@ This creates a `.keysync.json` file:
 
 ```json
 {
-  "projects": {
-    "my-api": {
+  "repos": {
+    "yourorg/my-api": {
+      "project": "my-api",
       "platforms": {}
     }
   }
@@ -78,13 +78,8 @@ The client library uses build tags to call the OS keychain directly on each
 platform — no `keysync` binary dependency at runtime.
 
 ```bash
-go get github.com/dipockdas/keysync/client@latest
+go get github.com/dipockdas/keysync/clients/go@latest
 ```
-
-**Note:** The client library is currently being migrated from the `client/`
-package to `clients/go/` with the hybrid architecture (direct OS keychain access
-per platform instead of shelling out to `keysync get`). See
-[clients/README.md](../clients/README.md) for the plan.
 
 ## Step 4: Use secrets in your application
 
@@ -96,48 +91,70 @@ package main
 import (
     "fmt"
     "log"
-    "os"
 
-    "github.com/dipockdas/keysync/client"
+    "github.com/dipockdas/keysync/clients/go"
 )
 
 func main() {
-    // Retrieve a secret at startup
-    dbURL, err := client.GetSecret("my-api", "DATABASE_URL")
+    // Retrieve a project-scoped secret
+    stripeKey, err := keysync.GetSecret("my-api", "STRIPE_KEY")
+    if err != nil {
+        log.Fatalf("failed to get STRIPE_KEY: %v", err)
+    }
+
+    // Retrieve a global secret
+    dbURL, err := keysync.GetGlobal("DATABASE_URL")
     if err != nil {
         log.Fatalf("failed to get DATABASE_URL: %v", err)
     }
 
-    // Use the secret (don't log it!)
+    // Use the secrets (don't log them!)
     db, err := openDatabase(dbURL)
     // ...
 }
 ```
 
 **Key points:**
-- `GetSecret` takes `(project, key)` — project can be `""` for global-only
-- Project-scoped secrets override global secrets with the same key
-- The function shells out to the OS keychain tool on each platform
+- `GetSecret(project, key)` retrieves project-scoped secrets with global fallback
+- `GetGlobal(key)` retrieves global-only secrets
+- The library calls the OS keychain directly (macOS Keychain, libsecret, Windows Credential Manager)
 - No `.env` files, no secret values in your codebase
+- Supports environment scoping: `GetEnvSecret(project, env, key)`
 
 For testing, use the in-memory store:
 
 ```go
-func TestMyHandler(t *testing.T) {
-    store := client.NewMemoryStore()
-    store.SetSecret(context.Background(), "global", "", "DATABASE_URL", "postgres://test:test@localhost/testdb")
+import (
+    "context"
+    "testing"
 
-    // Inject the store into your handler
+    "github.com/dipockdas/keysync/clients/go"
+)
+
+func TestMyHandler(t *testing.T) {
+    ctx := context.Background()
+    store := keysync.NewMemoryStore()
+    store.Set(ctx, keysync.ScopeGlobal, "", "", "DATABASE_URL", "postgres://test:test@localhost/testdb")
+
+    // Inject the store into your handler for testing
     handler := NewHandler(store)
     // ... test with handler
 }
 ```
 
-## Step 5: Set up GitHub Actions CI
+## Step 5: Sync secrets to GitHub
 
-Add a workflow step that makes secrets available in CI. GitHub doesn't expose
-secret values via API, but `keysync sync` pushes them as GitHub Actions secrets
-on push to main.
+Push your local secrets to GitHub Secrets so they're available in CI:
+
+```bash
+keysync sync -p my-api
+```
+
+This reads secrets from your OS keychain and pushes them to:
+1. GitHub Secrets (via `gh` CLI)
+2. Configured deployment platforms (Vercel, Railway, etc.)
+
+Now you can use the secrets in your GitHub Actions workflows:
 
 ```yaml
 # .github/workflows/ci.yml
@@ -153,50 +170,16 @@ jobs:
         with:
           go-version: '1.25'
 
-      - name: Install libsecret (Linux keychain)
-        run: sudo apt-get install -y libsecret-tools
-
       - name: Run tests
         run: go test ./...
 
       - name: Integration test with secrets
-        run: |
-          # Run a database test that needs DATABASE_URL
-          # The secret was set by keysync sync on main branch
-          go run ./cmd/migration
+        run: go run ./cmd/migration
         env:
           DATABASE_URL: ${{ secrets.DATABASE_URL }}
 ```
 
-Add the sync workflow:
-
-```yaml
-# .github/workflows/sync-secrets.yml
-name: Sync Secrets
-on:
-  push:
-    branches: [main]
-
-jobs:
-  sync:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-go@v5
-        with:
-          go-version: '1.25'
-      - name: Build keysync
-        run: |
-          git clone https://github.com/dipockdas/keysync.git /tmp/keysync
-          cd /tmp/keysync && go build -o /tmp/keysync/bin/keysync ./cmd/keysync
-      - name: Sync secrets
-        run: /tmp/keysync/bin/keysync sync -p my-api
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-          RAILWAY_TOKEN: ${{ secrets.RAILWAY_TOKEN }}
-          SUPABASE_TOKEN: ${{ secrets.SUPABASE_TOKEN }}
-```
+The secrets are available as `${{ secrets.SECRET_NAME }}` in all your workflows.
 
 ## Step 6: Configure deployment platforms
 
@@ -204,8 +187,9 @@ Add your platforms to `.keysync.json`:
 
 ```json
 {
-  "projects": {
-    "my-api": {
+  "repos": {
+    "yourorg/my-api": {
+      "project": "my-api",
       "platforms": {
         "vercel": {
           "projectId": "prj_xxxxx",
@@ -217,19 +201,17 @@ Add your platforms to `.keysync.json`:
 }
 ```
 
-Set platform tokens as local environment variables:
+Store platform tokens in your keychain:
 
 ```bash
-export VERCEL_TOKEN=your_vercel_token
+keysync set VERCEL_TOKEN=your_vercel_token
 ```
 
-Then sync locally:
+Then sync to GitHub and all platforms:
 
 ```bash
 keysync sync -p my-api
 ```
-
-Or let CI handle it on push to main.
 
 ## Migration from `.env`
 
@@ -242,14 +224,12 @@ keysync migrate --file .env
 This interactively prompts for each secret's scope. After migration, remove the
 `.env` file and update your code to use the keysync client library instead.
 
-## Complete example
+## Next Steps
 
-See the [example-go-app](../examples/go-app/) directory for a complete working
-example with:
-- Application code using `client.GetSecret`
-- Unit tests with `client.MemoryStore`
-- Makefile with `make build`, `make test`
-- GitHub Actions workflow for CI and sync
+- Explore other [client libraries](../clients/README.md) for TypeScript, Python, Swift, Java, C#, Rust, C++, and Ruby
+- Set up secret rotation with `keysync rotate`
+- Configure multiple environments with `--env` flag
+- See [migration guide](migration-guide.md) for more advanced migration scenarios
 
 ## Troubleshooting
 

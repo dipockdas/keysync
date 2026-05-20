@@ -42,6 +42,18 @@ make clean          # rm -rf ./bin/
 - Client libraries in `clients/` access the OS keychain directly (no dependency on the keysync binary)
 - Each client library has its own README.md, CLAUDE.md, and AGENTS.md
 
+## Open-source safety
+
+The `keysync sync` command includes validation to prevent users from accidentally syncing secrets to the keysync repository itself:
+
+- Rejects repo names matching `dipockdas/keysync` (internal/commands/sync.go)
+- Rejects placeholder values like `YOUR_ORG/YOUR_REPO`
+- Example `.keysync.json` uses placeholder values, not real repo names
+
+**Why this matters**: The sync command pushes secrets to GitHub Secrets via the `gh` CLI. Without validation, users who copy the example config without updating it would push their secrets to the keysync repo itself, creating a security risk.
+
+**Sync is local-only**: The sync command runs on the user's machine and reads from their OS keychain. There is no CI/CD workflow that syncs from GitHub Secrets to platforms — all syncing happens locally.
+
 ## Migration: replacing .env with keysync
 
 When helping a user who has run `keysync migrate` and needs to update source code:

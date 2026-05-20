@@ -81,7 +81,7 @@ git rm --cached .env
 git commit -m "Migrate secrets from .env to keysync"
 ```
 
-## Step 4: Set up CI/CD (optional)
+## Step 4: Sync to GitHub and platforms
 
 Create a `.keysync.json` in your project root:
 
@@ -90,32 +90,49 @@ Create a `.keysync.json` in your project root:
   "repos": {
     "owner/repo": {
       "project": "my-project",
-      "env": "production"
+      "platforms": {
+        "vercel": {
+          "projectId": "prj_xxxxx"
+        }
+      }
     }
   }
 }
 ```
 
-Then add this to `.github/workflows/ci.yml`:
+Then push your secrets to GitHub Secrets and deployment platforms:
+
+```bash
+keysync sync --project my-project
+```
+
+This reads secrets from your OS keychain and pushes them to:
+- GitHub Secrets (via `gh` CLI)
+- Configured platforms (Vercel, Railway, Supabase)
+
+## Step 5: Use secrets in CI
+
+Your GitHub Actions workflows can now access secrets:
 
 ```yaml
-- name: Sync secrets
-  if: github.ref == 'refs/heads/main'
-  run: keysync sync --repo ${{ github.repository }} --store fallback
-  env:
-    GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+# .github/workflows/ci.yml
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          API_KEY: ${{ secrets.API_KEY }}
+        run: ./deploy.sh
 ```
 
-This syncs your local secrets to GitHub Secrets on every push to main.
+## Step 6: Share with your team
 
-## Step 5: Share with your team
-
-Each team member runs:
-```bash
-keysync sync --repo owner/repo --store fallback
-```
-
-This pulls secrets from GitHub into their local keychain.
+Each team member:
+1. Runs `keysync migrate --file .env` on their machine
+2. Or uses `keysync pull` to download secrets from GitHub Secrets
+3. Runs `keysync sync` when they add/change secrets locally
 
 ## Rolling back
 
