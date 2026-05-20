@@ -105,20 +105,59 @@ if ($rustup) {
 
 # ─── VS Build Tools workload ───
 Write-Host "Adding VS C++ workload..." -ForegroundColor Yellow
-$vsWhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
-if (Test-Path $vsWhere) {
-    $vsPath = & $vsWhere -latest -property installationPath
+
+# Find the VS installation path using multiple methods
+$vsInstallPath = $null
+
+# Method 1: vswhere (standard)
+$vswhere = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vswhere.exe"
+if (Test-Path $vswhere) {
+    $vsInstallPath = & $vswhere -latest -property installationPath
+}
+
+# Method 2: Well-known paths (fallback if vswhere fails)
+if (-not $vsInstallPath) {
+    $knownPaths = @(
+        "C:\Program Files (x86)\Microsoft Visual Studio\2022\BuildTools",
+        "C:\Program Files\Microsoft Visual Studio\2022\BuildTools"
+    )
+    foreach ($p in $knownPaths) {
+        if (Test-Path "$p\Common7\Tools") {
+            $vsInstallPath = $p
+            break
+        }
+    }
+}
+
+if ($vsInstallPath) {
     $vsInstaller = "${env:ProgramFiles(x86)}\Microsoft Visual Studio\Installer\vs_installer.exe"
-    if ($vsPath -and (Test-Path $vsInstaller)) {
-        # Use VCTools for Build Tools (NativeDesktop is for the full IDE only)
-        $workload = "Microsoft.VisualStudio.Workload.VCTools"
-        Start-Process -Wait -FilePath $vsInstaller -ArgumentList "modify --installPath `"$vsPath`" --add $workload --quiet"
-        Write-Host "  C++ workload installed." -ForegroundColor Green
+    if (Test-Path $vsInstaller) {
+        if (-not (Test-Path "$vsInstallPath\VC")) {
+            Write-Host "  Installing C++ workload. A progress window will open." -ForegroundColor Yellow
+            Write-Host "  This may take 10-30 minutes." -ForegroundColor Yellow
+            # Use --passive (not --quiet) so errors are visible
+            Start-Process -Wait -FilePath $vsInstaller -ArgumentList @(
+                "modify",
+                "--installPath", "`"$vsInstallPath`"",
+                "--add", "Microsoft.VisualStudio.Workload.VCTools",
+                "--includeRecommended",
+                "--passive"
+            )
+            if (Test-Path "$vsInstallPath\VC") {
+                Write-Host "  C++ workload installed." -ForegroundColor Green
+            } else {
+                Write-Host "  C++ workload may have failed. Run fix-vs-buildtools.ps1 for detailed help." -ForegroundColor Yellow
+            }
+        } else {
+            Write-Host "  C++ workload already installed." -ForegroundColor Green
+        }
     } else {
-        Write-Host "  Could not find VS installer. Install 'Desktop development with C++' manually." -ForegroundColor Yellow
+        Write-Host "  Could not find vs_installer.exe. Install 'Desktop development with C++' manually." -ForegroundColor Yellow
     }
 } else {
-    Write-Host "  vswhere not found. Install C++ workload manually via Visual Studio Installer." -ForegroundColor Yellow
+    Write-Host "  Could not find VS Build Tools. Install C++ workload manually:" -ForegroundColor Yellow
+    Write-Host "    1. Run: winget install -h Microsoft.VisualStudio.2022.BuildTools" -ForegroundColor Gray
+    Write-Host "    2. Re-run this script, or run fix-vs-buildtools.ps1" -ForegroundColor Gray
 }
 
 # ─── Fix PATH for the current session ───
