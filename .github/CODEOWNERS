@@ -1,5 +1,22 @@
-# Each owner line is a glob pattern followed by one or more @owners
+# CODEOWNERS file for keysync
+#
+# Every pull request will automatically request review from @dipockdas
 # See: https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
 
 # Default owner for everything in the repo
 * @dipockdas
+
+# Specific ownership for security-critical components
+/internal/crypto/ @dipockdas
+/internal/store/ @dipockdas
+/internal/github/ @dipockdas
+/internal/platforms/ @dipockdas
+
+# Client libraries (require extra scrutiny)
+/clients/ @dipockdas
+
+# Documentation and community files
+/docs/ @dipockdas
+/SECURITY.md @dipockdas
+/CONTRIBUTING.md @dipockdas
+/CODE_OF_CONDUCT.md @dipockdas
