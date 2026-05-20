@@ -18,3 +18,7 @@
 # OS secret store index
 ~/.config/keysync/
 Thumbs.db
+
+# Test artifacts
+test-results/
+*.test.txt

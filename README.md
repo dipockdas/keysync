@@ -1,6 +1,7 @@
 # keysync
 
 [![CI](https://github.com/dipockdas/keysync/actions/workflows/ci.yml/badge.svg)](https://github.com/dipockdas/keysync/actions/workflows/ci.yml)
+[![Cross-Platform](https://github.com/dipockdas/keysync/actions/workflows/cross-platform.yml/badge.svg)](https://github.com/dipockdas/keysync/actions/workflows/cross-platform.yml)
 [![Release](https://img.shields.io/github/v/release/dipockdas/keysync)](https://github.com/dipockdas/keysync/releases)
 [![Go Report](https://goreportcard.com/badge/github.com/dipockdas/keysync)](https://goreportcard.com/report/github.com/dipockdas/keysync)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
