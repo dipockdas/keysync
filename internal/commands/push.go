@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/dipockdas/keysync/internal/config"
-	"github.com/dipockdas/keysync/internal/github"
 	"github.com/dipockdas/keysync/internal/platforms"
 	"github.com/dipockdas/keysync/internal/store"
 	"github.com/spf13/cobra"
@@ -85,19 +84,16 @@ copyable template.
 			if pushPlatforms != "" {
 				platformNames = strings.Split(pushPlatforms, ",")
 			} else {
-				platformNames = configuredPlatforms(platformsCfg)
+				// Default: push to GitHub + all configured platforms
+				platformNames = []string{"github"}
+				platformNames = append(platformNames, configuredPlatforms(platformsCfg)...)
 			}
 
-			// Push to GitHub
-			if err := pushToGitHub(repoKey, secrets); err != nil {
-				fmt.Fprintf(os.Stderr, "warning: GitHub push: %v\n", err)
-			}
-
-			// Push to each platform
+			// Push to each platform (including GitHub)
 			var pushErrors int
 			for _, name := range platformNames {
 				name = strings.TrimSpace(name)
-				platformCfg := getPlatformConfigJSON(platformsCfg, name)
+				platformCfg := getPlatformConfigJSON(platformsCfg, name, repoKey)
 				if platformCfg == "" {
 					fmt.Fprintf(os.Stderr, "  SKIP: %s (not configured)\n", name)
 					continue
@@ -239,7 +235,25 @@ func configuredPlatforms(pc any) []string {
 }
 
 // getPlatformConfigJSON returns the JSON config string for a platform.
-func getPlatformConfigJSON(pc any, platformName string) string {
+// For GitHub, it synthesizes a config with the repo name if not explicitly configured.
+func getPlatformConfigJSON(pc any, platformName string, repoKey string) string {
+	// Special case: GitHub uses the repo key if not explicitly configured
+	if platformName == "github" {
+		data, _ := json.Marshal(pc)
+		var raw map[string]json.RawMessage
+		if err := json.Unmarshal(data, &raw); err != nil {
+			return ""
+		}
+		if cfg, ok := raw["github"]; ok {
+			// User explicitly configured GitHub
+			return string(cfg)
+		}
+		// Auto-generate GitHub config from repo key
+		githubCfg := fmt.Sprintf(`{"repo":"%s"}`, repoKey)
+		return githubCfg
+	}
+
+	// Regular platform lookup
 	data, _ := json.Marshal(pc)
 	var raw map[string]json.RawMessage
 	if err := json.Unmarshal(data, &raw); err != nil {
@@ -250,21 +264,4 @@ func getPlatformConfigJSON(pc any, platformName string) string {
 		return ""
 	}
 	return string(cfg)
-}
-
-// pushToGitHub pushes all secrets to GitHub Secrets for the given repo.
-func pushToGitHub(repoKey string, secrets map[string]string) error {
-	gh, err := github.NewClient(repoKey)
-	if err != nil {
-		return err
-	}
-	fmt.Printf("  → github (%s)\n", gh.Repo())
-	for key, value := range secrets {
-		if err := gh.Set(key, value); err != nil {
-			fmt.Fprintf(os.Stderr, "    FAIL: %s: %v\n", key, err)
-		} else {
-			fmt.Printf("    ✓ %s\n", key)
-		}
-	}
-	return nil
 }

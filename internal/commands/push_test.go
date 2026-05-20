@@ -299,7 +299,7 @@ func TestGetPlatformConfigJSON_Existing(t *testing.T) {
 			Target:    []string{"production"},
 		},
 	}
-	json := getPlatformConfigJSON(pc, "vercel")
+	json := getPlatformConfigJSON(pc, "vercel", "test/repo")
 	if json == "" {
 		t.Fatal("getPlatformConfigJSON returned empty for vercel")
 	}
@@ -309,14 +309,14 @@ func TestGetPlatformConfigJSON_Missing(t *testing.T) {
 	pc := config.PlatformConfig{
 		Vercel: &config.VercelConfig{ProjectID: "proj_abc"},
 	}
-	json := getPlatformConfigJSON(pc, "railway")
+	json := getPlatformConfigJSON(pc, "railway", "test/repo")
 	if json != "" {
 		t.Errorf("getPlatformConfigJSON = %q, want empty", json)
 	}
 }
 
 func TestGetPlatformConfigJSON_NilConfig(t *testing.T) {
-	json := getPlatformConfigJSON(nil, "vercel")
+	json := getPlatformConfigJSON(nil, "vercel", "test/repo")
 	if json != "" {
 		t.Errorf("getPlatformConfigJSON = %q, want empty", json)
 	}

@@ -2,6 +2,7 @@ package platforms
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"net/http"
 	"os"
@@ -56,10 +57,24 @@ func Register(name string, fn func(ctx context.Context, configJSON string, secre
 // Get creates a platform instance by name with the given JSON config and secret store.
 // The store is used to look up the API token (e.g., VERCEL_TOKEN) as a global secret,
 // falling back to environment variables.
+//
+// Generic platform detection: If the config JSON contains a "type" field ("cli" or "http"),
+// it's treated as a generic platform and routed to NewGeneric(). Otherwise, it's looked up
+// in the hardcoded platform registry.
 func Get(ctx context.Context, name, configJSON string, secretSt store.Store) (Platform, error) {
+	// Check if this is a generic platform by looking for "type" field
+	var typeCheck struct {
+		Type string `json:"type"`
+	}
+	if err := json.Unmarshal([]byte(configJSON), &typeCheck); err == nil && typeCheck.Type != "" {
+		// This is a generic platform - route to NewGeneric
+		return NewGeneric(ctx, name, configJSON, secretSt)
+	}
+
+	// Not generic - try hardcoded platform registry
 	fn, ok := registry[name]
 	if !ok {
-		return nil, fmt.Errorf("unknown platform: %s (available: %v)", name, available())
+		return nil, fmt.Errorf("unknown platform: %s (available: %v, or add a generic platform with \"type\": \"cli\"/\"http\")", name, available())
 	}
 	return fn(ctx, configJSON, secretSt)
 }
