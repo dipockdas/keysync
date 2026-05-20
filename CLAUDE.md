@@ -52,7 +52,49 @@ The `keysync push` command includes validation to prevent users from accidentall
 
 **Why this matters**: The sync command pushes secrets to GitHub Secrets via the `gh` CLI. Without validation, users who copy the example config without updating it would push their secrets to the keysync repo itself, creating a security risk.
 
-**Sync is local-only**: The sync command runs on the user's machine and reads from their OS keychain. There is no CI/CD workflow that syncs from GitHub Secrets to platforms — all syncing happens locally.
+**Push is local-only**: The push command runs on the user's machine and reads from their OS keychain. There is no CI/CD workflow that syncs from GitHub Secrets to platforms — all pushing happens locally.
+
+## Platform configuration
+
+Platforms are configured in `.keysync.json` and can be either:
+
+1. **Hardcoded** - Vercel, Railway, Supabase (built-in Go implementations in `internal/platforms/`)
+2. **Generic** - Any platform via declarative CLI or HTTP configs (no Go code needed)
+
+Generic platforms require a `"type"` field (`"cli"` or `"http"`). See [docs/platform-examples.md](docs/platform-examples.md) for complete examples.
+
+**Example `.keysync.json` with mixed platforms**:
+```json
+{
+  "repos": {
+    "myorg/myapp": {
+      "project": "myapp",
+      "platforms": {
+        "github": {
+          "type": "cli",
+          "command": "gh secret set {KEY} --repo {REPO}",
+          "stdin": "{VALUE}",
+          "token_env": "GH_TOKEN",
+          "config": {"REPO": "myorg/myapp"}
+        },
+        "vercel": {
+          "projectId": "prj_abc123"
+        },
+        "cloudflare": {
+          "type": "cli",
+          "command": "wrangler secret put {KEY}",
+          "stdin": "{VALUE}",
+          "token_env": "CLOUDFLARE_API_TOKEN"
+        }
+      }
+    }
+  }
+}
+```
+
+Config schema: `internal/config/config.go` defines:
+- `PlatformConfig` - legacy struct with Vercel/Railway/Supabase fields
+- `GenericPlatformConfig` - new struct for CLI/HTTP platforms with type, command, endpoint, etc.
 
 ## Migration: replacing .env with keysync
 

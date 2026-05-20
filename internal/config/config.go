@@ -43,6 +43,37 @@ type SupabaseConfig struct {
 	Ref string `json:"ref"`
 }
 
+// GenericPlatformConfig describes a platform defined via CLI or HTTP API.
+// This allows users to add support for new platforms (Cloudflare, GitLab, Netlify, etc.)
+// without writing Go code. AI assistants can generate these configs from platform docs.
+type GenericPlatformConfig struct {
+	// Type specifies the adapter type: "cli" or "http"
+	Type string `json:"type"`
+
+	// CLI-based platform fields (when Type = "cli")
+	Command string `json:"command,omitempty"` // Command template with {KEY}, {VALUE}, {TOKEN} placeholders
+	Stdin   string `json:"stdin,omitempty"`   // Data to pipe to stdin (e.g., "{VALUE}")
+
+	// HTTP-based platform fields (when Type = "http")
+	Endpoint string                 `json:"endpoint,omitempty"` // API endpoint URL with placeholders
+	Method   string                 `json:"method,omitempty"`   // HTTP method (GET, POST, PUT, PATCH, DELETE)
+	Headers  map[string]string      `json:"headers,omitempty"`  // HTTP headers with placeholders
+	Body     interface{}            `json:"body,omitempty"`     // Request body (object or array) with placeholders
+
+	// Common fields
+	TokenEnv   string            `json:"token_env"`          // Environment variable name for API token
+	Config     map[string]string `json:"config,omitempty"`   // Platform-specific config (PROJECT_ID, SERVICE_ID, etc.)
+	Validation *ValidationConfig `json:"validation,omitempty"` // Optional pre-flight validation
+
+	// Note: To distinguish generic from hardcoded platforms, check for the "type" field.
+	// Hardcoded platforms (Vercel, Railway, Supabase) don't have a "type" field.
+}
+
+// ValidationConfig describes optional pre-flight checks for generic platforms.
+type ValidationConfig struct {
+	CommandCheck string `json:"command_check,omitempty"` // Command to verify CLI is installed (e.g., "wrangler --version")
+}
+
 // DefaultConfig returns a minimal default configuration scaffold.
 func DefaultConfig() *Config {
 	return &Config{

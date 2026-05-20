@@ -23,7 +23,7 @@ Keysync is designed for **developer-level secret management** — local developm
 
 - **OS-native secret storage** — macOS Keychain, Linux libsecret, Windows Credential Manager
 - **Three scope levels** — global, project-scoped, and environment-scoped secrets with automatic fallback
-- **Platform sync** — push secrets to GitHub, Vercel, Railway, and Supabase from your local machine
+- **Extensible platform support** — built-in support for GitHub, Vercel, Railway, Supabase + declarative configs for any platform (Cloudflare, GitLab, Netlify, Render, etc.) via CLI or HTTP APIs
 - **Platform tokens in keychain** — API tokens stored as global secrets, never in plaintext files
 - **Secret rotation** — generate cryptographically random secrets and update everywhere
 - **Migration** — import from `.env` files or pull from Vercel/Railway/Supabase CLIs
@@ -522,9 +522,48 @@ keysync push --project my-app
 keysync push --project my-app --platforms vercel,railway
 ```
 
-**Platform tokens**: The sync command reads platform API tokens from your keychain as global secrets (`VERCEL_TOKEN`, `RAILWAY_TOKEN`, `SUPABASE_TOKEN`). These tokens can also be provided as environment variables.
+**Platform tokens**: The push command reads platform API tokens from your keychain as global secrets (`VERCEL_TOKEN`, `RAILWAY_TOKEN`, `SUPABASE_TOKEN`, etc.). These tokens can also be provided as environment variables.
 
-**Note:** Sync is a local operation. There is no CI/CD workflow that syncs from GitHub Secrets to platforms — all syncing happens from your machine.
+**Note:** Push is a local operation. There is no CI/CD workflow that syncs from GitHub Secrets to platforms — all pushing happens from your machine.
+
+### Adding custom platforms
+
+Keysync supports any deployment platform via declarative configs — no Go code needed. Add platforms to `.keysync.json` using CLI commands or HTTP APIs:
+
+**CLI-based** (Cloudflare Workers):
+```json
+{
+  "platforms": {
+    "cloudflare": {
+      "type": "cli",
+      "command": "wrangler secret put {KEY}",
+      "stdin": "{VALUE}",
+      "token_env": "CLOUDFLARE_API_TOKEN"
+    }
+  }
+}
+```
+
+**HTTP-based** (GitLab CI/CD):
+```json
+{
+  "platforms": {
+    "gitlab": {
+      "type": "http",
+      "endpoint": "https://gitlab.com/api/v4/projects/{PROJECT_ID}/variables",
+      "method": "POST",
+      "headers": {"PRIVATE-TOKEN": "{GITLAB_TOKEN}"},
+      "body": {"key": "{KEY}", "value": "{VALUE}", "masked": true},
+      "token_env": "GITLAB_TOKEN",
+      "config": {"PROJECT_ID": "12345"}
+    }
+  }
+}
+```
+
+**AI-friendly**: Claude and other assistants can generate these configs from platform docs — just ask "add Cloudflare support" and they'll create the JSON.
+
+See [docs/platform-examples.md](docs/platform-examples.md) for Netlify, Render, Heroku, Fly.io, DigitalOcean, and more.
 
 ---
 

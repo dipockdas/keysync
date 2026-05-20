@@ -20,6 +20,67 @@ Secrets have three scopes (with precedence from lowest to highest):
 
 Higher scopes override lower scopes when the same key exists at multiple levels.
 
+## Adding platform support
+
+Keysync supports two types of platform configurations:
+
+1. **Hardcoded platforms** (Vercel, Railway, Supabase) - Built-in Go implementations
+2. **Generic platforms** (any platform) - Declarative JSON configs using CLI or HTTP APIs
+
+### Adding a generic platform (AI workflow)
+
+When a user asks to add a new platform (e.g., "add Cloudflare Workers support"):
+
+1. **Search for the platform's API/CLI documentation**
+2. **Determine if it's CLI-based or HTTP API-based**
+3. **Generate the JSON config** following the pattern below
+4. **Add to `.keysync.json` under `"platforms"`**
+5. **No Go code needed** - test immediately with `keysync push`
+
+**CLI-based platform template**:
+```json
+{
+  "platform-name": {
+    "type": "cli",
+    "command": "cli-tool command-with {KEY} placeholder",
+    "stdin": "{VALUE}",
+    "token_env": "PLATFORM_TOKEN_ENV_VAR",
+    "config": {
+      "CUSTOM_FIELD": "custom-value"
+    },
+    "validation": {
+      "command_check": "cli-tool --version"
+    }
+  }
+}
+```
+
+**HTTP-based platform template**:
+```json
+{
+  "platform-name": {
+    "type": "http",
+    "endpoint": "https://api.platform.com/path/{CONFIG_VAR}",
+    "method": "POST",
+    "headers": {
+      "Authorization": "Bearer {TOKEN_ENV_VAR}"
+    },
+    "body": {
+      "key": "{KEY}",
+      "value": "{VALUE}"
+    },
+    "token_env": "PLATFORM_TOKEN_ENV_VAR",
+    "config": {
+      "CONFIG_VAR": "value-from-config"
+    }
+  }
+}
+```
+
+**Placeholders**: `{KEY}`, `{VALUE}`, `{TOKEN_ENV_VAR}`, `{CONFIG_FIELD}`
+
+See [docs/platform-examples.md](docs/platform-examples.md) for complete examples: GitHub, Cloudflare, GitLab, Netlify, Render, Heroku, Fly.io, DigitalOcean, and more.
+
 ## Client libraries
 
 The `clients/` directory contains per-language libraries that read secrets
