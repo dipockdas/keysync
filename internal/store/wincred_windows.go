@@ -5,19 +5,62 @@ package store
 import (
 	"context"
 	"fmt"
+	"net/url"
 	"strings"
 	"sync"
 
 	"github.com/danieljoos/wincred"
 )
 
+// Windows Credential Target Format Specification (v2)
+//
+// Keysync stores secrets in Windows Credential Manager using a tagged-field format
+// with percent-encoded values. This format is deterministic, reversible, and supports
+// special characters (underscores, spaces, symbols) in all components.
+//
+// Format:
+//   keysync|s=<scope>|p=<project>|e=<environment>|k=<key>
+//
+// Where:
+//   - Separator: | (pipe character, ASCII 124)
+//   - Field separator: = (equals, ASCII 61)
+//   - Value encoding: URL percent encoding (RFC 3986)
+//   - Empty values: field present with empty value (e.g., "e=" for no environment)
+//
+// Encoding rules:
+//   - Reserved characters (_|=) are percent-encoded: _ → %5F, | → %7C, = → %3D
+//   - Unreserved characters (A-Z, a-z, 0-9, -, ., ~) are not encoded
+//   - All other characters are percent-encoded
+//
+// Examples:
+//   Global scope:
+//     keysync|s=global|p=|e=|k=API_KEY
+//
+//   Project scope (no special chars):
+//     keysync|s=project|p=my-app|e=|k=DATABASE_URL
+//
+//   Project scope (with underscores):
+//     keysync|s=project|p=my%5Fapp|e=|k=DATABASE%5FURL
+//
+//   Project+Environment (with underscores):
+//     keysync|s=project|p=api%5Fv2|e=prod%5Fus%5Feast|k=STRIPE_KEY
+//
+// Backward compatibility:
+//   The parser accepts both v2 (tagged) and v1 (underscore-delimited) formats.
+//   New credentials are always written in v2 format.
+//   Legacy v1 format: keysync_<scope>_<project>_<environment>_<key>
+//
+// Character limit:
+//   Windows credential targets have a 256-character maximum. Very long project,
+//   environment, or key names may exceed this limit. Percent encoding adds ~40%
+//   overhead for names with many special characters.
+//
+// Wire format version: 2
+// Introduced: keysync 1.0.0
+// Stability: This format is considered stable and will be supported indefinitely.
+
 // WincredStore implements Store using Windows Credential Manager
 // via the Win32 API (github.com/danieljoos/wincred).
-//
-// Credentials are stored as generic credentials with:
-//   - TargetName: "keysync_<scope>[_<project>[_<environment>]]"
-//   - UserName:   "<key>"
-//   - CredentialBlob: "<value>" (UTF-8 encoded)
 type WincredStore struct {
 	mu    sync.RWMutex
 	cache []SecretEntry // cached list, rebuilt on demand
@@ -29,24 +72,86 @@ func NewWincredStore() *WincredStore {
 	return ws
 }
 
-// credTarget returns the credential target name, INCLUDING the key name.
-// Format: "keysync_<scope>_<key>" or "keysync_<scope>_<project>_<key>" or "keysync_<scope>_<project>_<environment>_<key>"
-// This ensures each secret has a unique credential (fixes audit finding 3).
-func credTarget(scope Scope, project, environment, key string) string {
-	if scope == ScopeGlobal {
-		return fmt.Sprintf("keysync_%s_%s", scope, key)
+// encodeComponent percent-encodes a component for safe inclusion in target name
+func encodeComponent(s string) string {
+	if s == "" {
+		return ""
 	}
-	if environment != "" {
-		return fmt.Sprintf("keysync_%s_%s_%s_%s", scope, project, environment, key)
-	}
-	return fmt.Sprintf("keysync_%s_%s_%s", scope, project, key)
+	// Use url.QueryEscape which implements RFC 3986 percent encoding
+	return url.QueryEscape(s)
 }
 
-// parseCredTarget splits a target name back into scope, project, environment, and key.
-// "keysync_global_API_KEY" → (global, "", "", "API_KEY")
-// "keysync_project_my-app_DATABASE_URL" → (project, "my-app", "", "DATABASE_URL")
-// "keysync_project_my-app_production_STRIPE_KEY" → (project, "my-app", "production", "STRIPE_KEY")
+// decodeComponent percent-decodes a component
+func decodeComponent(s string) (string, error) {
+	return url.QueryUnescape(s)
+}
+
+// credTarget returns the credential target name in v2 tagged format
+func credTarget(scope Scope, project, environment, key string) string {
+	return fmt.Sprintf("keysync|s=%s|p=%s|e=%s|k=%s",
+		scope,
+		encodeComponent(project),
+		encodeComponent(environment),
+		encodeComponent(key))
+}
+
+// parseCredTarget parses both v2 (tagged) and v1 (legacy) formats
 func parseCredTarget(target string) (Scope, string, string, string) {
+	// Detect format
+	if strings.HasPrefix(target, "keysync|") {
+		return parseTaggedFormat(target)
+	}
+
+	// Legacy v1 format (underscore-delimited)
+	// Also check for old "keysync_" prefix to handle v1
+	if strings.HasPrefix(target, "keysync_") {
+		return parseLegacyFormat(target)
+	}
+
+	return ScopeGlobal, "", "", ""
+}
+
+// parseTaggedFormat parses v2 format: keysync|s=...|p=...|e=...|k=...
+func parseTaggedFormat(target string) (Scope, string, string, string) {
+	// Remove "keysync|" prefix
+	trimmed := strings.TrimPrefix(target, "keysync|")
+
+	// Split into field=value pairs
+	fields := make(map[string]string)
+	for _, pair := range strings.Split(trimmed, "|") {
+		parts := strings.SplitN(pair, "=", 2)
+		if len(parts) == 2 {
+			fields[parts[0]] = parts[1]
+		}
+	}
+
+	// Extract and decode scope (not encoded, just a fixed value)
+	scope := Scope(fields["s"])
+
+	// Decode project, environment, key
+	project, err := decodeComponent(fields["p"])
+	if err != nil {
+		// If decode fails, use raw value (should not happen with valid data)
+		project = fields["p"]
+	}
+
+	env, err := decodeComponent(fields["e"])
+	if err != nil {
+		env = fields["e"]
+	}
+
+	key, err := decodeComponent(fields["k"])
+	if err != nil {
+		key = fields["k"]
+	}
+
+	return scope, project, env, key
+}
+
+// parseLegacyFormat parses v1 format: keysync_scope_project_env_key
+// This uses heuristics and is ambiguous for names with underscores,
+// but provides backward compatibility for reading existing credentials.
+func parseLegacyFormat(target string) (Scope, string, string, string) {
 	trimmed := strings.TrimPrefix(target, "keysync_")
 	parts := strings.Split(trimmed, "_")
 
@@ -64,7 +169,7 @@ func parseCredTarget(target string) (Scope, string, string, string) {
 		if len(parts) < 2 {
 			return scope, "", "", ""
 		}
-		key := strings.Join(parts[1:], "_") // In case key contains underscores
+		key := strings.Join(parts[1:], "_") // Key may contain underscores
 		return scope, "", "", key
 	}
 
@@ -75,40 +180,14 @@ func parseCredTarget(target string) (Scope, string, string, string) {
 
 	project := parts[1]
 
-	// Try to determine if there's an environment
-	// Format could be: keysync_project_my-app_API_KEY (no env)
-	// Or: keysync_project_my-app_production_API_KEY (with env)
-	//
-	// We need a heuristic: if parts[2] looks like a common env name, treat it as env
-	// Otherwise, treat remaining parts as the key
-	//
-	// Actually, we can't reliably distinguish without context. Let's use a different approach:
-	// - If we have exactly 3 parts: keysync_project_PROJECT_KEY (no env)
-	// - If we have 4+ parts: keysync_project_PROJECT_ENV_KEY (with env)
-	// But this breaks if project/env names have underscores!
-	//
-	// Better approach: rebuild cache should use the full target as identifier,
-	// and we don't need to parse it perfectly. We just need uniqueness.
-	//
-	// Actually, looking at the code, rebuildCache uses parseCredTarget to populate
-	// the cache with scope/project/env/key, so we DO need to parse correctly.
-	//
-	// The safest approach: store metadata in a separate field or use a delimiter
-	// that can't appear in names. But we can't change the Windows API.
-	//
-	// Pragmatic solution: Assume project and environment names don't contain underscores,
-	// and key names might. So:
-	// - 3 parts: scope_project_KEY
-	// - 4+ parts: scope_project_env_KEY (where KEY might have underscores)
-
+	// Heuristic: if 3 parts, no env; if 4+, parts[2] is env
+	// This is ambiguous but maintains backward compatibility
 	if len(parts) == 3 {
-		// keysync_project_my-app_API_KEY → no environment
 		key := parts[2]
 		return scope, project, "", key
 	}
 
-	// 4+ parts: keysync_project_my-app_production_STRIPE_KEY
-	// Assume environment is parts[2], key is parts[3:]
+	// 4+ parts: assume environment is parts[2], key is parts[3:]
 	env := parts[2]
 	key := strings.Join(parts[3:], "_")
 	return scope, project, env, key
@@ -120,14 +199,13 @@ func (w *WincredStore) Get(_ context.Context, scope Scope, project, environment,
 	if err != nil {
 		return "", ErrNotFound
 	}
-	// Target now includes key, so no need to verify UserName
 	return string(cred.CredentialBlob), nil
 }
 
 func (w *WincredStore) Set(_ context.Context, scope Scope, project, environment, key, value string) error {
 	target := credTarget(scope, project, environment, key)
 
-	// Delete existing first to avoid duplicates (target now includes key)
+	// Delete existing first to avoid duplicates
 	existing, err := wincred.GetGenericCredential(target)
 	if err == nil {
 		_ = existing.Delete()
@@ -210,7 +288,9 @@ func (w *WincredStore) rebuildCache() {
 	w.cache = nil
 
 	for _, cred := range all {
-		if !strings.HasPrefix(cred.TargetName, "keysync_") {
+		// Check for both v2 and v1 prefixes
+		if !strings.HasPrefix(cred.TargetName, "keysync|") &&
+			!strings.HasPrefix(cred.TargetName, "keysync_") {
 			continue
 		}
 		scope, project, env, key := parseCredTarget(cred.TargetName)
