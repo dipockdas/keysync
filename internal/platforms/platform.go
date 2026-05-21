@@ -42,7 +42,8 @@ type Platform interface {
 	Name() string
 
 	// Upsert creates or updates a single secret on the platform.
-	Upsert(key, value string) error
+	// Context allows for timeout and cancellation support.
+	Upsert(ctx context.Context, key, value string) error
 }
 
 // registry holds all registered platform constructors.

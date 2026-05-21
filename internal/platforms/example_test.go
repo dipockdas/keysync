@@ -85,7 +85,7 @@ func (e *exampleClient) Name() string { return "example" }
 // Upsert sends a secret to the example platform's API.
 // Follow the patterns in vercel.go, railway.go, or supabase.go for
 // production details like response body error parsing and secret masking.
-func (e *exampleClient) Upsert(key, value string) error {
+func (e *exampleClient) Upsert(ctx context.Context, key, value string) error {
 	body := map[string]string{
 		"projectId": e.projectID,
 		"env":       key,
@@ -93,7 +93,7 @@ func (e *exampleClient) Upsert(key, value string) error {
 	}
 	raw, _ := json.Marshal(body)
 
-	req, err := http.NewRequest("PUT", e.apiURL+"/secrets", bytes.NewReader(raw))
+	req, err := http.NewRequestWithContext(ctx, "PUT", e.apiURL+"/secrets", bytes.NewReader(raw))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -179,7 +179,7 @@ func TestExamplePlatform_FullFlow(t *testing.T) {
 	}
 
 	// Upsert a secret.
-	if err := p.Upsert("DATABASE_URL", "postgres://prod:5432/db"); err != nil {
+	if err := p.Upsert(context.Background(), "DATABASE_URL", "postgres://prod:5432/db"); err != nil {
 		t.Fatalf("Upsert failed: %v", err)
 	}
 

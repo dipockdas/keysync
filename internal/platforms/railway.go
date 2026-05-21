@@ -57,7 +57,8 @@ func NewRailwayClient(ctx context.Context, environment, service string, secretSt
 func (r *RailwayClient) Name() string { return "railway" }
 
 // Upsert sets an environment variable in Railway.
-func (r *RailwayClient) Upsert(key, value string) error {
+func (r *RailwayClient) Upsert(ctx context.Context, key, value string) error {
+	_ = ctx // Context support to be added in future versions
 	mutation := `mutation($input: VariableUpsertInput!) {
 		variableUpsert(input: $input) {
 			id
@@ -113,8 +114,9 @@ func (r *RailwayClient) Upsert(key, value string) error {
 
 // BulkUpsert sends multiple env vars to Railway.
 func (r *RailwayClient) BulkUpsert(envs map[string]string) error {
+	ctx := context.Background() // TODO: Accept context as parameter in future
 	for key, value := range envs {
-		if err := r.Upsert(key, value); err != nil {
+		if err := r.Upsert(ctx, key, value); err != nil {
 			return fmt.Errorf("upsert %s: %w", key, err)
 		}
 	}

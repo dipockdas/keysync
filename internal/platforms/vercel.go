@@ -68,7 +68,8 @@ type vercelEnvRequest struct {
 }
 
 // Upsert creates or updates an environment variable in Vercel.
-func (v *VercelClient) Upsert(key, value string) error {
+func (v *VercelClient) Upsert(ctx context.Context, key, value string) error {
+	_ = ctx // Context support to be added in future versions
 	body := vercelEnvRequest{
 		Key:    key,
 		Value:  value,
@@ -111,8 +112,9 @@ func (v *VercelClient) Upsert(key, value string) error {
 
 // BulkUpsert sends multiple env vars in a single request.
 func (v *VercelClient) BulkUpsert(envs map[string]string) error {
+	ctx := context.Background() // TODO: Accept context as parameter in future
 	for key, value := range envs {
-		if err := v.Upsert(key, value); err != nil {
+		if err := v.Upsert(ctx, key, value); err != nil {
 			return fmt.Errorf("upsert %s: %w", key, err)
 		}
 	}

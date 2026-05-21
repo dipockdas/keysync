@@ -66,7 +66,7 @@ func (t *testPlatform) Name() string {
 	return t.name
 }
 
-func (t *testPlatform) Upsert(key, value string) error {
+func (t *testPlatform) Upsert(ctx context.Context, key, value string) error {
 	return nil
 }
 

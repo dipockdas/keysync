@@ -6,6 +6,7 @@ import (
 	"fmt"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/dipockdas/keysync/internal/config"
 	"github.com/dipockdas/keysync/internal/platforms"
@@ -108,7 +109,11 @@ copyable template.
 
 				fmt.Printf("  → %s\n", name)
 				for key, value := range secrets {
-					if err := p.Upsert(key, value); err != nil {
+					// Create context with timeout for each secret push (Finding 6: prevent indefinite hangs)
+				pushCtx, cancel := context.WithTimeout(ctx, 60*time.Second)
+				err := p.Upsert(pushCtx, key, value)
+				cancel() // Clean up resources immediately
+				if err != nil {
 						fmt.Fprintf(os.Stderr, "    FAIL: %s: %v\n", key, err)
 						pushErrors++
 					} else {

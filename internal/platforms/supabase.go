@@ -59,7 +59,8 @@ type supabaseSecret struct {
 }
 
 // Upsert sets a secret in Supabase.
-func (s *SupabaseClient) Upsert(key, value string) error {
+func (s *SupabaseClient) Upsert(ctx context.Context, key, value string) error {
+	_ = ctx // Context support to be added in future versions
 	return s.BulkUpsert([]supabaseSecret{{Name: key, Value: value}})
 }
 

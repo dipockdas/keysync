@@ -39,7 +39,9 @@ func (g *GitHubPlatform) Name() string {
 }
 
 // Upsert creates or updates a secret in GitHub Secrets.
-func (g *GitHubPlatform) Upsert(key, value string) error {
+func (g *GitHubPlatform) Upsert(ctx context.Context, key, value string) error {
+	// Note: github.Client.Set doesn't support context yet, but we accept it for interface compliance
+	_ = ctx
 	return g.client.Set(key, value)
 }
 

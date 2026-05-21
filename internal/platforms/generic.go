@@ -10,6 +10,7 @@ import (
 	"os/exec"
 	"regexp"
 	"strings"
+	"time"
 
 	"github.com/dipockdas/keysync/internal/config"
 	"github.com/dipockdas/keysync/internal/store"
@@ -81,7 +82,9 @@ func NewGeneric(ctx context.Context, name, configJSON string, secretSt store.Sto
 		name:   name,
 		config: &cfg,
 		token:  token,
-		client: &http.Client{},
+		client: &http.Client{
+			Timeout: 30 * time.Second, // Prevent indefinite hangs (Finding 6)
+		},
 	}, nil
 }
 
@@ -91,7 +94,7 @@ func (g *GenericPlatform) Name() string {
 }
 
 // Upsert creates or updates a secret on the platform.
-func (g *GenericPlatform) Upsert(key, value string) error {
+func (g *GenericPlatform) Upsert(ctx context.Context, key, value string) error {
 	// Validate key name (security: prevent command injection)
 	if !isValidKeyName(key) {
 		return fmt.Errorf("invalid key name %q: must contain only A-Z, 0-9, and underscore", key)
@@ -99,16 +102,16 @@ func (g *GenericPlatform) Upsert(key, value string) error {
 
 	switch g.config.Type {
 	case "cli":
-		return g.execCLI(key, value)
+		return g.execCLI(ctx, key, value)
 	case "http":
-		return g.execHTTP(key, value)
+		return g.execHTTP(ctx, key, value)
 	default:
 		return fmt.Errorf("unsupported type: %s", g.config.Type)
 	}
 }
 
 // execCLI executes a CLI command with template substitution.
-func (g *GenericPlatform) execCLI(key, value string) error {
+func (g *GenericPlatform) execCLI(ctx context.Context, key, value string) error {
 	// Build substitution map
 	subs := map[string]string{
 		"KEY":   key,
@@ -139,8 +142,8 @@ func (g *GenericPlatform) execCLI(key, value string) error {
 	cmdName := parts[0]
 	cmdArgs := parts[1:]
 
-	// Create command
-	cmd := exec.Command(cmdName, cmdArgs...)
+	// Create command with context for timeout support (Finding 6)
+	cmd := exec.CommandContext(ctx, cmdName, cmdArgs...)
 
 	// Handle stdin if specified
 	if g.config.Stdin != "" {
@@ -164,7 +167,7 @@ func (g *GenericPlatform) execCLI(key, value string) error {
 }
 
 // execHTTP executes an HTTP request with template substitution.
-func (g *GenericPlatform) execHTTP(key, value string) error {
+func (g *GenericPlatform) execHTTP(ctx context.Context, key, value string) error {
 	// Build substitution map
 	subs := map[string]string{
 		"KEY":   key,
@@ -192,8 +195,8 @@ func (g *GenericPlatform) execHTTP(key, value string) error {
 		bodyReader = bytes.NewReader(bodyJSON)
 	}
 
-	// Create request
-	req, err := http.NewRequest(g.config.Method, endpoint, bodyReader)
+	// Create request with context for timeout support (Finding 6)
+	req, err := http.NewRequestWithContext(ctx, g.config.Method, endpoint, bodyReader)
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}

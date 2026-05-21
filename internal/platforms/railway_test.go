@@ -44,7 +44,7 @@ func TestRailwayUpsert_Success(t *testing.T) {
 		baseURL:     ts.URL,
 	}
 
-	if err := client.Upsert("MY_KEY", "my-value"); err != nil {
+	if err := client.Upsert(context.Background(), "MY_KEY", "my-value"); err != nil {
 		t.Fatalf("Upsert failed: %v", err)
 	}
 }
@@ -64,7 +64,7 @@ func TestRailwayUpsert_APIError(t *testing.T) {
 		baseURL:     ts.URL,
 	}
 
-	err := client.Upsert("MY_KEY", "val")
+	err := client.Upsert(context.Background(), "MY_KEY", "val")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -85,7 +85,7 @@ func TestRailwayUpsert_GraphQLError(t *testing.T) {
 		baseURL:     ts.URL,
 	}
 
-	err := client.Upsert("MY_KEY", "val")
+	err := client.Upsert(context.Background(), "MY_KEY", "val")
 	if err == nil {
 		t.Fatal("expected error for GraphQL error, got nil")
 	}

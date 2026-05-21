@@ -35,7 +35,7 @@ func TestSupabaseUpsert_Success(t *testing.T) {
 		baseURL: ts.URL,
 	}
 
-	if err := client.Upsert("MY_KEY", "my-value"); err != nil {
+	if err := client.Upsert(context.Background(), "MY_KEY", "my-value"); err != nil {
 		t.Fatalf("Upsert failed: %v", err)
 	}
 
@@ -64,7 +64,7 @@ func TestSupabaseUpsert_APIError(t *testing.T) {
 		baseURL: ts.URL,
 	}
 
-	err := client.Upsert("MY_KEY", "val")
+	err := client.Upsert(context.Background(), "MY_KEY", "val")
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
@@ -121,7 +121,7 @@ func TestSupabaseUpsert_Created(t *testing.T) {
 		baseURL: ts.URL,
 	}
 
-	if err := client.Upsert("KEY", "val"); err != nil {
+	if err := client.Upsert(context.Background(), "KEY", "val"); err != nil {
 		t.Fatalf("Upsert with 201 Created failed: %v", err)
 	}
 }
