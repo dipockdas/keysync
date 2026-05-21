@@ -2,12 +2,16 @@
 
 This document shows how to configure different platforms in `.keysync.json`.
 
+**⚠️ Deprecation Notice**: Built-in hardcoded platforms (Vercel, Railway, Supabase) are deprecated and will be removed in keysync 2.0. Use the generic engine with first-party configs from `docs/platform-configs/` instead.
+
 ## Platform Types
 
-Platforms can be configured in two ways:
+Platforms are configured using the **generic engine** with declarative JSON configs:
 
-1. **Hardcoded** - Built-in support with Go implementations (Vercel, Railway, Supabase)
-2. **Generic** - Declarative configs using CLI commands or HTTP APIs (any platform)
+- **CLI-based**: Execute platform CLIs with template substitution (e.g., Cloudflare Workers via `wrangler`)
+- **HTTP-based**: Send HTTP requests to platform APIs (e.g., GitLab, Netlify, Render)
+
+See `docs/platform-configs/` for canonical examples of Vercel, Railway, and Supabase using the generic engine.
 
 ## Generic Platform Structure
 
@@ -38,7 +42,7 @@ Generic platforms require a `"type"` field set to either `"cli"` or `"http"`:
     "command": "gh secret set {KEY} --repo {REPO}",
     "stdin": "{VALUE}",
     "token_env": "GH_TOKEN",
-    "config": {
+    "template_vars": {
       "REPO": "yourorg/yourrepo"
     },
     "validation": {
@@ -91,7 +95,7 @@ Generic platforms require a `"type"` field set to either `"cli"` or `"http"`:
     "type": "cli",
     "command": "flyctl secrets set {KEY}={VALUE} --app {APP_NAME}",
     "token_env": "FLY_API_TOKEN",
-    "config": {
+    "template_vars": {
       "APP_NAME": "my-app"
     }
   }
@@ -110,7 +114,7 @@ Generic platforms require a `"type"` field set to either `"cli"` or `"http"`:
     "type": "cli",
     "command": "netlify env:set {KEY} {VALUE} --context {CONTEXT}",
     "token_env": "NETLIFY_AUTH_TOKEN",
-    "config": {
+    "template_vars": {
       "CONTEXT": "production"
     }
   }
@@ -144,7 +148,7 @@ Generic platforms require a `"type"` field set to either `"cli"` or `"http"`:
       "environment_scope": "*"
     },
     "token_env": "GITLAB_TOKEN",
-    "config": {
+    "template_vars": {
       "PROJECT_ID": "12345678"
     }
   }
@@ -178,7 +182,7 @@ Generic platforms require a `"type"` field set to either `"cli"` or `"http"`:
       }
     ],
     "token_env": "RENDER_API_KEY",
-    "config": {
+    "template_vars": {
       "SERVICE_ID": "srv-abc123xyz"
     }
   }
@@ -208,7 +212,7 @@ Generic platforms require a `"type"` field set to either `"cli"` or `"http"`:
       "{KEY}": "{VALUE}"
     },
     "token_env": "HEROKU_API_KEY",
-    "config": {
+    "template_vars": {
       "APP_NAME": "my-app"
     }
   }
@@ -243,7 +247,7 @@ Generic platforms require a `"type"` field set to either `"cli"` or `"http"`:
       }
     },
     "token_env": "DIGITALOCEAN_TOKEN",
-    "config": {
+    "template_vars": {
       "APP_ID": "abc-123-def"
     }
   }
@@ -333,7 +337,7 @@ All platform configs support these placeholders:
           "command": "gh secret set {KEY} --repo {REPO}",
           "stdin": "{VALUE}",
           "token_env": "GH_TOKEN",
-          "config": {
+          "template_vars": {
             "REPO": "myorg/myapp"
           }
         },
@@ -360,7 +364,7 @@ All platform configs support these placeholders:
             "masked": true
           },
           "token_env": "GITLAB_TOKEN",
-          "config": {
+          "template_vars": {
             "PROJECT_ID": "12345678"
           }
         }

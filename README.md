@@ -114,9 +114,11 @@ When you run `keysync push`, secrets are collected at all three scope levels (wi
 
 > **Requires `gh` CLI**: The `sync`, `set`, `rotate`, and `pull` commands all interact with GitHub Secrets via the `gh` CLI. Install it from [cli.github.com](https://cli.github.com) and authenticate with `gh auth login` before using these commands.
 
-**Built-in platforms**: Vercel, Railway, and Supabase are supported out of the box — add their project IDs to `.keysync.json` and store the API tokens as global secrets.
+**Platform support**: Keysync uses a declarative generic engine for deployment platforms. First-party configs for Vercel, Railway, and Supabase are provided in `docs/platform-configs/` — copy these into your `.keysync.json` and customize with your project IDs. The generic engine supports any platform with a CLI or HTTP API without writing Go code.
 
-**Custom platforms**: The `Platform` interface (`internal/platforms/platform.go`) is extensible — just implement `Name()` and `Upsert(key, value)` and register via `platforms.Register()`. If you use an AI coding assistant, it can help you write the integration: open `internal/platforms/` and ask it to implement a new platform following the existing patterns.
+**Legacy built-in platforms**: GitHub, Vercel, Railway, and Supabase have hardcoded implementations for backward compatibility (deprecated, will be removed in keysync 2.0). New configurations should use the generic platform engine with `"type": "http"` or `"type": "cli"`.
+
+**Custom platforms**: Add any platform by creating a declarative config — AI assistants can generate these from platform API docs. See `docs/platform-configs/README.md` for template variables and examples.
 
 ---
 
@@ -301,6 +303,10 @@ The `.keysync.json` file maps GitHub repos to their project names, allowed globa
 
 ### Platform fields
 
+**Built-in platforms** (GitHub, Vercel, Railway, Supabase) use legacy hardcoded implementations. **New implementations should use the generic platform engine** with declarative configs (see `docs/platform-configs/` for first-party examples).
+
+**Legacy built-in config fields** (deprecated, will be removed in keysync 2.0):
+
 | Platform | Field | Required | Description |
 |----------|-------|----------|-------------|
 | Vercel | `projectId` | Yes | Vercel project ID (`prj_xxxxx`) |
@@ -308,6 +314,15 @@ The `.keysync.json` file maps GitHub repos to their project names, allowed globa
 | Railway | `environment` | No | Railway deployment environment name |
 | Railway | `service` | No | Railway project/service ID |
 | Supabase | `ref` | Yes | Supabase project reference ID |
+
+**Generic platform configs** (recommended for all non-GitHub platforms):
+
+See `docs/platform-configs/` for canonical examples:
+- `vercel.json` - Vercel Environment Variables API
+- `railway.json` - Railway GraphQL API
+- `supabase.json` - Supabase Secrets Management API
+
+Generic configs use `"type": "http"` or `"type": "cli"` with template variables (`{KEY}`, `{VALUE}`, `{TOKEN}`). This approach supports any platform with a CLI or HTTP API — no Go code required.
 
 ### Platform tokens
 
@@ -359,7 +374,7 @@ Secrets in the keychain are identified by a **service name** and an **account na
 | Project | `keysync/project/<name>` | Secret key |
 | Project + Environment | `keysync/project/<name>/env/<env>` | Secret key |
 
-Windows uses underscores: `keysync_global`, `keysync_project_<name>`, `keysync_project_<name>_<env>`.
+**Windows**: Uses a tagged-field format in credential target names: `keysync|s=<scope>|p=<project>|e=<environment>|k=<key>`, with values percent-encoded to support special characters (underscores, spaces, symbols). Legacy underscore-delimited format (`keysync_global_<key>`) is supported for reading existing credentials but new credentials use the v2 tagged format. See wire format specification in `internal/store/wincred_windows.go`.
 
 When syncing, secrets are merged with three-level precedence: environment-scoped (highest) → project-scoped → global (lowest).
 
@@ -484,6 +499,11 @@ exec my-app
 - View via: Control Panel > Credential Manager > Windows Credentials
 - Manage via command line: `cmdkey /list`, `cmdkey /delete`
 
+**Limitations**:
+- **256-character limit**: Windows credential target names have a 256-character maximum length. Very long project, environment, or key names may exceed this limit (especially after percent encoding, which adds ~40% overhead for names with many special characters).
+- **Wire format**: Credentials are stored using a tagged-field format (`keysync|s=<scope>|p=<percent>|e=<percent>|k=<percent>`) with URL percent encoding to support special characters. Legacy underscore-delimited credentials are readable for backward compatibility but new credentials always use the v2 format.
+- **No cross-user access**: Windows Credential Manager credentials are user-specific and cannot be shared across user accounts on the same machine.
+
 ---
 
 ## Pushing Secrets
@@ -523,6 +543,8 @@ keysync push --project my-app --platforms vercel,railway
 ```
 
 **Platform tokens**: The push command reads platform API tokens from your keychain as global secrets (`VERCEL_TOKEN`, `RAILWAY_TOKEN`, `SUPABASE_TOKEN`, etc.). These tokens can also be provided as environment variables.
+
+**Timeout behavior**: All HTTP platform requests have a 30-second timeout to prevent indefinite hangs. CLI-based platforms inherit the command's context and respect the overall operation timeout. If a platform push fails due to timeout, the operation will return an error without retrying.
 
 **Note:** Push is a local operation. There is no CI/CD workflow that syncs from GitHub Secrets to platforms — all pushing happens from your machine.
 

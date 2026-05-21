@@ -22,10 +22,9 @@ Higher scopes override lower scopes when the same key exists at multiple levels.
 
 ## Adding platform support
 
-Keysync supports two types of platform configurations:
+Keysync uses a **generic platform engine** for deployment platform support. All platforms (including Vercel, Railway, Supabase) should use declarative JSON configs with `"type": "cli"` or `"type": "http"`.
 
-1. **Hardcoded platforms** (Vercel, Railway, Supabase) - Built-in Go implementations
-2. **Generic platforms** (any platform) - Declarative JSON configs using CLI or HTTP APIs
+**⚠️ Deprecation**: Built-in hardcoded implementations (Vercel, Railway, Supabase) are deprecated and will be removed in keysync 2.0. Use first-party configs from `docs/platform-configs/` instead.
 
 ### Adding a generic platform (AI workflow)
 
@@ -45,7 +44,7 @@ When a user asks to add a new platform (e.g., "add Cloudflare Workers support"):
     "command": "cli-tool command-with {KEY} placeholder",
     "stdin": "{VALUE}",
     "token_env": "PLATFORM_TOKEN_ENV_VAR",
-    "config": {
+    "template_vars": {
       "CUSTOM_FIELD": "custom-value"
     },
     "validation": {
@@ -63,21 +62,23 @@ When a user asks to add a new platform (e.g., "add Cloudflare Workers support"):
     "endpoint": "https://api.platform.com/path/{CONFIG_VAR}",
     "method": "POST",
     "headers": {
-      "Authorization": "Bearer {TOKEN_ENV_VAR}"
+      "Authorization": "Bearer {TOKEN}"
     },
     "body": {
       "key": "{KEY}",
       "value": "{VALUE}"
     },
     "token_env": "PLATFORM_TOKEN_ENV_VAR",
-    "config": {
+    "template_vars": {
       "CONFIG_VAR": "value-from-config"
     }
   }
 }
 ```
 
-**Placeholders**: `{KEY}`, `{VALUE}`, `{TOKEN_ENV_VAR}`, `{CONFIG_FIELD}`
+**Built-in placeholders**: `{KEY}` (secret name), `{VALUE}` (secret value), `{TOKEN}` (platform API token)
+
+**User-defined placeholders**: Any field in `template_vars` can be used as `{FIELD_NAME}` in endpoint, headers, or body
 
 See [docs/platform-examples.md](docs/platform-examples.md) for complete examples: GitHub, Cloudflare, GitLab, Netlify, Render, Heroku, Fly.io, DigitalOcean, and more.
 
