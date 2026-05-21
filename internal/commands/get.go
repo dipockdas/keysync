@@ -101,9 +101,8 @@ func outputSecret(key, value string) error {
 	}
 
 	if err := copyToClipboard(value); err != nil {
-		// Fall back to printing on clipboard failure
-		fmt.Printf("%s=%s", key, value)
-		return nil
+		// Do NOT print secret to stdout without --unmask (security: prevents accidental disclosure)
+		return fmt.Errorf("clipboard unavailable: %w\n\nTo print to stdout instead, run with: keysync get %s --unmask", err, key)
 	}
 	fmt.Printf("Key %s copied to clipboard\n", key)
 	return nil
