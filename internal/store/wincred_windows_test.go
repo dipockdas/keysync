@@ -337,7 +337,7 @@ func TestEncodeComponent_EdgeCases(t *testing.T) {
 	}{
 		{"simple", false},      // No special chars
 		{"my-app", false},      // Hyphens OK
-		{"my_app", true},       // Underscores encoded
+		{"my_app", false},      // Underscores NOT encoded (unreserved)
 		{"my|app", true},       // Pipe encoded
 		{"my=app", true},       // Equals encoded
 		{"", false},            // Empty OK
@@ -345,7 +345,7 @@ func TestEncodeComponent_EdgeCases(t *testing.T) {
 		{"my.app", false},      // Period OK
 		{"my app", true},       // Space encoded
 		{"my:app", true},       // Colon encoded
-		{"api_v2_prod", true},  // Multiple underscores
+		{"api_v2_prod", false}, // Multiple underscores NOT encoded
 	}
 
 	for _, tt := range tests {

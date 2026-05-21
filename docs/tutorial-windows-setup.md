@@ -54,21 +54,32 @@ Windows stores secrets in the **Credential Manager**, which has two sections:
 
 ### How keysync stores secrets on Windows
 
-Keysync uses the `wincred` Go library to interact with the Win32 Credential Manager API directly. Secrets are stored as **Generic Credentials** with these conventions:
+Keysync uses the `wincred` Go library to interact with the Win32 Credential Manager API directly. Secrets are stored as **Generic Credentials** using a tagged-field format with percent encoding:
 
-| Scope | Target Name |
-|-------|-------------|
-| Global | `keysync_global` |
-| Project | `keysync_project_<name>` |
-| Project + Environment | `keysync_project_<name>_<env>` |
+**Wire format (v2)**:
+```
+keysync|s=<scope>|p=<project>|e=<environment>|k=<key>
+```
 
-The Credential's `UserName` field holds the secret key, and `CredentialBlob` holds the secret value. All credentials are persisted with `Type = Generic` and persist to the local machine.
+Examples:
+- Global secret: `keysync|s=global|p=|e=|k=API_KEY`
+- Project secret: `keysync|s=project|p=my-app|e=|k=DATABASE_URL`
+- Environment secret: `keysync|s=project|p=my-app|e=production|k=DATABASE_URL`
+
+Values are percent-encoded using RFC 3986 rules:
+- Unreserved characters (A-Z, a-z, 0-9, -, ., _, ~) are NOT encoded
+- Separators (|, =) are percent-encoded
+- Spaces become `+`
+
+The Credential's `UserName` field holds the secret key (for display), and `CredentialBlob` holds the secret value. All credentials are persisted with `Type = Generic` and `Persist = LocalMachine`.
+
+**Backward compatibility**: Keysync reads legacy v1 credentials (e.g., `keysync_global_KEY`) but writes new credentials in v2 format. This allows seamless migration from older versions.
 
 ### Viewing stored credentials
 
 Via Control Panel:
 1. Open **Control Panel > Credential Manager > Windows Credentials**
-2. Look for entries prefixed with `keysync_`
+2. Look for entries starting with `keysync|` (new format) or `keysync_` (legacy format)
 
 Via PowerShell:
 
@@ -76,8 +87,8 @@ Via PowerShell:
 # List all keysync credentials using the built-in cmdkey tool
 cmdkey /list | Select-String "keysync"
 
-# View a specific credential
-cmdkey /list | Select-String "keysync_global"
+# View a specific credential (new format)
+cmdkey /list | Select-String "keysync\|s=global"
 ```
 
 > **Note**: `cmdkey` can list and delete credentials but cannot create them. Keysync uses the Win32 API directly (via `wincred`) for full read/write access.
@@ -244,7 +255,7 @@ Ensure you're running PowerShell or Command Prompt as the same user who stored t
 
 ### Cannot find secrets with `cmdkey /list`
 
-`cmdkey` only shows a subset of credential types. Use the Python or Go client's `list_secrets()` function instead, or open **Credential Manager > Windows Credentials** and look for `keysync_*` entries.
+`cmdkey` only shows a subset of credential types. Use `keysync list` or the Python/Go client's `list_secrets()` function instead, or open **Credential Manager > Windows Credentials** and look for entries starting with `keysync|` (new format) or `keysync_` (legacy format).
 
 ### Build fails with CGo errors
 

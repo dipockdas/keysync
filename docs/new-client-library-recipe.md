@@ -41,13 +41,24 @@ The account/key name is always just the secret key itself:
 
 ### Windows Variant
 
-Windows Credential Manager target names use underscores instead of slashes:
+Windows Credential Manager uses a tagged-field format with percent encoding (v2):
 
-| Scope | Target Name |
-|-------|-------------|
-| Global | `keysync_global` |
-| Project | `keysync_project_<name>` |
-| Project + Environment | `keysync_project_<name>_<env>` |
+**Wire format**:
+```
+keysync|s=<scope>|p=<project>|e=<environment>|k=<key>
+```
+
+Examples:
+- Global: `keysync|s=global|p=|e=|k=API_KEY`
+- Project: `keysync|s=project|p=my-app|e=|k=DATABASE_URL`
+- Project + Environment: `keysync|s=project|p=my-app|e=production|k=DATABASE_URL`
+
+Values are percent-encoded using RFC 3986 rules (via `url.QueryEscape` or equivalent):
+- Unreserved characters (A-Z, a-z, 0-9, -, ., _, ~) are NOT encoded
+- Separators (|, =) are percent-encoded: | → %7C, = → %3D
+- Spaces become `+` (not `%20`)
+
+**Backward compatibility**: Client libraries should support reading legacy v1 credentials (e.g., `keysync_global_KEY`, `keysync_project_<name>_KEY`) as a fallback, but new writes use v2 format.
 
 ### Helper Functions Your Library Should Implement
 
@@ -209,7 +220,9 @@ value := string(cred.CredentialBlob)
 // List
 creds, err := wincred.List()
 for _, cred := range creds {
-    if strings.HasPrefix(cred.TargetName, "keysync_") {
+    // Check for both v2 (keysync|) and legacy v1 (keysync_) formats
+    if strings.HasPrefix(cred.TargetName, "keysync|") || strings.HasPrefix(cred.TargetName, "keysync_") {
+        // Parse target name to extract scope, project, environment, key
         // ...
     }
 }
@@ -553,7 +566,7 @@ Use this checklist when implementing a new client library in any language.
 - [ ] Implement `parseServiceName(serviceName)` function
 - [ ] Handle the `/env/` separator correctly for deep project paths
 - [ ] Write tests for all service name cases (global, project, project+env, deep paths, edge cases)
-- [ ] For Windows: implement underscore variants
+- [ ] For Windows: implement v2 tagged-field format with percent encoding, plus v1 fallback support
 
 ### Phase 2: Platform Implementations
 
@@ -566,8 +579,11 @@ Use this checklist when implementing a new client library in any language.
   - [ ] Implement `list()` via `secret-tool search service keysync`
   - [ ] Handle exit code 1 (check stderr to distinguish not-found vs error)
 - [ ] Windows implementation:
-  - [ ] Implement `get(target)` via `CredReadW` Win32 API
-  - [ ] Implement `list()` via `CredEnumerateW` Win32 API
+  - [ ] Implement `get(target)` via `CredReadW` Win32 API (try v2 format first, fallback to v1)
+  - [ ] Implement `list()` via `CredEnumerateW` Win32 API (parse both v2 and v1 formats)
+  - [ ] Parse v2 tagged format: `keysync|s=<scope>|p=<project>|e=<env>|k=<key>`
+  - [ ] Parse v1 legacy format: `keysync_global_<key>`, `keysync_project_<name>_<key>`
+  - [ ] Implement percent decoding for v2 values (url.QueryUnescape or equivalent)
   - [ ] Handle ERROR_NOT_FOUND
 - [ ] Unsupported platform stub (return clear error)
 
