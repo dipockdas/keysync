@@ -600,6 +600,37 @@ Use `--dry-run` to preview without storing.
 
 ---
 
+## Troubleshooting
+
+### Fallback Storage Mode (Headless Servers)
+
+If the OS keychain is unavailable (e.g., headless Linux server, Docker container, SSH session without X11 forwarding), keysync will fail closed and require explicit opt-in to fallback mode:
+
+```bash
+keysync --store=fallback set -p my-app API_KEY=value
+```
+
+**⚠️ Security Note**: Fallback mode stores secrets in an encrypted file (`~/.config/keysync/store.json`) with the encryption key stored alongside (`~/.config/keysync/key`). This provides weaker protection than OS-native secret storage because:
+- The encryption key and encrypted data are on the same disk
+- An attacker with file system access can read both the key and encrypted secrets
+- There is no OS-level access control or audit logging
+
+**Recommended for production**: Instead of fallback mode, use:
+- SSH forwarding to access your local keychain remotely
+- Platform-specific service accounts with keychain access
+- Dedicated secrets managers (HashiCorp Vault, AWS Secrets Manager, etc.)
+
+**CI/CD environments**: Platform tokens can be set via environment variables instead:
+```bash
+export VERCEL_TOKEN=...
+export RAILWAY_TOKEN=...
+keysync push -p my-app
+```
+
+Keysync checks environment variables as a fallback when keychain access fails.
+
+---
+
 ## Development
 
 ```bash

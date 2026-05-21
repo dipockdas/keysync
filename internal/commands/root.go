@@ -202,26 +202,42 @@ Use "{{.CommandPath}} [command] --help" for more information about a command.{{e
 
 // openStore creates the appropriate Store for the current platform.
 func openStore(ctx context.Context) store.Store {
-	// Use fallback store when explicitly requested (avoids keychain prompts).
+	// Use fallback store when explicitly requested via --store=fallback
 	if storeFlag == "fallback" {
 		st, err := store.NewFallbackStore()
 		if err != nil {
-			fmt.Fprintf(os.Stderr, "warning: failed to open fallback store: %v\n", err)
-			return store.NewMemoryStore()
+			fmt.Fprintf(os.Stderr, "ERROR: Failed to open fallback store: %v\n", err)
+			fmt.Fprintf(os.Stderr, "Fallback store requires write access to: ~/.config/keysync/\n")
+			os.Exit(1)
 		}
+
+		// Show security warning when using fallback mode
+		fmt.Fprintf(os.Stderr, "\n⚠️  WARNING: Using fallback file-based storage instead of OS keychain\n")
+		fmt.Fprintf(os.Stderr, "   Storage location: ~/.config/keysync/store.json\n")
+		fmt.Fprintf(os.Stderr, "   Encryption key:   ~/.config/keysync/key\n")
+		fmt.Fprintf(os.Stderr, "   This provides weaker security than OS-native secret storage.\n")
+		fmt.Fprintf(os.Stderr, "   The encryption key and encrypted data are stored on the same disk.\n\n")
+
 		return st
 	}
 
-	// Attempt OS-native keychain first
-	if st, err := tryKeychain(ctx); err == nil {
+	// Attempt OS-native keychain
+	st, err := tryKeychain(ctx)
+	if err == nil {
 		return st
 	}
 
-	// Fall back to encrypted file store
-	st, err := store.NewFallbackStore()
-	if err != nil {
-		fmt.Fprintf(os.Stderr, "warning: failed to open fallback store: %v\n", err)
-		return store.NewMemoryStore()
-	}
-	return st
+	// Fail closed when OS keychain unavailable and fallback not requested
+	fmt.Fprintf(os.Stderr, "ERROR: OS keychain unavailable: %v\n\n", err)
+	fmt.Fprintf(os.Stderr, "Keysync requires OS-native secret storage:\n")
+	fmt.Fprintf(os.Stderr, "  • macOS:   Keychain Access\n")
+	fmt.Fprintf(os.Stderr, "  • Linux:   libsecret (GNOME Keyring / KDE Wallet)\n")
+	fmt.Fprintf(os.Stderr, "  • Windows: Credential Manager\n\n")
+	fmt.Fprintf(os.Stderr, "To use file-based storage instead (not recommended), run with:\n")
+	fmt.Fprintf(os.Stderr, "  keysync --store=fallback [command]\n\n")
+	fmt.Fprintf(os.Stderr, "⚠️  WARNING: Fallback mode stores secrets in an encrypted file with the\n")
+	fmt.Fprintf(os.Stderr, "   encryption key stored alongside. This provides weaker protection than\n")
+	fmt.Fprintf(os.Stderr, "   OS-native secret storage and should only be used when necessary.\n")
+	os.Exit(1)
+	return nil // unreachable
 }
