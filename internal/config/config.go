@@ -62,9 +62,10 @@ type GenericPlatformConfig struct {
 	Body     interface{}            `json:"body,omitempty"`     // Request body (object or array) with placeholders
 
 	// Common fields
-	TokenEnv   string            `json:"token_env"`          // Environment variable name for API token
-	Config     map[string]string `json:"config,omitempty"`   // Platform-specific config (PROJECT_ID, SERVICE_ID, etc.)
-	Validation *ValidationConfig `json:"validation,omitempty"` // Optional pre-flight validation
+	TokenEnv     string            `json:"token_env"`                // Environment variable name for API token
+	TemplateVars map[string]string `json:"template_vars,omitempty"` // User-defined template variables (PROJECT_ID, SERVICE_ID, etc.)
+	Config       map[string]string `json:"config,omitempty"`         // Deprecated: use template_vars instead (kept for backward compat)
+	Validation   *ValidationConfig `json:"validation,omitempty"`     // Optional pre-flight validation
 
 	// Note: To distinguish generic from hardcoded platforms, check for the "type" field.
 	// Hardcoded platforms (Vercel, Railway, Supabase) don't have a "type" field.

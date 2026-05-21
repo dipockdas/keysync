@@ -116,12 +116,17 @@ func (g *GenericPlatform) execCLI(ctx context.Context, key, value string) error 
 	subs := map[string]string{
 		"KEY":   key,
 		"VALUE": value,
+		"TOKEN": g.token, // Standard {TOKEN} placeholder
 	}
-	// Add token (use token_env name as placeholder)
+	// Add token (use token_env name as placeholder for backward compat)
 	if g.config.TokenEnv != "" {
 		subs[g.config.TokenEnv] = g.token
 	}
-	// Add config fields
+	// Add template_vars fields
+	for k, v := range g.config.TemplateVars {
+		subs[k] = v
+	}
+	// Add config fields (deprecated, for backward compat)
 	for k, v := range g.config.Config {
 		subs[k] = v
 	}
@@ -172,12 +177,17 @@ func (g *GenericPlatform) execHTTP(ctx context.Context, key, value string) error
 	subs := map[string]string{
 		"KEY":   key,
 		"VALUE": value,
+		"TOKEN": g.token, // Standard {TOKEN} placeholder
 	}
-	// Add token
+	// Add token (use token_env name as placeholder for backward compat)
 	if g.config.TokenEnv != "" {
 		subs[g.config.TokenEnv] = g.token
 	}
-	// Add config fields
+	// Add template_vars fields
+	for k, v := range g.config.TemplateVars {
+		subs[k] = v
+	}
+	// Add config fields (deprecated, for backward compat)
 	for k, v := range g.config.Config {
 		subs[k] = v
 	}

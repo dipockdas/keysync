@@ -11,6 +11,20 @@ import (
 	"github.com/dipockdas/keysync/internal/store"
 )
 
+// DEPRECATED: This built-in Vercel implementation is deprecated in favor of
+// declarative generic configs. It will be removed in keysync 2.0.
+//
+// To migrate, use the generic HTTP platform configuration. See:
+//   docs/platform-configs/vercel.json
+//
+// The generic config provides the same functionality with better timeout
+// support and maintainability. Legacy configs (without "type": "http") will
+// continue to work via this implementation until keysync 2.0.
+//
+// Introduced: keysync 0.x
+// Deprecated: keysync 1.0
+// Removal planned: keysync 2.0
+
 func init() {
 	Register("vercel", newVercelFromConfig)
 }
