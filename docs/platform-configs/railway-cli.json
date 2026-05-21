@@ -1,0 +1,8 @@
+{
+  "type": "cli",
+  "command": "railway variables set {KEY}={VALUE}",
+  "token_env": "RAILWAY_TOKEN",
+  "validation": {
+    "command_check": "railway --version"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "type": "cli",
+  "command": "supabase secrets set {KEY}={VALUE} --project-ref {REF}",
+  "token_env": "SUPABASE_ACCESS_TOKEN",
+  "template_vars": {
+    "REF": "YOUR_PROJECT_REF"
+  },
+  "validation": {
+    "command_check": "supabase --version"
+  }
+}
