@@ -540,7 +540,7 @@ func saveRepoConfig(repo, projectName string) error {
 	cfg.Repos[repo] = config.RepoConfig{
 		Project:   projectName,
 		Globals:   cfg.Repos[repo].Globals, // preserve any existing globals
-		Platforms: config.PlatformConfig{},
+		Platforms: make(map[string]json.RawMessage),
 	}
 	savePath := config.DefaultConfigPath(".")
 	return config.SaveConfig(cfg, savePath)

@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"encoding/json"
 	"fmt"
 	"os"
 
@@ -49,7 +50,7 @@ Then store your platform API tokens with:
 			if project != "" && repoFlag != "" {
 				cfg.Repos[repoFlag] = config.RepoConfig{
 					Project:   project,
-					Platforms: config.PlatformConfig{},
+					Platforms: make(map[string]json.RawMessage),
 				}
 			}
 

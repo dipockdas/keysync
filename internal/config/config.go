@@ -14,12 +14,13 @@ type Config struct {
 
 // RepoConfig maps a GitHub repo to its project name, global keys, and platforms.
 type RepoConfig struct {
-	Project   string         `json:"project"`
-	Globals   []string       `json:"globals,omitempty"`
-	Platforms PlatformConfig `json:"platforms"`
+	Project   string                     `json:"project"`
+	Globals   []string                   `json:"globals,omitempty"`
+	Platforms map[string]json.RawMessage `json:"platforms"`
 }
 
-// PlatformConfig holds optional configuration for each deployment platform.
+// PlatformConfig is deprecated - platforms are now stored as map[string]json.RawMessage.
+// Kept for backward compatibility with typed helpers below.
 type PlatformConfig struct {
 	Vercel   *VercelConfig   `json:"vercel,omitempty"`
 	Railway  *RailwayConfig  `json:"railway,omitempty"`

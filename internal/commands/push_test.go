@@ -2,6 +2,7 @@ package commands
 
 import (
 	"context"
+	"encoding/json"
 	"testing"
 
 	"github.com/dipockdas/keysync/internal/config"
@@ -225,11 +226,12 @@ func TestCollectSecrets_FullMerge(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestConfiguredPlatforms_Single(t *testing.T) {
-	pc := config.PlatformConfig{
-		Vercel: &config.VercelConfig{
-			ProjectID: "proj_abc",
-			Target:    []string{"production"},
-		},
+	vercelJSON, _ := json.Marshal(config.VercelConfig{
+		ProjectID: "proj_abc",
+		Target:    []string{"production"},
+	})
+	pc := map[string]json.RawMessage{
+		"vercel": vercelJSON,
 	}
 	names := configuredPlatforms(pc)
 	if len(names) != 1 || names[0] != "vercel" {
@@ -238,13 +240,15 @@ func TestConfiguredPlatforms_Single(t *testing.T) {
 }
 
 func TestConfiguredPlatforms_Multiple(t *testing.T) {
-	pc := config.PlatformConfig{
-		Vercel: &config.VercelConfig{
-			ProjectID: "proj_abc",
-		},
-		Supabase: &config.SupabaseConfig{
-			Ref: "ref_xyz",
-		},
+	vercelJSON, _ := json.Marshal(config.VercelConfig{
+		ProjectID: "proj_abc",
+	})
+	supabaseJSON, _ := json.Marshal(config.SupabaseConfig{
+		Ref: "ref_xyz",
+	})
+	pc := map[string]json.RawMessage{
+		"vercel":   vercelJSON,
+		"supabase": supabaseJSON,
 	}
 	names := configuredPlatforms(pc)
 	if len(names) != 2 {
@@ -263,7 +267,7 @@ func TestConfiguredPlatforms_Multiple(t *testing.T) {
 }
 
 func TestConfiguredPlatforms_None(t *testing.T) {
-	pc := config.PlatformConfig{}
+	pc := make(map[string]json.RawMessage)
 	names := configuredPlatforms(pc)
 	if len(names) != 0 {
 		t.Errorf("configuredPlatforms = %v, want empty", names)
@@ -278,9 +282,10 @@ func TestConfiguredPlatforms_Nil(t *testing.T) {
 }
 
 func TestConfiguredPlatforms_ExcludesEmpty(t *testing.T) {
-	pc := config.PlatformConfig{
-		Vercel:  &config.VercelConfig{ProjectID: "proj_abc"},
-		Railway: nil, // nil should be excluded
+	vercelJSON, _ := json.Marshal(config.VercelConfig{ProjectID: "proj_abc"})
+	pc := map[string]json.RawMessage{
+		"vercel":  vercelJSON,
+		"railway": json.RawMessage("null"), // null should be excluded
 	}
 	names := configuredPlatforms(pc)
 	if len(names) != 1 || names[0] != "vercel" {
@@ -293,31 +298,33 @@ func TestConfiguredPlatforms_ExcludesEmpty(t *testing.T) {
 // ---------------------------------------------------------------------------
 
 func TestGetPlatformConfigJSON_Existing(t *testing.T) {
-	pc := config.PlatformConfig{
-		Vercel: &config.VercelConfig{
-			ProjectID: "proj_abc",
-			Target:    []string{"production"},
-		},
+	vercelJSON, _ := json.Marshal(config.VercelConfig{
+		ProjectID: "proj_abc",
+		Target:    []string{"production"},
+	})
+	pc := map[string]json.RawMessage{
+		"vercel": vercelJSON,
 	}
-	json := getPlatformConfigJSON(pc, "vercel", "test/repo")
-	if json == "" {
+	result := getPlatformConfigJSON(pc, "vercel", "test/repo")
+	if result == "" {
 		t.Fatal("getPlatformConfigJSON returned empty for vercel")
 	}
 }
 
 func TestGetPlatformConfigJSON_Missing(t *testing.T) {
-	pc := config.PlatformConfig{
-		Vercel: &config.VercelConfig{ProjectID: "proj_abc"},
+	vercelJSON, _ := json.Marshal(config.VercelConfig{ProjectID: "proj_abc"})
+	pc := map[string]json.RawMessage{
+		"vercel": vercelJSON,
 	}
-	json := getPlatformConfigJSON(pc, "railway", "test/repo")
-	if json != "" {
-		t.Errorf("getPlatformConfigJSON = %q, want empty", json)
+	result := getPlatformConfigJSON(pc, "railway", "test/repo")
+	if result != "" {
+		t.Errorf("getPlatformConfigJSON = %q, want empty", result)
 	}
 }
 
 func TestGetPlatformConfigJSON_NilConfig(t *testing.T) {
-	json := getPlatformConfigJSON(nil, "vercel", "test/repo")
-	if json != "" {
-		t.Errorf("getPlatformConfigJSON = %q, want empty", json)
+	result := getPlatformConfigJSON(nil, "vercel", "test/repo")
+	if result != "" {
+		t.Errorf("getPlatformConfigJSON = %q, want empty", result)
 	}
 }
