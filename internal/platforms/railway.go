@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/dipockdas/keysync/internal/store"
 )
@@ -63,8 +64,10 @@ func NewRailwayClient(ctx context.Context, environment, service string, secretSt
 		token:       token,
 		environment: environment,
 		service:     service,
-		client:      http.DefaultClient,
-		baseURL:     "https://backboard.railway.app/graphql/v2",
+		client: &http.Client{
+			Timeout: 30 * time.Second, // Match generic platform timeout
+		},
+		baseURL: "https://backboard.railway.app/graphql/v2",
 	}, nil
 }
 
@@ -72,7 +75,6 @@ func (r *RailwayClient) Name() string { return "railway" }
 
 // Upsert sets an environment variable in Railway.
 func (r *RailwayClient) Upsert(ctx context.Context, key, value string) error {
-	_ = ctx // Context support to be added in future versions
 	mutation := `mutation($input: VariableUpsertInput!) {
 		variableUpsert(input: $input) {
 			id
@@ -95,7 +97,7 @@ func (r *RailwayClient) Upsert(ctx context.Context, key, value string) error {
 	}
 	raw, _ := json.Marshal(body)
 
-	req, err := http.NewRequest("POST", r.baseURL, bytes.NewReader(raw))
+	req, err := http.NewRequestWithContext(ctx, "POST", r.baseURL, bytes.NewReader(raw))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}

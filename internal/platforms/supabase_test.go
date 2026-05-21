@@ -97,7 +97,7 @@ func TestSupabaseBulkUpsert(t *testing.T) {
 		baseURL: ts.URL,
 	}
 
-	err := client.UpsertMap(map[string]string{"A": "1", "B": "2"})
+	err := client.UpsertMap(context.Background(), map[string]string{"A": "1", "B": "2"})
 	if err != nil {
 		t.Fatalf("UpsertMap failed: %v", err)
 	}

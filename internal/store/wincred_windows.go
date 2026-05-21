@@ -24,26 +24,30 @@ import (
 // Where:
 //   - Separator: | (pipe character, ASCII 124)
 //   - Field separator: = (equals, ASCII 61)
-//   - Value encoding: URL percent encoding (RFC 3986)
+//   - Value encoding: url.QueryEscape (Go stdlib, RFC 3986-based)
 //   - Empty values: field present with empty value (e.g., "e=" for no environment)
 //
-// Encoding rules:
-//   - Reserved characters (_|=) are percent-encoded: _ → %5F, | → %7C, = → %3D
-//   - Unreserved characters (A-Z, a-z, 0-9, -, ., ~) are not encoded
+// Encoding rules (per url.QueryEscape):
+//   - Unreserved characters (A-Z, a-z, 0-9, -, ., _, ~) are NOT encoded
+//   - Separators (|, =) are percent-encoded: | → %7C, = → %3D
+//   - Spaces are encoded as + (not %20)
 //   - All other characters are percent-encoded
 //
 // Examples:
 //   Global scope:
 //     keysync|s=global|p=|e=|k=API_KEY
 //
-//   Project scope (no special chars):
+//   Project scope (hyphens not encoded):
 //     keysync|s=project|p=my-app|e=|k=DATABASE_URL
 //
-//   Project scope (with underscores):
-//     keysync|s=project|p=my%5Fapp|e=|k=DATABASE%5FURL
+//   Project scope (underscores not encoded):
+//     keysync|s=project|p=my_app|e=|k=DATABASE_URL
 //
-//   Project+Environment (with underscores):
-//     keysync|s=project|p=api%5Fv2|e=prod%5Fus%5Feast|k=STRIPE_KEY
+//   Project+Environment (underscores not encoded):
+//     keysync|s=project|p=api_v2|e=prod_us_east|k=STRIPE_KEY
+//
+//   Special characters (pipes and equals encoded):
+//     keysync|s=project|p=my%7Capp|e=env%3Dtest|k=KEY
 //
 // Backward compatibility:
 //   The parser accepts both v2 (tagged) and v1 (underscore-delimited) formats.
@@ -93,6 +97,19 @@ func credTarget(scope Scope, project, environment, key string) string {
 		encodeComponent(project),
 		encodeComponent(environment),
 		encodeComponent(key))
+}
+
+// credTargetLegacy returns the credential target name in v1 underscore-delimited format
+// Used as fallback when reading existing v1 credentials
+func credTargetLegacy(scope Scope, project, environment, key string) string {
+	if scope == ScopeGlobal {
+		return fmt.Sprintf("keysync_global_%s", key)
+	}
+	// Project scope
+	if environment == "" {
+		return fmt.Sprintf("keysync_project_%s_%s", project, key)
+	}
+	return fmt.Sprintf("keysync_project_%s_%s_%s", project, environment, key)
 }
 
 // parseCredTarget parses both v2 (tagged) and v1 (legacy) formats
@@ -194,8 +211,16 @@ func parseLegacyFormat(target string) (Scope, string, string, string) {
 }
 
 func (w *WincredStore) Get(_ context.Context, scope Scope, project, environment, key string) (string, error) {
+	// Try v2 format first
 	target := credTarget(scope, project, environment, key)
 	cred, err := wincred.GetGenericCredential(target)
+	if err == nil {
+		return string(cred.CredentialBlob), nil
+	}
+
+	// Fall back to v1 format for backward compatibility
+	targetLegacy := credTargetLegacy(scope, project, environment, key)
+	cred, err = wincred.GetGenericCredential(targetLegacy)
 	if err != nil {
 		return "", ErrNotFound
 	}
@@ -238,11 +263,18 @@ func (w *WincredStore) Set(_ context.Context, scope Scope, project, environment,
 }
 
 func (w *WincredStore) Delete(_ context.Context, scope Scope, project, environment, key string) error {
+	// Try v2 format first
 	target := credTarget(scope, project, environment, key)
 	cred, err := wincred.GetGenericCredential(target)
 	if err != nil {
-		return ErrNotFound
+		// Fall back to v1 format for backward compatibility
+		targetLegacy := credTargetLegacy(scope, project, environment, key)
+		cred, err = wincred.GetGenericCredential(targetLegacy)
+		if err != nil {
+			return ErrNotFound
+		}
 	}
+
 	if err := cred.Delete(); err != nil {
 		return fmt.Errorf("wincred delete: %w", err)
 	}

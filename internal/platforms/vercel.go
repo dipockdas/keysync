@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/dipockdas/keysync/internal/store"
 )
@@ -66,8 +67,10 @@ func NewVercelClient(ctx context.Context, projectID string, targets []string, se
 		token:     token,
 		projectID: projectID,
 		targets:   targets,
-		client:    http.DefaultClient,
-		baseURL:   "https://api.vercel.com",
+		client: &http.Client{
+			Timeout: 30 * time.Second, // Match generic platform timeout
+		},
+		baseURL: "https://api.vercel.com",
 	}, nil
 }
 
@@ -83,7 +86,6 @@ type vercelEnvRequest struct {
 
 // Upsert creates or updates an environment variable in Vercel.
 func (v *VercelClient) Upsert(ctx context.Context, key, value string) error {
-	_ = ctx // Context support to be added in future versions
 	body := vercelEnvRequest{
 		Key:    key,
 		Value:  value,
@@ -93,7 +95,7 @@ func (v *VercelClient) Upsert(ctx context.Context, key, value string) error {
 	raw, _ := json.Marshal(body)
 
 	url := fmt.Sprintf("%s/v9/projects/%s/env", v.baseURL, v.projectID)
-	req, err := http.NewRequest("POST", url, bytes.NewReader(raw))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(raw))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}

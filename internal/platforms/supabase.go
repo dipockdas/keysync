@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"time"
 
 	"github.com/dipockdas/keysync/internal/store"
 )
@@ -58,9 +59,11 @@ func NewSupabaseClient(ctx context.Context, ref string, secretSt store.Store) (*
 		return nil, fmt.Errorf("SUPABASE_TOKEN not set (store it with: keysync set SUPABASE_TOKEN=...)")
 	}
 	return &SupabaseClient{
-		token:   token,
-		ref:     ref,
-		client:  http.DefaultClient,
+		token: token,
+		ref:   ref,
+		client: &http.Client{
+			Timeout: 30 * time.Second, // Match generic platform timeout
+		},
 		baseURL: "https://api.supabase.com",
 	}, nil
 }
@@ -74,16 +77,15 @@ type supabaseSecret struct {
 
 // Upsert sets a secret in Supabase.
 func (s *SupabaseClient) Upsert(ctx context.Context, key, value string) error {
-	_ = ctx // Context support to be added in future versions
-	return s.BulkUpsert([]supabaseSecret{{Name: key, Value: value}})
+	return s.BulkUpsert(ctx, []supabaseSecret{{Name: key, Value: value}})
 }
 
 // BulkUpsert sends multiple secrets to Supabase in a single request.
-func (s *SupabaseClient) BulkUpsert(secrets []supabaseSecret) error {
+func (s *SupabaseClient) BulkUpsert(ctx context.Context, secrets []supabaseSecret) error {
 	raw, _ := json.Marshal(secrets)
 
 	url := fmt.Sprintf("%s/v1/projects/%s/secrets", s.baseURL, s.ref)
-	req, err := http.NewRequest("POST", url, bytes.NewReader(raw))
+	req, err := http.NewRequestWithContext(ctx, "POST", url, bytes.NewReader(raw))
 	if err != nil {
 		return fmt.Errorf("create request: %w", err)
 	}
@@ -106,10 +108,10 @@ func (s *SupabaseClient) BulkUpsert(secrets []supabaseSecret) error {
 }
 
 // UpsertMap sends multiple env vars to Supabase.
-func (s *SupabaseClient) UpsertMap(envs map[string]string) error {
+func (s *SupabaseClient) UpsertMap(ctx context.Context, envs map[string]string) error {
 	secrets := make([]supabaseSecret, 0, len(envs))
 	for key, value := range envs {
 		secrets = append(secrets, supabaseSecret{Name: key, Value: value})
 	}
-	return s.BulkUpsert(secrets)
+	return s.BulkUpsert(ctx, secrets)
 }
