@@ -10,11 +10,10 @@
   "body": {
     "key": "{KEY}",
     "value": "{VALUE}",
-    "target": "{TARGETS}",
+    "target": ["production", "preview"],
     "type": "encrypted"
   },
   "template_vars": {
-    "PROJECT_ID": "YOUR_PROJECT_ID",
-    "TARGETS": ["production", "preview"]
+    "PROJECT_ID": "YOUR_PROJECT_ID"
   }
 }
