@@ -49,10 +49,6 @@ import (
 //   Special characters (pipes and equals encoded):
 //     keysync|s=project|p=my%7Capp|e=env%3Dtest|k=KEY
 //
-// Backward compatibility:
-//   The parser accepts both v2 (tagged) and v1 (underscore-delimited) formats.
-//   New credentials are always written in v2 format.
-//   Legacy v1 format: keysync_<scope>_<project>_<environment>_<key>
 //
 // Character limit:
 //   Windows credential targets have a 256-character maximum. Very long project,
@@ -99,37 +95,13 @@ func credTarget(scope Scope, project, environment, key string) string {
 		encodeComponent(key))
 }
 
-// credTargetLegacy returns the credential target name in v1 underscore-delimited format
-// Used as fallback when reading existing v1 credentials
-func credTargetLegacy(scope Scope, project, environment, key string) string {
-	if scope == ScopeGlobal {
-		return fmt.Sprintf("keysync_global_%s", key)
-	}
-	// Project scope
-	if environment == "" {
-		return fmt.Sprintf("keysync_project_%s_%s", project, key)
-	}
-	return fmt.Sprintf("keysync_project_%s_%s_%s", project, environment, key)
-}
-
-// parseCredTarget parses both v2 (tagged) and v1 (legacy) formats
+// parseCredTarget parses v2 tagged format: keysync|s=...|p=...|e=...|k=...
 func parseCredTarget(target string) (Scope, string, string, string) {
-	// Detect format
-	if strings.HasPrefix(target, "keysync|") {
-		return parseTaggedFormat(target)
+	// Only accept v2 format
+	if !strings.HasPrefix(target, "keysync|") {
+		return ScopeGlobal, "", "", ""
 	}
 
-	// Legacy v1 format (underscore-delimited)
-	// Also check for old "keysync_" prefix to handle v1
-	if strings.HasPrefix(target, "keysync_") {
-		return parseLegacyFormat(target)
-	}
-
-	return ScopeGlobal, "", "", ""
-}
-
-// parseTaggedFormat parses v2 format: keysync|s=...|p=...|e=...|k=...
-func parseTaggedFormat(target string) (Scope, string, string, string) {
 	// Remove "keysync|" prefix
 	trimmed := strings.TrimPrefix(target, "keysync|")
 
@@ -165,62 +137,9 @@ func parseTaggedFormat(target string) (Scope, string, string, string) {
 	return scope, project, env, key
 }
 
-// parseLegacyFormat parses v1 format: keysync_scope_project_env_key
-// This uses heuristics and is ambiguous for names with underscores,
-// but provides backward compatibility for reading existing credentials.
-func parseLegacyFormat(target string) (Scope, string, string, string) {
-	trimmed := strings.TrimPrefix(target, "keysync_")
-	parts := strings.Split(trimmed, "_")
-
-	if len(parts) < 2 {
-		return ScopeGlobal, "", "", ""
-	}
-
-	scope := Scope(parts[0])
-	if scope != ScopeGlobal && scope != ScopeProject {
-		return ScopeGlobal, "", "", ""
-	}
-
-	// Global scope: keysync_global_KEY
-	if scope == ScopeGlobal {
-		if len(parts) < 2 {
-			return scope, "", "", ""
-		}
-		key := strings.Join(parts[1:], "_") // Key may contain underscores
-		return scope, "", "", key
-	}
-
-	// Project scope: keysync_project_PROJECT_KEY or keysync_project_PROJECT_ENV_KEY
-	if len(parts) < 3 {
-		return scope, "", "", ""
-	}
-
-	project := parts[1]
-
-	// Heuristic: if 3 parts, no env; if 4+, parts[2] is env
-	// This is ambiguous but maintains backward compatibility
-	if len(parts) == 3 {
-		key := parts[2]
-		return scope, project, "", key
-	}
-
-	// 4+ parts: assume environment is parts[2], key is parts[3:]
-	env := parts[2]
-	key := strings.Join(parts[3:], "_")
-	return scope, project, env, key
-}
-
 func (w *WincredStore) Get(_ context.Context, scope Scope, project, environment, key string) (string, error) {
-	// Try v2 format first
 	target := credTarget(scope, project, environment, key)
 	cred, err := wincred.GetGenericCredential(target)
-	if err == nil {
-		return string(cred.CredentialBlob), nil
-	}
-
-	// Fall back to v1 format for backward compatibility
-	targetLegacy := credTargetLegacy(scope, project, environment, key)
-	cred, err = wincred.GetGenericCredential(targetLegacy)
 	if err != nil {
 		return "", ErrNotFound
 	}
@@ -263,16 +182,10 @@ func (w *WincredStore) Set(_ context.Context, scope Scope, project, environment,
 }
 
 func (w *WincredStore) Delete(_ context.Context, scope Scope, project, environment, key string) error {
-	// Try v2 format first
 	target := credTarget(scope, project, environment, key)
 	cred, err := wincred.GetGenericCredential(target)
 	if err != nil {
-		// Fall back to v1 format for backward compatibility
-		targetLegacy := credTargetLegacy(scope, project, environment, key)
-		cred, err = wincred.GetGenericCredential(targetLegacy)
-		if err != nil {
-			return ErrNotFound
-		}
+		return ErrNotFound
 	}
 
 	if err := cred.Delete(); err != nil {
@@ -320,9 +233,8 @@ func (w *WincredStore) rebuildCache() {
 	w.cache = nil
 
 	for _, cred := range all {
-		// Check for both v2 and v1 prefixes
-		if !strings.HasPrefix(cred.TargetName, "keysync|") &&
-			!strings.HasPrefix(cred.TargetName, "keysync_") {
+		// Only check for v2 format
+		if !strings.HasPrefix(cred.TargetName, "keysync|") {
 			continue
 		}
 		scope, project, env, key := parseCredTarget(cred.TargetName)

@@ -69,43 +69,7 @@ func TestCredTarget_NewFormat_RoundTrip(t *testing.T) {
 	}
 }
 
-// Test 3: Legacy format compatibility
-func TestParseCredTarget_LegacyFormat(t *testing.T) {
-	tests := []struct {
-		target string
-		scope  Scope
-		proj   string
-		env    string
-		key    string
-	}{
-		{"keysync_global_API_KEY", ScopeGlobal, "", "", "API_KEY"},
-		// Note: DATABASE_URL has underscore, so parser sees 4 parts and assumes env is present
-		// This is the ambiguity of v1 format - parser interprets as env=DATABASE, key=URL
-		{"keysync_project_myapp_DATABASE_URL", ScopeProject, "myapp", "DATABASE", "URL"},
-		{"keysync_project_myapp_production_STRIPE_KEY", ScopeProject, "myapp", "production", "STRIPE_KEY"},
-		// Legacy format with underscores in key (best-effort parsing)
-		{"keysync_global_AWS_SECRET_KEY", ScopeGlobal, "", "", "AWS_SECRET_KEY"},
-	}
-
-	for _, tt := range tests {
-		scope, proj, env, key := parseCredTarget(tt.target)
-
-		if scope != tt.scope {
-			t.Errorf("%s: scope = %v, want %v", tt.target, scope, tt.scope)
-		}
-		if proj != tt.proj {
-			t.Errorf("%s: project = %q, want %q", tt.target, proj, tt.proj)
-		}
-		if env != tt.env {
-			t.Errorf("%s: env = %q, want %q", tt.target, env, tt.env)
-		}
-		if key != tt.key {
-			t.Errorf("%s: key = %q, want %q", tt.target, key, tt.key)
-		}
-	}
-}
-
-// Test 4: End-to-end with WincredStore - underscores in all components
+// Test 3: End-to-end with WincredStore - underscores in all components
 func TestWincredStore_UnderscoresInAllComponents(t *testing.T) {
 	st := NewWincredStore()
 	ctx := context.Background()
@@ -373,35 +337,27 @@ func TestParseCredTarget_FormatDetection(t *testing.T) {
 	tests := []struct {
 		name   string
 		target string
-		isV2   bool
+		valid  bool
 	}{
 		{"v2-global", "keysync|s=global|p=|e=|k=API_KEY", true},
 		{"v2-project", "keysync|s=project|p=myapp|e=|k=KEY", true},
-		{"v1-global", "keysync_global_API_KEY", false},
-		{"v1-project", "keysync_project_myapp_KEY", false},
-		{"invalid", "something_else", false},
+		{"invalid-old-format", "keysync_global_API_KEY", false},
+		{"invalid-random", "something_else", false},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			scope, _, _, key := parseCredTarget(tt.target)
 
-			// Valid keysync formats should successfully extract a key
-			if key == "" && (tt.isV2 || strings.HasPrefix(tt.target, "keysync_")) {
-				t.Errorf("parseCredTarget(%q) failed to extract key", tt.target)
-			}
-
-			// For invalid formats (not keysync at all), key should be empty
-			if !tt.isV2 && !strings.HasPrefix(tt.target, "keysync") {
-				if key != "" {
-					t.Errorf("parseCredTarget(%q) should return empty key for invalid format, got %q", tt.target, key)
-				}
-			}
-
-			// Valid formats should have both scope and key
-			if (tt.isV2 || strings.HasPrefix(tt.target, "keysync_")) {
+			if tt.valid {
+				// Valid v2 formats should extract both scope and key
 				if (scope != ScopeGlobal && scope != ScopeProject) || key == "" {
 					t.Errorf("parseCredTarget(%q) should return valid scope and non-empty key", tt.target)
+				}
+			} else {
+				// Invalid formats should return empty key
+				if key != "" {
+					t.Errorf("parseCredTarget(%q) should return empty key for invalid format, got %q", tt.target, key)
 				}
 			}
 		})

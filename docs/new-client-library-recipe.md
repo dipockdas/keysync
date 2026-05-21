@@ -58,8 +58,6 @@ Values are percent-encoded using RFC 3986 rules (via `url.QueryEscape` or equiva
 - Separators (|, =) are percent-encoded: | → %7C, = → %3D
 - Spaces become `+` (not `%20`)
 
-**Backward compatibility**: Client libraries should support reading legacy v1 credentials (e.g., `keysync_global_KEY`, `keysync_project_<name>_KEY`) as a fallback, but new writes use v2 format.
-
 ### Helper Functions Your Library Should Implement
 
 **`serviceName(scope, project, environment?)`** → builds the service name string:
@@ -220,8 +218,8 @@ value := string(cred.CredentialBlob)
 // List
 creds, err := wincred.List()
 for _, cred := range creds {
-    // Check for both v2 (keysync|) and legacy v1 (keysync_) formats
-    if strings.HasPrefix(cred.TargetName, "keysync|") || strings.HasPrefix(cred.TargetName, "keysync_") {
+    // Check for v2 format
+    if strings.HasPrefix(cred.TargetName, "keysync|") {
         // Parse target name to extract scope, project, environment, key
         // ...
     }
@@ -566,7 +564,7 @@ Use this checklist when implementing a new client library in any language.
 - [ ] Implement `parseServiceName(serviceName)` function
 - [ ] Handle the `/env/` separator correctly for deep project paths
 - [ ] Write tests for all service name cases (global, project, project+env, deep paths, edge cases)
-- [ ] For Windows: implement v2 tagged-field format with percent encoding, plus v1 fallback support
+- [ ] For Windows: implement v2 tagged-field format with percent encoding
 
 ### Phase 2: Platform Implementations
 
@@ -579,10 +577,9 @@ Use this checklist when implementing a new client library in any language.
   - [ ] Implement `list()` via `secret-tool search service keysync`
   - [ ] Handle exit code 1 (check stderr to distinguish not-found vs error)
 - [ ] Windows implementation:
-  - [ ] Implement `get(target)` via `CredReadW` Win32 API (try v2 format first, fallback to v1)
-  - [ ] Implement `list()` via `CredEnumerateW` Win32 API (parse both v2 and v1 formats)
+  - [ ] Implement `get(target)` via `CredReadW` Win32 API
+  - [ ] Implement `list()` via `CredEnumerateW` Win32 API
   - [ ] Parse v2 tagged format: `keysync|s=<scope>|p=<project>|e=<env>|k=<key>`
-  - [ ] Parse v1 legacy format: `keysync_global_<key>`, `keysync_project_<name>_<key>`
   - [ ] Implement percent decoding for v2 values (url.QueryUnescape or equivalent)
   - [ ] Handle ERROR_NOT_FOUND
 - [ ] Unsupported platform stub (return clear error)

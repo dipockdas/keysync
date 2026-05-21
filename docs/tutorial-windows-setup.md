@@ -73,8 +73,6 @@ Values are percent-encoded using RFC 3986 rules:
 
 The Credential's `UserName` field holds the secret key (for display), and `CredentialBlob` holds the secret value. All credentials are persisted with `Type = Generic` and `Persist = LocalMachine`.
 
-**Backward compatibility**: Keysync reads legacy v1 credentials (e.g., `keysync_global_KEY`) but writes new credentials in v2 format. This allows seamless migration from older versions.
-
 ### Viewing stored credentials
 
 Via Control Panel:
