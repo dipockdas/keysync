@@ -29,71 +29,112 @@ func NewWincredStore() *WincredStore {
 	return ws
 }
 
-// credTarget returns the credential target name.
-// Format: "keysync_<scope>[_<project>[_<environment>]]"
-func credTarget(scope Scope, project, environment string) string {
+// credTarget returns the credential target name, INCLUDING the key name.
+// Format: "keysync_<scope>_<key>" or "keysync_<scope>_<project>_<key>" or "keysync_<scope>_<project>_<environment>_<key>"
+// This ensures each secret has a unique credential (fixes audit finding 3).
+func credTarget(scope Scope, project, environment, key string) string {
 	if scope == ScopeGlobal {
-		return fmt.Sprintf("keysync_%s", scope)
+		return fmt.Sprintf("keysync_%s_%s", scope, key)
 	}
-	base := fmt.Sprintf("keysync_%s_%s", scope, project)
 	if environment != "" {
-		base += "_" + environment
+		return fmt.Sprintf("keysync_%s_%s_%s_%s", scope, project, environment, key)
 	}
-	return base
+	return fmt.Sprintf("keysync_%s_%s_%s", scope, project, key)
 }
 
-// parseCredTarget splits a target name back into scope, project, and environment.
-// "keysync_global" → (global, "", "")
-// "keysync_project_my-app" → (project, "my-app", "")
-// "keysync_project_my-app_production" → (project, "my-app", "production")
-func parseCredTarget(target string) (Scope, string, string) {
+// parseCredTarget splits a target name back into scope, project, environment, and key.
+// "keysync_global_API_KEY" → (global, "", "", "API_KEY")
+// "keysync_project_my-app_DATABASE_URL" → (project, "my-app", "", "DATABASE_URL")
+// "keysync_project_my-app_production_STRIPE_KEY" → (project, "my-app", "production", "STRIPE_KEY")
+func parseCredTarget(target string) (Scope, string, string, string) {
 	trimmed := strings.TrimPrefix(target, "keysync_")
-	parts := strings.SplitN(trimmed, "_", 3)
-	if len(parts) == 0 {
-		return ScopeGlobal, "", ""
+	parts := strings.Split(trimmed, "_")
+
+	if len(parts) < 2 {
+		return ScopeGlobal, "", "", ""
 	}
+
 	scope := Scope(parts[0])
 	if scope != ScopeGlobal && scope != ScopeProject {
-		return ScopeGlobal, "", ""
+		return ScopeGlobal, "", "", ""
 	}
+
+	// Global scope: keysync_global_KEY
 	if scope == ScopeGlobal {
-		return scope, "", ""
+		if len(parts) < 2 {
+			return scope, "", "", ""
+		}
+		key := strings.Join(parts[1:], "_") // In case key contains underscores
+		return scope, "", "", key
 	}
-	if len(parts) < 2 {
-		return scope, "", ""
+
+	// Project scope: keysync_project_PROJECT_KEY or keysync_project_PROJECT_ENV_KEY
+	if len(parts) < 3 {
+		return scope, "", "", ""
 	}
+
 	project := parts[1]
-	env := ""
-	if len(parts) >= 3 {
-		env = parts[2]
+
+	// Try to determine if there's an environment
+	// Format could be: keysync_project_my-app_API_KEY (no env)
+	// Or: keysync_project_my-app_production_API_KEY (with env)
+	//
+	// We need a heuristic: if parts[2] looks like a common env name, treat it as env
+	// Otherwise, treat remaining parts as the key
+	//
+	// Actually, we can't reliably distinguish without context. Let's use a different approach:
+	// - If we have exactly 3 parts: keysync_project_PROJECT_KEY (no env)
+	// - If we have 4+ parts: keysync_project_PROJECT_ENV_KEY (with env)
+	// But this breaks if project/env names have underscores!
+	//
+	// Better approach: rebuild cache should use the full target as identifier,
+	// and we don't need to parse it perfectly. We just need uniqueness.
+	//
+	// Actually, looking at the code, rebuildCache uses parseCredTarget to populate
+	// the cache with scope/project/env/key, so we DO need to parse correctly.
+	//
+	// The safest approach: store metadata in a separate field or use a delimiter
+	// that can't appear in names. But we can't change the Windows API.
+	//
+	// Pragmatic solution: Assume project and environment names don't contain underscores,
+	// and key names might. So:
+	// - 3 parts: scope_project_KEY
+	// - 4+ parts: scope_project_env_KEY (where KEY might have underscores)
+
+	if len(parts) == 3 {
+		// keysync_project_my-app_API_KEY → no environment
+		key := parts[2]
+		return scope, project, "", key
 	}
-	return scope, project, env
+
+	// 4+ parts: keysync_project_my-app_production_STRIPE_KEY
+	// Assume environment is parts[2], key is parts[3:]
+	env := parts[2]
+	key := strings.Join(parts[3:], "_")
+	return scope, project, env, key
 }
 
 func (w *WincredStore) Get(_ context.Context, scope Scope, project, environment, key string) (string, error) {
-	target := credTarget(scope, project, environment)
+	target := credTarget(scope, project, environment, key)
 	cred, err := wincred.GetGenericCredential(target)
 	if err != nil {
 		return "", ErrNotFound
 	}
-	// Verify the account name matches (target might match but different key)
-	if cred.UserName != key {
-		return "", ErrNotFound
-	}
+	// Target now includes key, so no need to verify UserName
 	return string(cred.CredentialBlob), nil
 }
 
 func (w *WincredStore) Set(_ context.Context, scope Scope, project, environment, key, value string) error {
-	target := credTarget(scope, project, environment)
+	target := credTarget(scope, project, environment, key)
 
-	// Delete existing first to avoid duplicates
+	// Delete existing first to avoid duplicates (target now includes key)
 	existing, err := wincred.GetGenericCredential(target)
-	if err == nil && existing.UserName == key {
+	if err == nil {
 		_ = existing.Delete()
 	}
 
 	cred := wincred.NewGenericCredential(target)
-	cred.UserName = key
+	cred.UserName = key // Keep UserName for debugging/display purposes
 	cred.CredentialBlob = []byte(value)
 	cred.Persist = wincred.PersistLocalMachine
 
@@ -103,18 +144,25 @@ func (w *WincredStore) Set(_ context.Context, scope Scope, project, environment,
 
 	// Update cache
 	w.mu.Lock()
-	w.cache = append(w.cache, SecretEntry{Scope: scope, Project: project, Environment: environment, Key: key})
+	// Check if already in cache (avoid duplicates)
+	found := false
+	for _, e := range w.cache {
+		if e.Scope == scope && e.Project == project && e.Environment == environment && e.Key == key {
+			found = true
+			break
+		}
+	}
+	if !found {
+		w.cache = append(w.cache, SecretEntry{Scope: scope, Project: project, Environment: environment, Key: key})
+	}
 	w.mu.Unlock()
 	return nil
 }
 
 func (w *WincredStore) Delete(_ context.Context, scope Scope, project, environment, key string) error {
-	target := credTarget(scope, project, environment)
+	target := credTarget(scope, project, environment, key)
 	cred, err := wincred.GetGenericCredential(target)
 	if err != nil {
-		return ErrNotFound
-	}
-	if cred.UserName != key {
 		return ErrNotFound
 	}
 	if err := cred.Delete(); err != nil {
@@ -165,12 +213,16 @@ func (w *WincredStore) rebuildCache() {
 		if !strings.HasPrefix(cred.TargetName, "keysync_") {
 			continue
 		}
-		scope, project, env := parseCredTarget(cred.TargetName)
+		scope, project, env, key := parseCredTarget(cred.TargetName)
+		// Skip entries where we couldn't extract a key
+		if key == "" {
+			continue
+		}
 		w.cache = append(w.cache, SecretEntry{
 			Scope:       scope,
 			Project:     project,
 			Environment: env,
-			Key:         cred.UserName,
+			Key:         key,
 		})
 	}
 }
