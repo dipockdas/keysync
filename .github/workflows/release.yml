@@ -113,13 +113,36 @@ jobs:
         run: |
           cd dist
           for dir in keysync_darwin_*; do
+            binary="$dir/keysync"
             zip_file="${dir}.zip"
+
+            # Create initial zip for notarization
             (cd "$dir" && zip -r "../$zip_file" .)
+
+            # Submit for notarization and wait
+            echo "Submitting $zip_file for notarization..."
             xcrun notarytool submit "$zip_file" \
               --apple-id ${{ secrets.APPLE_ID }} \
               --team-id ${{ secrets.TEAM_ID }} \
               --password ${{ secrets.APPLE_ID_PWD }} \
               --wait
+
+            # Check notarization status
+            if [ $? -eq 0 ]; then
+              echo "Notarization successful for $zip_file"
+
+              # Staple the notarization ticket to the binary
+              echo "Stapling notarization ticket to $binary..."
+              xcrun stapler staple "$binary"
+
+              # Re-create the zip with the stapled binary
+              rm "$zip_file"
+              (cd "$dir" && zip -r "../$zip_file" .)
+              echo "Created final notarized and stapled archive: $zip_file"
+            else
+              echo "ERROR: Notarization failed for $zip_file"
+              exit 1
+            fi
           done
 
       - uses: actions/upload-artifact@v7
