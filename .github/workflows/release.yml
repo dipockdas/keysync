@@ -132,7 +132,7 @@ jobs:
 
             # Extract submission ID and status
             SUBMISSION_ID=$(echo "$NOTARY_OUTPUT" | grep "id:" | head -1 | awk '{print $2}')
-            STATUS=$(echo "$NOTARY_OUTPUT" | grep "status:" | awk '{print $2}')
+            STATUS=$(echo "$NOTARY_OUTPUT" | grep "^  status:" | awk '{print $2}')
 
             echo "Submission ID: $SUBMISSION_ID"
             echo "Status: $STATUS"
