@@ -141,14 +141,18 @@ jobs:
             if [ "$STATUS" = "Accepted" ]; then
               echo "✅ Notarization accepted for $zip_file"
 
-              # Staple the notarization ticket to the binary
-              echo "Stapling notarization ticket to $binary..."
-              xcrun stapler staple "$binary"
+              # Try to staple the notarization ticket (may fail for raw binaries)
+              echo "Attempting to staple notarization ticket to $binary..."
+              if xcrun stapler staple "$binary" 2>/dev/null; then
+                echo "✅ Stapling successful"
+              else
+                echo "⚠️  Stapling failed (expected for raw binaries - users can still download)"
+              fi
 
-              # Re-create the zip with the stapled binary
+              # Re-create the zip with the notarized binary
               rm "$zip_file"
               (cd "$dir" && zip -r "../$zip_file" .)
-              echo "✅ Created final notarized and stapled archive: $zip_file"
+              echo "✅ Created final notarized archive: $zip_file"
             else
               echo "❌ ERROR: Notarization failed with status: $STATUS"
               echo "Fetching detailed log..."
