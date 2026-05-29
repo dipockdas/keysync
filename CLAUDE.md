@@ -28,6 +28,9 @@ docs/                   # Tutorials and guides
 
 ```bash
 make build          # go build -o ./bin/keysync ./cmd/keysync
+make build-signed   # macOS: Developer ID sign (Always Allow persists across rebuilds)
+export PATH="$PWD/bin:$PATH"
+keysync trust       # macOS: after every make build or binary copy
 make test           # Run all non-platform tests
 make test-platform  # Run platform client tests
 make clean          # rm -rf ./bin/

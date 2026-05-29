@@ -39,10 +39,12 @@ This project adheres to a [Code of Conduct](CODE_OF_CONDUCT.md). By participatin
 2. **Build the project**
 
    ```bash
-   make build
+   make build              # macOS: prefer make build-signed when you have a Developer ID cert
+   export PATH="$PWD/bin:$PATH"
+   ./bin/keysync trust       # macOS: required after every rebuild — avoids repeated keychain prompts
    ```
 
-   This creates `./bin/keysync`.
+   This creates `./bin/keysync`. On macOS, run `keysync trust` again whenever you `make build` or copy the binary to a new path.
 
 3. **Run tests and security checks**
 

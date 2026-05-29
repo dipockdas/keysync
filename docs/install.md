@@ -54,22 +54,26 @@ go install github.com/dipockdas/keysync/cmd/keysync@v1.0.3
 ```bash
 git clone https://github.com/dipockdas/keysync.git
 cd keysync
-make build
-./bin/keysync version
+make build              # macOS: make build-signed when you have a Developer ID certificate
+export PATH="$PWD/bin:$PATH"
+keysync trust           # macOS: after every build or copy — avoids repeated keychain prompts
+keysync version
+keysync doctor
 ```
 
-Optional: install to `/usr/local/bin`:
+Optional: install to `/usr/local/bin` (run `keysync trust` again on macOS after copying):
 
 ```bash
 cp ./bin/keysync /usr/local/bin/keysync
+keysync trust
 ```
 
-macOS developers who want fewer keychain prompts after rebuilds:
+macOS: signed builds and install helper:
 
 ```bash
 make build-signed
-make install-signed   # optional: ~/.local/bin/keysync
-keysync trust         # once after install or copy to a new path
+make install-signed   # ~/.local/bin/keysync
+keysync trust
 ```
 
 ## Prerequisites

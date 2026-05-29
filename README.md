@@ -88,9 +88,10 @@ Ensure the install directory is on your `PATH` (`$HOME/go/bin` by default). See 
 
 ```bash
 git clone https://github.com/dipockdas/keysync.git
-cd keysync && make build-signed   # macOS: signed binary; use make build on Linux/Windows
+cd keysync
+make build-signed                 # macOS: recommended; use make build on Linux/Windows
 export PATH="$PWD/bin:$PATH"
-keysync trust                     # macOS: once after install
+keysync trust                     # macOS: after every build or copy — avoids keychain prompts
 ```
 
 ### First steps (any install method)
@@ -194,8 +195,9 @@ Per-language guides: [`clients/README.md`](clients/README.md).
 Contributions are welcome — bugs, docs, client libraries, and platform configs.
 
 1. Read [CONTRIBUTING.md](CONTRIBUTING.md)
-2. `make build && make test`
-3. Open a pull request
+2. `make build` (or `make build-signed` on macOS), then `keysync trust` on macOS after each rebuild
+3. `make test`
+4. Open a pull request
 
 Report security issues via [private vulnerability reporting](https://github.com/dipockdas/keysync/security/advisories/new) — not public issues. See [SECURITY.md](SECURITY.md).
 
@@ -204,10 +206,13 @@ Report security issues via [private vulnerability reporting](https://github.com/
 ## Development
 
 ```bash
-make build          # → ./bin/keysync
-make test           # unit tests
-make test-platform  # platform client tests
-make build-signed   # macOS codesign (fewer keychain prompts)
+make build              # → ./bin/keysync
+export PATH="$PWD/bin:$PATH"
+keysync trust           # macOS: run after every make build (or copy to PATH)
+make test               # unit tests
+make test-platform      # platform client tests
+make build-signed       # macOS: codesign so "Always Allow" persists across rebuilds
+make install-signed     # optional: ~/.local/bin/keysync + run keysync trust
 ```
 
 ---
