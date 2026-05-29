@@ -192,14 +192,31 @@ Add your platforms to `.keysync.json`:
       "project": "my-api",
       "platforms": {
         "vercel": {
-          "projectId": "prj_xxxxx",
-          "target": ["production"]
+          "type": "http",
+          "endpoint": "https://api.vercel.com/v9/projects/{PROJECT_ID}/env",
+          "method": "POST",
+          "token_env": "VERCEL_TOKEN",
+          "headers": {
+            "Authorization": "Bearer {TOKEN}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "key": "{KEY}",
+            "value": "{VALUE}",
+            "target": ["production", "preview"],
+            "type": "encrypted"
+          },
+          "template_vars": {
+            "PROJECT_ID": "prj_xxxxx"
+          }
         }
       }
     }
   }
 }
 ```
+
+Add Railway or Supabase the same way — see [platform-examples.md](platform-examples.md).
 
 Store platform tokens in your keychain:
 

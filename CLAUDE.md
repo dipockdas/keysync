@@ -80,12 +80,9 @@ Full guide: [docs/getting-started.md](docs/getting-started.md). README: [README.
 
 ## Platform configuration
 
-Platforms are configured in `.keysync.json` and can be either:
+All platforms use the **generic engine** in `.keysync.json` with `"type": "cli"` or `"type": "http"` (including Vercel, Railway, Supabase). First-party configs: [docs/platform-configs/](docs/platform-configs/). Examples: [docs/platform-examples.md](docs/platform-examples.md).
 
-1. **Hardcoded** - Vercel, Railway, Supabase (built-in Go implementations in `internal/platforms/`)
-2. **Generic** - Any platform via declarative CLI or HTTP configs (no Go code needed)
-
-Generic platforms require a `"type"` field (`"cli"` or `"http"`). See [docs/platform-examples.md](docs/platform-examples.md) for complete examples.
+GitHub can use the structured `platforms.github` block (secrets vs variables) — see [docs/configuration.md](docs/configuration.md).
 
 **Example `.keysync.json` with mixed platforms**:
 ```json
@@ -102,7 +99,13 @@ Generic platforms require a `"type"` field (`"cli"` or `"http"`). See [docs/plat
           "config": {"REPO": "myorg/myapp"}
         },
         "vercel": {
-          "projectId": "prj_abc123"
+          "type": "http",
+          "endpoint": "https://api.vercel.com/v9/projects/{PROJECT_ID}/env",
+          "method": "POST",
+          "token_env": "VERCEL_TOKEN",
+          "headers": { "Authorization": "Bearer {TOKEN}", "Content-Type": "application/json" },
+          "body": { "key": "{KEY}", "value": "{VALUE}", "target": ["production"], "type": "encrypted" },
+          "template_vars": { "PROJECT_ID": "prj_abc123" }
         },
         "cloudflare": {
           "type": "cli",

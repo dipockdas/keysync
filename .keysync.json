@@ -14,12 +14,67 @@
           }
         },
         "vercel": {
-          "projectId": "prj_xxxxx",
-          "target": ["production", "preview"]
+          "type": "http",
+          "endpoint": "https://api.vercel.com/v9/projects/{PROJECT_ID}/env",
+          "method": "POST",
+          "token_env": "VERCEL_TOKEN",
+          "headers": {
+            "Authorization": "Bearer {TOKEN}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "key": "{KEY}",
+            "value": "{VALUE}",
+            "target": ["production", "preview"],
+            "type": "encrypted"
+          },
+          "template_vars": {
+            "PROJECT_ID": "YOUR_VERCEL_PROJECT_ID"
+          }
         },
         "railway": {
-          "environment": "production",
-          "service": "your-service-id"
+          "type": "http",
+          "endpoint": "https://backboard.railway.app/graphql/v2",
+          "method": "POST",
+          "token_env": "RAILWAY_TOKEN",
+          "headers": {
+            "Authorization": "Bearer {TOKEN}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "query": "mutation($input: VariableUpsertInput!) { variableUpsert(input: $input) { id name } }",
+            "variables": {
+              "input": {
+                "name": "{KEY}",
+                "value": "{VALUE}",
+                "projectId": "{SERVICE_ID}",
+                "environment": "{ENVIRONMENT}"
+              }
+            }
+          },
+          "template_vars": {
+            "SERVICE_ID": "YOUR_RAILWAY_SERVICE_ID",
+            "ENVIRONMENT": "production"
+          }
+        },
+        "supabase": {
+          "type": "http",
+          "endpoint": "https://api.supabase.com/v1/projects/{REF}/secrets",
+          "method": "POST",
+          "token_env": "SUPABASE_TOKEN",
+          "headers": {
+            "Authorization": "Bearer {TOKEN}",
+            "Content-Type": "application/json"
+          },
+          "body": [
+            {
+              "name": "{KEY}",
+              "value": "{VALUE}"
+            }
+          ],
+          "template_vars": {
+            "REF": "YOUR_SUPABASE_PROJECT_REF"
+          }
         },
         "cloudflare": {
           "type": "cli",

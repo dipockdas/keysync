@@ -1,8 +1,8 @@
 # First-Party Platform Configurations
 
 This directory contains canonical configuration examples for popular deployment
-platforms. These platforms are supported through keysync's declarative generic
-engine, not hardcoded implementations.
+platforms using keysync's declarative generic engine (`"type": "cli"` or `"type": "http"`).
+Vercel, Railway, and Supabase use the same pattern as Cloudflare or GitLab.
 
 **Two approaches**: Each platform can be configured using either:
 1. **HTTP API** - Direct API calls (requires API token, more control)
@@ -107,8 +107,3 @@ Platform-specific variables (in `template_vars`):
 - Railway: `SERVICE_ID`, `ENVIRONMENT`
 - Supabase: `REF`
 
-## Backward Compatibility
-
-Keysync 1.0+ still supports legacy config formats (without `"type": "http"`).
-These will be routed to the old built-in implementations, which are deprecated
-and will be removed in a future version.

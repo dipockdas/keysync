@@ -45,9 +45,7 @@ Higher scopes override lower scopes when the same key exists at multiple levels.
 
 ## Adding platform support
 
-Keysync uses a **generic platform engine** for deployment platform support. All platforms (including Vercel, Railway, Supabase) should use declarative JSON configs with `"type": "cli"` or `"type": "http"`.
-
-**⚠️ Deprecation**: Built-in hardcoded implementations (Vercel, Railway, Supabase) are deprecated and will be removed in keysync 2.0. Use first-party configs from `docs/platform-configs/` instead.
+Keysync uses a **generic platform engine** for all deployment platforms (including Vercel, Railway, Supabase). Every platform entry needs `"type": "cli"` or `"type": "http"`. Copy first-party configs from `docs/platform-configs/`.
 
 ### Adding a generic platform (AI workflow)
 

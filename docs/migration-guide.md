@@ -92,13 +92,31 @@ Create a `.keysync.json` in your project root:
       "project": "my-project",
       "platforms": {
         "vercel": {
-          "projectId": "prj_xxxxx"
+          "type": "http",
+          "endpoint": "https://api.vercel.com/v9/projects/{PROJECT_ID}/env",
+          "method": "POST",
+          "token_env": "VERCEL_TOKEN",
+          "headers": {
+            "Authorization": "Bearer {TOKEN}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "key": "{KEY}",
+            "value": "{VALUE}",
+            "target": ["production", "preview"],
+            "type": "encrypted"
+          },
+          "template_vars": {
+            "PROJECT_ID": "prj_xxxxx"
+          }
         }
       }
     }
   }
 }
 ```
+
+See [platform-examples.md](platform-examples.md) for Railway, Supabase, and other platforms.
 
 Then push your secrets to GitHub Secrets and deployment platforms:
 

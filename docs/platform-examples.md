@@ -2,16 +2,14 @@
 
 This document shows how to configure different platforms in `.keysync.json`.
 
-**⚠️ Deprecation Notice**: Built-in hardcoded platforms (Vercel, Railway, Supabase) are deprecated and will be removed in keysync 2.0. Use the generic engine with first-party configs from `docs/platform-configs/` instead.
-
 ## Platform Types
 
 Platforms are configured using the **generic engine** with declarative JSON configs:
 
 - **CLI-based**: Execute platform CLIs with template substitution (e.g., Cloudflare Workers via `wrangler`)
-- **HTTP-based**: Send HTTP requests to platform APIs (e.g., GitLab, Netlify, Render)
+- **HTTP-based**: Send HTTP requests to platform APIs (e.g., GitLab, Vercel, Railway, Supabase, Heroku, Render)
 
-See `docs/platform-configs/` for canonical examples of Vercel, Railway, and Supabase using the generic engine.
+Canonical JSON for Vercel, Railway, and Supabase also lives in `docs/platform-configs/` (same format as the examples below).
 
 ## Generic Platform Structure
 
@@ -223,6 +221,114 @@ Generic platforms require a `"type"` field set to either `"cli"` or `"http"`:
 
 ---
 
+### Vercel
+
+```json
+{
+  "vercel": {
+    "type": "http",
+    "endpoint": "https://api.vercel.com/v9/projects/{PROJECT_ID}/env",
+    "method": "POST",
+    "token_env": "VERCEL_TOKEN",
+    "headers": {
+      "Authorization": "Bearer {TOKEN}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "key": "{KEY}",
+      "value": "{VALUE}",
+      "target": ["production", "preview"],
+      "type": "encrypted"
+    },
+    "template_vars": {
+      "PROJECT_ID": "prj_abc123xyz"
+    }
+  }
+}
+```
+
+**Find PROJECT_ID**: Vercel dashboard → Project → Settings → Project ID (`prj_…`), or `vercel project ls`
+
+**Token**: Vercel → Account Settings → Tokens → create token with project access. Store as global secret `VERCEL_TOKEN`.
+
+**Push**: `keysync push -p my-app --platforms vercel`
+
+---
+
+### Railway
+
+```json
+{
+  "railway": {
+    "type": "http",
+    "endpoint": "https://backboard.railway.app/graphql/v2",
+    "method": "POST",
+    "token_env": "RAILWAY_TOKEN",
+    "headers": {
+      "Authorization": "Bearer {TOKEN}",
+      "Content-Type": "application/json"
+    },
+    "body": {
+      "query": "mutation($input: VariableUpsertInput!) { variableUpsert(input: $input) { id name } }",
+      "variables": {
+        "input": {
+          "name": "{KEY}",
+          "value": "{VALUE}",
+          "projectId": "{SERVICE_ID}",
+          "environment": "{ENVIRONMENT}"
+        }
+      }
+    },
+    "template_vars": {
+      "SERVICE_ID": "your-service-id",
+      "ENVIRONMENT": "production"
+    }
+  }
+}
+```
+
+**Find SERVICE_ID**: Railway project → service → Settings → Service ID
+
+**Token**: Railway → Account → Tokens. Store as global secret `RAILWAY_TOKEN`.
+
+**Push**: `keysync push -p my-app --platforms railway`
+
+---
+
+### Supabase
+
+```json
+{
+  "supabase": {
+    "type": "http",
+    "endpoint": "https://api.supabase.com/v1/projects/{REF}/secrets",
+    "method": "POST",
+    "token_env": "SUPABASE_TOKEN",
+    "headers": {
+      "Authorization": "Bearer {TOKEN}",
+      "Content-Type": "application/json"
+    },
+    "body": [
+      {
+        "name": "{KEY}",
+        "value": "{VALUE}"
+      }
+    ],
+    "template_vars": {
+      "REF": "abcdefghijklmnopqrst"
+    }
+  }
+}
+```
+
+**Find REF**: Supabase dashboard → Project Settings → General → Reference ID
+
+**Token**: Supabase → Account → Access Tokens (Management API). Store as global secret `SUPABASE_TOKEN`.
+
+**Push**: `keysync push -p my-app --platforms supabase`
+
+---
+
 ### DigitalOcean App Platform
 
 ```json
@@ -255,56 +361,6 @@ Generic platforms require a `"type"` field set to either `"cli"` or `"http"`:
 ```
 
 **Token**: DigitalOcean → API → Generate New Token
-
----
-
-## Hardcoded Platforms (Legacy)
-
-These platforms have built-in Go implementations and don't require a `"type"` field:
-
-### Vercel
-
-```json
-{
-  "vercel": {
-    "projectId": "prj_abc123xyz",
-    "target": ["production", "preview", "development"]
-  }
-}
-```
-
-**Token**: `VERCEL_TOKEN` (global secret or env var)
-
----
-
-### Railway
-
-```json
-{
-  "railway": {
-    "environment": "production",
-    "service": "service-id-here"
-  }
-}
-```
-
-**Token**: `RAILWAY_TOKEN` (global secret or env var)
-
----
-
-### Supabase
-
-```json
-{
-  "supabase": {
-    "ref": "abcdefghijklmnopqrst"
-  }
-}
-```
-
-**Token**: `SUPABASE_TOKEN` (global secret or env var)
-
-**Find ref**: Supabase dashboard → Project Settings → General → Reference ID
 
 ---
 
@@ -342,8 +398,23 @@ All platform configs support these placeholders:
           }
         },
         "vercel": {
-          "projectId": "prj_production123",
-          "target": ["production"]
+          "type": "http",
+          "endpoint": "https://api.vercel.com/v9/projects/{PROJECT_ID}/env",
+          "method": "POST",
+          "token_env": "VERCEL_TOKEN",
+          "headers": {
+            "Authorization": "Bearer {TOKEN}",
+            "Content-Type": "application/json"
+          },
+          "body": {
+            "key": "{KEY}",
+            "value": "{VALUE}",
+            "target": ["production"],
+            "type": "encrypted"
+          },
+          "template_vars": {
+            "PROJECT_ID": "prj_production123"
+          }
         },
         "cloudflare": {
           "type": "cli",

@@ -1,5 +1,7 @@
 # Send Command Redesign
 
+> **Historical note:** Internal design document from pre-release planning. The shipped command is **`keysync push`**, not `send`. Deprecation timelines and `sync` alias plans below were not implemented.
+
 ## Overview
 
 Refactor `keysync push` → `keysync send` with three major improvements:

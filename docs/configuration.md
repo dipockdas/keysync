@@ -11,9 +11,15 @@ The `.keysync.json` file maps GitHub repositories to project names, optional glo
       "project": "my-app",
       "globals": ["STRIPE_KEY"],
       "platforms": {
-        "vercel": { "projectId": "prj_xxxxx", "target": ["production", "preview"] },
-        "railway": { "environment": "production", "service": "abc123" },
-        "supabase": { "ref": "abcdefghijklmnopqrst" }
+        "vercel": {
+          "type": "http",
+          "endpoint": "https://api.vercel.com/v9/projects/{PROJECT_ID}/env",
+          "method": "POST",
+          "token_env": "VERCEL_TOKEN",
+          "headers": { "Authorization": "Bearer {TOKEN}", "Content-Type": "application/json" },
+          "body": { "key": "{KEY}", "value": "{VALUE}", "target": ["production", "preview"], "type": "encrypted" },
+          "template_vars": { "PROJECT_ID": "YOUR_VERCEL_PROJECT_ID" }
+        }
       }
     }
   }
@@ -49,9 +55,9 @@ See [pushing-secrets.md](pushing-secrets.md) and [local-vs-ci-env.md](local-vs-c
 
 ## Platform configuration
 
-### Generic engine (recommended)
+### Generic engine
 
-Add any platform with `"type": "cli"` or `"type": "http"`. First-party examples live in [platform-configs/](platform-configs/README.md). More samples: [platform-examples.md](platform-examples.md).
+All platforms use `"type": "cli"` or `"type": "http"` — including Vercel, Railway, and Supabase. Copy configs from [platform-configs/](platform-configs/README.md). More samples: [platform-examples.md](platform-examples.md).
 
 **CLI example** (Cloudflare Workers):
 
@@ -98,17 +104,9 @@ GitHub does not use `"type": "cli"`. Configure under `platforms.github`:
 
 Keys in `variables` are pushed with `gh variable set` (Actions `vars.*`). All other pushed keys use `gh secret set`. Example: [platform-configs/github.json](platform-configs/github.json).
 
-### Legacy built-in fields
+### Vercel, Railway, Supabase
 
-Vercel, Railway, and Supabase still accept shorthand fields in `.keysync.json` for backward compatibility. New projects should copy configs from `docs/platform-configs/` instead.
-
-| Platform | Field | Description |
-|----------|-------|-------------|
-| Vercel | `projectId` | Vercel project ID (`prj_…`) |
-| Vercel | `target` | `production`, `preview`, `development` |
-| Railway | `environment` | Deployment environment name |
-| Railway | `service` | Service ID |
-| Supabase | `ref` | Project reference ID |
+Same `"type": "http"` pattern as GitLab or Heroku. Full examples with push commands: [platform-examples.md](platform-examples.md#vercel). Copy-paste JSON: [platform-configs/vercel.json](platform-configs/vercel.json), [railway.json](platform-configs/railway.json), [supabase.json](platform-configs/supabase.json).
 
 ## Platform tokens
 
