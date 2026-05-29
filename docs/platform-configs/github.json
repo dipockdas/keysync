@@ -1,0 +1,12 @@
+{
+  "repo": "YOUR_ORG/YOUR_REPO",
+  "secrets": [
+    "OAUTH_CLIENT_SECRET",
+    "SESSION_SECRET"
+  ],
+  "variables": [
+    "OAUTH_CLIENT_ID",
+    "AUTH_ISSUER_URL",
+    "APP_BASE_URL"
+  ]
+}

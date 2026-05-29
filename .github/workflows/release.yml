@@ -1,0 +1,224 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          check-latest: true
+      - run: go test ./internal/store/... ./internal/config/... ./internal/crypto/... ./internal/commands/... -race -count=1
+
+  build-linux:
+    needs: test
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          check-latest: true
+      - name: Build linux + windows
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          LDFLAGS="-X github.com/dipockdas/keysync/internal/commands.Version=${VERSION}"
+          mkdir -p dist
+
+          for os in linux windows; do
+            for arch in amd64 arm64; do
+              echo "Building for $os/$arch..."
+              ext=""
+              [ "$os" = "windows" ] && ext=".exe"
+              GOOS=$os GOARCH=$arch CGO_ENABLED=0 go build \
+                -ldflags "$LDFLAGS" \
+                -o "dist/keysync_${os}_${arch}/keysync${ext}" \
+                ./cmd/keysync
+            done
+          done
+      - name: Package archives
+        shell: bash
+        run: |
+          cd dist
+          for dir in keysync_*; do
+            os_arch="${dir#keysync_}"
+            if [[ "$os_arch" == windows_* ]]; then
+              (cd "$dir" && zip -r "../keysync_${os_arch}.zip" .)
+            else
+              (cd "$dir" && tar czf "../keysync_${os_arch}.tar.gz" .)
+            fi
+          done
+      - uses: actions/upload-artifact@v7
+        with:
+          name: linux-windows-artifacts
+          path: |
+            dist/keysync_*.tar.gz
+            dist/keysync_*.zip
+
+  build-darwin:
+    needs: test
+    runs-on: macos-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/setup-go@v6
+        with:
+          go-version: stable
+          check-latest: true
+
+      - name: Install signing certificate
+        run: |
+          echo "${{ secrets.DEVELOPER_ID_CERT }}" | base64 -d > /tmp/cert.p12
+          security create-keychain -p temp temp.keychain
+          security unlock-keychain -p temp temp.keychain
+          security import /tmp/cert.p12 -k temp.keychain \
+            -P "${{ secrets.DEVELOPER_ID_CERT_PWD }}" -T /usr/bin/codesign
+          security set-key-partition-list -S apple-tool:,apple: -s -k temp temp.keychain
+          security default-keychain -s temp.keychain
+
+      - name: Build darwin (native, with Keychain cgo support)
+        shell: bash
+        run: |
+          VERSION="${{ github.ref_name }}"
+          LDFLAGS="-X github.com/dipockdas/keysync/internal/commands.Version=${VERSION}"
+          mkdir -p dist
+
+          for arch in amd64 arm64; do
+            echo "Building for darwin/$arch..."
+            GOOS=darwin GOARCH=$arch CGO_ENABLED=1 go build \
+              -ldflags "$LDFLAGS" \
+              -o "dist/keysync_darwin_${arch}/keysync" \
+              ./cmd/keysync
+          done
+
+      - name: Sign binaries
+        shell: bash
+        run: |
+          for dir in dist/keysync_darwin_*; do
+            codesign --force --sign "Developer ID Application: Dipock Das (W69M8X9AXT)" \
+              --options runtime \
+              --timestamp "$dir/keysync"
+          done
+
+      - name: Package and notarize
+        shell: bash
+        run: |
+          cd dist
+          for dir in keysync_darwin_*; do
+            binary="$dir/keysync"
+            zip_file="${dir}.zip"
+
+            # Create initial zip for notarization
+            (cd "$dir" && zip -r "../$zip_file" .)
+
+            # Submit for notarization and wait
+            echo "Submitting $zip_file for notarization..."
+            NOTARY_OUTPUT=$(xcrun notarytool submit "$zip_file" \
+              --apple-id ${{ secrets.APPLE_ID }} \
+              --team-id ${{ secrets.TEAM_ID }} \
+              --password ${{ secrets.APPLE_ID_PWD }} \
+              --wait 2>&1)
+
+            echo "$NOTARY_OUTPUT"
+
+            # Extract submission ID and status
+            SUBMISSION_ID=$(echo "$NOTARY_OUTPUT" | grep "id:" | head -1 | awk '{print $2}')
+            STATUS=$(echo "$NOTARY_OUTPUT" | grep "^  status:" | awk '{print $2}')
+
+            echo "Submission ID: $SUBMISSION_ID"
+            echo "Status: $STATUS"
+
+            # Check if notarization was accepted
+            if [ "$STATUS" = "Accepted" ]; then
+              echo "✅ Notarization accepted for $zip_file"
+
+              # Try to staple the notarization ticket (may fail for raw binaries)
+              echo "Attempting to staple notarization ticket to $binary..."
+              if xcrun stapler staple "$binary" 2>/dev/null; then
+                echo "✅ Stapling successful"
+              else
+                echo "⚠️  Stapling failed (expected for raw binaries - users can still download)"
+              fi
+
+              # Re-create the zip with the notarized binary
+              rm "$zip_file"
+              (cd "$dir" && zip -r "../$zip_file" .)
+              echo "✅ Created final notarized archive: $zip_file"
+            else
+              echo "❌ ERROR: Notarization failed with status: $STATUS"
+              echo "Fetching detailed log..."
+              xcrun notarytool log "$SUBMISSION_ID" \
+                --apple-id ${{ secrets.APPLE_ID }} \
+                --team-id ${{ secrets.TEAM_ID }} \
+                --password ${{ secrets.APPLE_ID_PWD }}
+              exit 1
+            fi
+          done
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: darwin-artifacts
+          path: dist/keysync_darwin_*.zip
+
+  create-release:
+    needs: [build-linux, build-darwin]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          name: linux-windows-artifacts
+          path: artifacts
+      - uses: actions/download-artifact@v8
+        with:
+          name: darwin-artifacts
+          path: artifacts
+      - name: Generate checksums
+        shell: bash
+        run: |
+          find artifacts -name '*.tar.gz' -o -name '*.zip' | while read f; do
+            sha256sum "$f"
+          done > artifacts/checksums.txt
+      - name: Create release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -e
+          NOTES="## keysync ${GITHUB_REF_NAME}
+
+          ### Install (macOS / Linux)
+
+          \`\`\`bash
+          brew tap dipockdas/keysync https://github.com/dipockdas/keysync
+          brew install keysync
+          \`\`\`
+
+          See [Homebrew guide](https://github.com/dipockdas/keysync/blob/main/docs/homebrew.md).
+
+          ### Build artifacts
+          "
+
+          for f in $(find artifacts -name '*.tar.gz' -o -name '*.zip' -o -name 'checksums.txt' | sort); do
+            NOTES="${NOTES}
+          - \`$(basename $f)\`"
+          done
+
+          # Flatten and collect all artifacts
+          mkdir -p release-assets
+          find artifacts -type f \( -name '*.tar.gz' -o -name '*.zip' -o -name 'checksums.txt' \) -exec cp {} release-assets/ \;
+
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$GITHUB_REF_NAME" \
+            --notes "$NOTES" \
+            --draft \
+            release-assets/*

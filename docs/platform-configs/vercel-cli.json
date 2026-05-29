@@ -1,0 +1,9 @@
+{
+  "type": "cli",
+  "command": "vercel env add {KEY} production preview --yes",
+  "stdin": "{VALUE}",
+  "token_env": "VERCEL_TOKEN",
+  "validation": {
+    "command_check": "vercel --version"
+  }
+}

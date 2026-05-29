@@ -1,0 +1,17 @@
+[package]
+name = "keysync"
+version = "0.1.0"
+edition = "2021"
+description = "Read secrets from the OS keychain — a keysync client library for Rust"
+license = "MIT"
+repository = "https://github.com/dipockdas/keysync"
+
+[dependencies]
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { version = "0.52", features = [
+    "Win32_Security_Credentials",
+    "Win32_Foundation",
+] }
+
+[dev-dependencies]

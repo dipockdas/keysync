@@ -1,0 +1,25 @@
+{
+  "type": "http",
+  "endpoint": "https://backboard.railway.app/graphql/v2",
+  "method": "POST",
+  "token_env": "RAILWAY_TOKEN",
+  "headers": {
+    "Authorization": "Bearer {TOKEN}",
+    "Content-Type": "application/json"
+  },
+  "body": {
+    "query": "mutation($input: VariableUpsertInput!) { variableUpsert(input: $input) { id name } }",
+    "variables": {
+      "input": {
+        "name": "{KEY}",
+        "value": "{VALUE}",
+        "projectId": "{SERVICE_ID}",
+        "environment": "{ENVIRONMENT}"
+      }
+    }
+  },
+  "template_vars": {
+    "SERVICE_ID": "YOUR_SERVICE_ID",
+    "ENVIRONMENT": "production"
+  }
+}

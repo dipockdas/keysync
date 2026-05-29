@@ -1,0 +1,28 @@
+
+.DS_Store
+.env
+.env.local
+.env.production
+.env.test
+.idea/
+.vscode/
+*.exe
+*.swo
+*.swp
+/bin/
+/keysync
+# Binaries
+# Environment files (never commit secrets)
+# IDE
+.claude/
+# OS
+# OS secret store index
+~/.config/keysync/
+Thumbs.db
+
+# Test artifacts
+test-results/
+*.test.txt
+
+# Internal/draft documents
+docs/blog-post.md
