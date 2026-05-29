@@ -18,6 +18,8 @@ Instead, please use **GitHub private vulnerability reporting**:
 
 Select "Report a vulnerability" and include reproduction steps. You should receive a response within 48 hours. If you do not, comment on the advisory thread to follow up.
 
+For urgent issues or if private reporting is unavailable, you may email **agent@dipockdas.com** (PGP key not required; use GitHub private reporting when possible).
+
 Please include the following information in your report:
 
 - Type of vulnerability (e.g., buffer overflow, SQL injection, cross-site scripting)
