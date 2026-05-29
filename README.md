@@ -27,13 +27,34 @@ At runtime, apps read **environment variables** (from `keysync export` locally o
 
 ---
 
+## Features
+
+- OS-native secret storage (macOS, Linux, Windows)
+- Global, project, and environment scopes with `keysync mv` between them
+- `keysync push` to GitHub Secrets + declarative platform configs (CLI or HTTP)
+- Import from `.env` or cloud CLIs (`keysync migrate`)
+- Secret rotation, export, shell completion, `keysync doctor`
+- Client libraries: Go, Python, TypeScript, Dart, Swift, Java, C#, Rust, C++, Ruby
+
+---
+
+## Demo
+
+See keysync in action before you install — suggested flow: `init` → `set` → `list` → `push` → `export`.
+
+Terminal recording coming soon — see [docs/demo.md](docs/demo.md) for `asciinema` recording and embed instructions.
+
+---
+
 ## Quick start
 
-No compiler required — download a release, store secrets in your OS keychain, and sync when you are ready.
+Pick one way to install, then follow **First steps** below.
 
-**Optional:** [`gh` CLI](https://cli.github.com) for `keysync push` to GitHub Secrets (install from [cli.github.com](https://cli.github.com)).
+**Optional:** [`gh` CLI](https://cli.github.com) for `keysync push` to GitHub Secrets.
 
-### Install from the releases page
+### 1. Install from the releases page
+
+Best if you want a pre-built binary with no compiler or package manager.
 
 1. Open **[Releases](https://github.com/dipockdas/keysync/releases)** and download the archive for your system:
    - **macOS (Apple Silicon):** `keysync_darwin_arm64.zip`
@@ -41,37 +62,29 @@ No compiler required — download a release, store secrets in your OS keychain, 
    - **Linux:** `keysync_linux_amd64.tar.gz` or `keysync_linux_arm64.tar.gz`
    - **Windows:** `keysync_windows_amd64.zip` or `keysync_windows_arm64.zip`
 2. Extract the archive and put `keysync` (or `keysync.exe` on Windows) on your `PATH`.
-3. Verify:
+3. Verify: `keysync version` and `keysync doctor`
+4. **macOS only:** `keysync trust` (fewer keychain password prompts)
 
-   ```bash
-   keysync version
-   keysync doctor
-   ```
+### 2. Terminal install (Homebrew or Go)
 
-4. **macOS only** (fewer keychain password prompts):
+**Homebrew** (macOS and Linux):
 
-   ```bash
-   keysync trust
-   ```
+```bash
+brew tap dipockdas/keysync https://github.com/dipockdas/keysync
+brew install keysync
+```
 
-5. In your project directory:
+**Go install** (requires [Go 1.25+](https://go.dev/dl/)):
 
-   ```bash
-   keysync init --project my-app
-   keysync set API_KEY=your_value_here
-   keysync set -p my-app DATABASE_URL=postgres://localhost:5432/myapp
-   keysync push -p my-app --dry-run    # preview what would sync
-   keysync push -p my-app              # → GitHub Secrets + platforms (needs gh)
-   eval $(keysync export API_KEY)      # one secret into your shell
-   ```
+```bash
+go install github.com/dipockdas/keysync/cmd/keysync@latest
+```
 
-Edit `.keysync.json` with your repo name and platform IDs — see [configuration](docs/configuration.md). Platform tokens (`VERCEL_TOKEN`, etc.) are stored with `keysync set`, never in the config file.
+Ensure the install directory is on your `PATH` (`$HOME/go/bin` by default). See [docs/homebrew.md](docs/homebrew.md) and [docs/install.md](docs/install.md).
 
-More install options (Homebrew, Go): [docs/install.md](docs/install.md).
+### 3. Build from source (developers)
 
-### Build from source (developers)
-
-**Prerequisites:** [Go 1.25+](https://go.dev/dl/), [`gh` CLI](https://cli.github.com) for push.
+**Prerequisites:** [Go 1.25+](https://go.dev/dl/).
 
 ```bash
 git clone https://github.com/dipockdas/keysync.git
@@ -80,13 +93,20 @@ export PATH="$PWD/bin:$PATH"
 keysync trust                     # macOS: once after install
 ```
 
-Then use the same `keysync init` / `set` / `push` / `export` commands as above.
+### First steps (any install method)
 
----
+In your project directory:
 
-## Demo
+```bash
+keysync init --project my-app
+keysync set API_KEY=your_value_here
+keysync set -p my-app DATABASE_URL=postgres://localhost:5432/myapp
+keysync push -p my-app --dry-run    # preview what would sync
+keysync push -p my-app              # → GitHub Secrets + platforms (needs gh)
+eval $(keysync export API_KEY)      # one secret into your shell
+```
 
-Terminal recording coming soon — see [docs/demo.md](docs/demo.md) for `asciinema` instructions. Suggested flow: `init` → `set` → `list` → `push` → `export`.
+Edit `.keysync.json` with your repo name and platform IDs — see [configuration](docs/configuration.md). Platform tokens (`VERCEL_TOKEN`, etc.) are stored with `keysync set`, never in the config file.
 
 ---
 
@@ -97,17 +117,6 @@ Terminal recording coming soon — see [docs/demo.md](docs/demo.md) for `asciine
 </p>
 
 Three scope levels: **global** → **project** → **environment** (higher wins on conflict). Move between scopes with `keysync mv`. Details: [architecture](docs/architecture.md).
-
----
-
-## Features
-
-- OS-native secret storage (macOS, Linux, Windows)
-- Global, project, and environment scopes with `keysync mv` between them
-- `keysync push` to GitHub Secrets + declarative platform configs (CLI or HTTP)
-- Import from `.env` or cloud CLIs (`keysync migrate`)
-- Secret rotation, export, shell completion, `keysync doctor`
-- Client libraries: Go, Python, TypeScript, Dart, Swift, Java, C#, Rust, C++, Ruby
 
 ---
 
@@ -130,18 +139,7 @@ Three scope levels: **global** → **project** → **environment** (higher wins 
 
 Global flags: `--project` / `-p`, `--env` / `-e`, `--config`, `--store fallback`. Full reference: `keysync --help`.
 
----
-
-## Installation
-
-| Method | Best for |
-|--------|----------|
-| **[Releases](https://github.com/dipockdas/keysync/releases)** | Everyone — pre-built binaries (recommended) |
-| **Homebrew** | `brew tap dipockdas/keysync https://github.com/dipockdas/keysync && brew install keysync` |
-| **Go install** | `go install github.com/dipockdas/keysync/cmd/keysync@latest` |
-| **From source** | `git clone … && make build` → `./bin/keysync` |
-
-Full details: [docs/install.md](docs/install.md). Platform keychain notes: [docs/platform-setup.md](docs/platform-setup.md).
+Install reference: [docs/install.md](docs/install.md) · Platform keychain notes: [docs/platform-setup.md](docs/platform-setup.md)
 
 ---
 
