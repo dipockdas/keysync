@@ -12,4 +12,7 @@ paths = [
   '''(?i)test-results/''',
   '''\.keysync\.json$''',
   '''README\.md$''',
+  '''(?i)(^|/)AGENTS\.md$''',
+  '''(?i)(^|/)CLAUDE\.md$''',
+  '''(?i)clients/.*/README\.md$''',
 ]
