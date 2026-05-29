@@ -19,9 +19,11 @@
 
 ## Why keysync
 
-`.env` files are convenient until they leak — committed by mistake, copied to the wrong machine, or shared in a screenshot. Your OS already has a credential store you trust for SSH keys and browser passwords. Keysync makes that store the source of truth for every development secret, with a single `keysync push` to GitHub and Vercel, Railway, Supabase, Cloudflare, GitLab, and [any platform with a CLI or HTTP API](docs/platform-examples.md).
+`.env` files are convenient until they leak — committed by mistake, copied to the wrong machine, or shared in a screenshot. Your OS already has a credential store you trust for SSH keys and browser passwords. Keysync makes that store the source of truth for every development secret, with a single `keysync push` to GitHub and [any platform with a CLI or HTTP API](docs/platform-examples.md) — Vercel, Railway, Supabase, Cloudflare, GitLab, and more.
 
 At runtime, apps read **environment variables** (from `keysync export` locally or from your platform in production). Client libraries check env first, so you are not locked in — migrate to Vault or AWS Secrets Manager later without rewriting application code.
+
+Oh and it's just handy to get your secrets without having to remember where you left your keys....
 
 [When is keysync the right fit?](docs/when-to-use.md) · [Architecture](docs/architecture.md) · [Security scanning](docs/SECURITY-SCANNING.md)
 
@@ -40,7 +42,7 @@ At runtime, apps read **environment variables** (from `keysync export` locally o
 
 ## Demo
 
-See keysync in action before you install — suggested flow: `init` → `set` → `list` → `push` → `export`.
+See keysync in action before you install — same flow as [First steps](#first-steps-any-install-method): `set` → `get` → `list`, then `init` → `migrate`, then `push`.
 
 Terminal recording coming soon — see [docs/demo.md](docs/demo.md) for `asciinema` recording and embed instructions.
 
@@ -63,7 +65,7 @@ Best if you want a pre-built binary with no compiler or package manager.
    - **Windows:** `keysync_windows_amd64.zip` or `keysync_windows_arm64.zip`
 2. Extract the archive and put `keysync` (or `keysync.exe` on Windows) on your `PATH`.
 3. Verify: `keysync version` and `keysync doctor`
-4. **macOS only:** `keysync trust` (fewer keychain password prompts)
+4. **macOS only:** `keysync trust` (stops repeated Keychain access pop-ups)
 
 ### 2. Terminal install (Homebrew or Go)
 
@@ -72,6 +74,7 @@ Best if you want a pre-built binary with no compiler or package manager.
 ```bash
 brew tap dipockdas/keysync https://github.com/dipockdas/keysync
 brew install keysync
+keysync trust                  # macOS only
 ```
 
 **Go install** (requires [Go 1.25+](https://go.dev/dl/)):
@@ -80,7 +83,13 @@ brew install keysync
 go install github.com/dipockdas/keysync/cmd/keysync@latest
 ```
 
-Ensure the install directory is on your `PATH` (`$HOME/go/bin` by default). See [docs/homebrew.md](docs/homebrew.md) and [docs/install.md](docs/install.md).
+Ensure the install directory is on your `PATH` (`$HOME/go/bin` by default), then on macOS:
+
+```bash
+keysync trust
+```
+
+See [docs/homebrew.md](docs/homebrew.md) and [docs/install.md](docs/install.md).
 
 ### 3. Build from source (developers)
 
@@ -91,7 +100,7 @@ git clone https://github.com/dipockdas/keysync.git
 cd keysync
 make build-signed                 # macOS: recommended; use make build on Linux/Windows
 export PATH="$PWD/bin:$PATH"
-keysync trust                     # macOS: after every build or copy — avoids keychain prompts
+keysync trust                     # macOS: after every build or copy — stops repeated Keychain pop-ups
 ```
 
 ### First steps (any install method)
@@ -169,7 +178,7 @@ Install reference: [docs/install.md](docs/install.md) · Platform keychain notes
 
 ## Client libraries
 
-Read secrets at runtime — env vars first, keychain fallback. No dependency on the `keysync` binary.
+If you don't want to export secrets as environment variables, you can read secrets at runtime — env vars first, keychain fallback. No dependency on the `keysync` binary.
 
 | Language | Path | Windows |
 |----------|------|---------|
