@@ -91,6 +91,7 @@ gh auth login
 
 ## Next steps
 
+- [Getting started](getting-started.md)
 - [Quick start](../README.md#quick-start)
 - [Platform setup](platform-setup.md)
 - [Configuration](configuration.md)

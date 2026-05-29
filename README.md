@@ -96,18 +96,41 @@ keysync trust                     # macOS: after every build or copy — avoids 
 
 ### First steps (any install method)
 
-In your project directory:
+After `keysync version`, `keysync doctor`, and on macOS `keysync trust`, work through three stages. Full walkthrough: **[docs/getting-started.md](docs/getting-started.md)**.
+
+#### 1. Local — try keysync anywhere
+
+No project folder or `.keysync.json` required.
 
 ```bash
-keysync init --project my-app
 keysync set API_KEY=your_value_here
-keysync set -p my-app DATABASE_URL=postgres://localhost:5432/myapp
-keysync push -p my-app --dry-run    # preview what would sync
-keysync push -p my-app              # → GitHub Secrets + platforms (needs gh)
-eval $(keysync export API_KEY)      # one secret into your shell
+keysync get API_KEY
+keysync set -p my-app DATABASE_URL=postgres://localhost:5432/myapp --env ""
+keysync get DATABASE_URL -p my-app
+keysync list
+keysync list -p my-app
 ```
 
-Edit `.keysync.json` with your repo name and platform IDs — see [configuration](docs/configuration.md). Platform tokens (`VERCEL_TOKEN`, etc.) are stored with `keysync set`, never in the config file.
+With `-p`, `set` defaults to the `dev` environment unless you pass `--env` (use `--env ""` for project-wide secrets).
+
+#### 2. In your project — init and migrate
+
+```bash
+cd ~/code/my-app
+keysync init --project my-app
+keysync migrate                  # optional: import an existing .env
+```
+
+Edit `.keysync.json` with your repo and platform IDs — see [configuration](docs/configuration.md).
+
+#### 3. Cloud — push to GitHub and platforms
+
+Requires [`gh`](https://cli.github.com). Platform tokens (`VERCEL_TOKEN`, etc.) go in the keychain via `keysync set`, never in the config file.
+
+```bash
+keysync push -p my-app --dry-run
+keysync push -p my-app
+```
 
 ---
 
@@ -170,6 +193,7 @@ Per-language guides: [`clients/README.md`](clients/README.md).
 
 | Topic | Guide |
 |-------|--------|
+| Getting started | [docs/getting-started.md](docs/getting-started.md) |
 | Installation | [docs/install.md](docs/install.md) · [Homebrew](docs/homebrew.md) |
 | Configuration & platforms | [docs/configuration.md](docs/configuration.md) |
 | Testing & CI | [docs/testing.md](docs/testing.md) |
