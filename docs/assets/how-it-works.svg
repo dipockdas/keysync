@@ -40,7 +40,7 @@
   <rect class="box-platform" x="400" y="40" width="200" height="72" rx="8"/>
   <text class="label" x="500" y="68" text-anchor="middle">GitHub + platforms</text>
   <text class="sublabel" x="500" y="88" text-anchor="middle">GitHub Secrets, Vercel,</text>
-  <text class="sublabel" x="500" y="104" text-anchor="middle">Railway, Supabase, &</text>
+  <text class="sublabel" x="500" y="104" text-anchor="middle">Railway, Supabase, ...</text>
 
   <!-- Export branch -->
   <line class="arrow-down" x1="285" y1="112" x2="285" y2="148"/>
@@ -48,7 +48,7 @@
 
   <rect class="box-accent" x="210" y="150" width="150" height="56" rx="8"/>
   <text class="label" x="285" y="176" text-anchor="middle">Shell env vars</text>
-  <text class="sublabel" x="285" y="194" text-anchor="middle">eval $(keysync export &)</text>
+  <text class="sublabel" x="285" y="194" text-anchor="middle">eval $(keysync export ...)</text>
 
   <line class="arrow" x1="360" y1="178" x2="618" y2="178"/>
 
@@ -59,6 +59,6 @@
   <!-- Scopes note -->
   <rect fill="#fffbeb" stroke="#d97706" stroke-width="1" x="620" y="40" width="280" height="72" rx="8"/>
   <text class="label" x="760" y="64" text-anchor="middle">Scopes</text>
-  <text class="sublabel" x="760" y="84" text-anchor="middle">global ’ project ’ environment</text>
-  <text class="sublabel" x="760" y="100" text-anchor="middle">higher scope wins on conflict · keysync mv</text>
+  <text class="sublabel" x="760" y="84" text-anchor="middle">global - project - environment</text>
+  <text class="sublabel" x="760" y="100" text-anchor="middle">higher scope wins - keysync mv</text>
 </svg>

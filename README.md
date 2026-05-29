@@ -93,7 +93,7 @@ Terminal recording coming soon — see [docs/demo.md](docs/demo.md) for `asciine
 ## How it works
 
 <p align="center">
-  <img src="docs/assets/how-it-works.svg" alt="keysync flow: .keysync.json and set store secrets in the OS keychain; push syncs to GitHub and platforms; export loads env vars for your app" width="920"/>
+  <img src="docs/assets/how-it-works.png" alt="keysync flow: configuration in .keysync.json, secrets in the OS keychain, push syncs to GitHub and platforms, export loads environment variables for your app" width="920"/>
 </p>
 
 Three scope levels: **global** → **project** → **environment** (higher wins on conflict). Move between scopes with `keysync mv`. Details: [architecture](docs/architecture.md).
