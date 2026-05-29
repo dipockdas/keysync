@@ -1,5 +1,15 @@
 # keysync — Project Instructions for Claude Code
 
+## Agent workflow
+
+Read **[docs/coding-assistants.md](docs/coding-assistants.md)** and **[`.agents/skills/keysync-agent/SKILL.md`](.agents/skills/keysync-agent/SKILL.md)** before helping with keysync.
+
+**Do not run `keysync set` or `keysync migrate` for the user** — secret values must not enter chat. Give terminal commands for the user to run. They may share migrate output JSON (key names/scopes only) for code updates.
+
+**OK for assistants:** `.keysync.json` edits, `push --dry-run`, init scaffolding, client migration, export docs (user runs `eval $(keysync export …)` locally).
+
+When editing **this repository**: do not run `keysync init` or `keysync push` here; `.keysync.json` is an example template only. Use `make test` — never store real user secrets in the keysync repo.
+
 ## Repository structure
 
 ```
@@ -15,6 +25,7 @@ clients/                # Native language client libraries
   go/                   #   Go client (build-tagged, direct keychain)
   node/                 #   TypeScript/Node.js client
   python/               #   Python client
+  dart/                 #   Dart/Flutter client
   swift/                #   Swift client
   java/                 #   Java client (Maven, JNA for Windows)
   csharp/               #   C# client (.NET 8.0, P/Invoke for Windows)
@@ -49,13 +60,23 @@ make clean          # rm -rf ./bin/
 
 The `keysync push` command includes validation to prevent users from accidentally syncing secrets to the keysync repository itself:
 
-- Rejects repo names matching `dipockdas/keysync` (internal/commands/sync.go)
+- Rejects repo names matching `dipockdas/keysync` (`internal/commands/push.go`)
 - Rejects placeholder values like `YOUR_ORG/YOUR_REPO`
 - Example `.keysync.json` uses placeholder values, not real repo names
 
 **Why this matters**: The sync command pushes secrets to GitHub Secrets via the `gh` CLI. Without validation, users who copy the example config without updating it would push their secrets to the keysync repo itself, creating a security risk.
 
 **Push is local-only**: The push command runs on the user's machine and reads from their OS keychain. There is no CI/CD workflow that syncs from GitHub Secrets to platforms — all pushing happens locally.
+
+## User quick start (three stages)
+
+1. **Local** — `set` / `get` / `list` (no `.keysync.json` required)
+2. **Project** — `init`, optional `migrate`
+3. **Cloud** — `push --dry-run`, then `push` (needs `gh`)
+
+Full guide: [docs/getting-started.md](docs/getting-started.md). README: [README.md](README.md#first-steps-any-install-method).
+
+**Scopes:** With `-p`, `set`/`push`/`list` default to `dev` unless `--env` is passed; `--env ""` = project-wide. `get`/`export` use `--env` only when explicitly passed.
 
 ## Platform configuration
 

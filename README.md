@@ -203,6 +203,7 @@ Per-language guides: [`clients/README.md`](clients/README.md).
 | Topic | Guide |
 |-------|--------|
 | Getting started | [docs/getting-started.md](docs/getting-started.md) |
+| Coding assistants | [docs/coding-assistants.md](docs/coding-assistants.md) |
 | Installation | [docs/install.md](docs/install.md) · [Homebrew](docs/homebrew.md) |
 | Configuration & platforms | [docs/configuration.md](docs/configuration.md) |
 | Testing & CI | [docs/testing.md](docs/testing.md) |
@@ -258,6 +259,8 @@ Apache 2.0 — see [LICENSE](LICENSE).
 
 ## For AI coding assistants
 
+- [docs/coding-assistants.md](docs/coding-assistants.md) — what assistants should and should not do (`set` / `migrate` are user-only)
+- [`.agents/skills/keysync-agent/SKILL.md`](.agents/skills/keysync-agent/SKILL.md) — agent skill (same policy)
 - [AGENTS.md](AGENTS.md) — architecture and client-library conventions
 - [CLAUDE.md](CLAUDE.md) — build commands and repo layout
 - Per-language `AGENTS.md` under [`clients/`](clients/)

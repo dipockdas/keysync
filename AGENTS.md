@@ -1,11 +1,34 @@
 # keysync — Agent Instructions
 
+## Using keysync safely (read first)
+
+Full policy: **[docs/coding-assistants.md](docs/coding-assistants.md)**. Agent skill: **[`.agents/skills/keysync-agent/SKILL.md`](.agents/skills/keysync-agent/SKILL.md)**.
+
+### User-initiated (do not run for the user)
+
+- **`keysync set`** — requires the secret in chat or terminal; tell the user to run it locally. Never ask them to paste secret values into the conversation.
+- **`keysync migrate`** — reads `.env` on their machine; user runs it. For code help they may paste only the migrate **result JSON** (key names + scopes), not `.env` contents.
+- **`keysync push`** (real push) — user runs after reviewing `keysync push --dry-run`.
+
+### Assistant-friendly
+
+- Edit **`.keysync.json`** (repo slugs, platform IDs, generic platform configs — no tokens).
+- **`keysync push --dry-run`**, **`keysync init`** (scaffold), **`keysync doctor`**, **`keysync trust`** instructions.
+- **Client library migration** and **`keysync export`** documentation (user runs export in their shell).
+- **Never** log, commit, or paste secret values — key names and scopes only.
+- **Never `keysync init` or `keysync push` in the `dipockdas/keysync` repo** — example config only.
+
+Other rules: **`set` is local only** (use `push` for cloud); with **`-p`**, `set`/`push`/`list` default to **`dev`** unless `--env` is set (`--env ""` = project-wide).
+
+User flow: [docs/getting-started.md](docs/getting-started.md).
+
 ## Project overview
 
 keysync is a unified secret management tool that stores secrets in OS-native
 keychains (macOS Keychain, Linux libsecret, Windows Credential Manager) and
-syncs them to GitHub Secrets and deployment platforms (Vercel, Railway,
-Supabase).
+syncs them to GitHub Secrets and deployment platforms via declarative configs
+(Vercel, Railway, Supabase, Cloudflare, GitLab, and more — see
+[docs/platform-examples.md](docs/platform-examples.md)).
 
 ## Architecture
 
@@ -92,6 +115,7 @@ directly from the OS keychain with no dependency on the keysync binary:
 | Go | `clients/go/` | security CLI | secret-tool CLI | wincred library | Ready |
 | Python | `clients/python/` | security CLI | secret-tool CLI | ctypes Win32 API | Ready |
 | TypeScript | `clients/node/` | security CLI | secret-tool CLI | PowerShell + Win32 | Ready (macOS/Linux) |
+| Dart/Flutter | `clients/dart/` | security CLI | secret-tool CLI | Not planned | Ready (macOS/Linux) |
 | Swift | `clients/swift/` | Security.framework | secret-tool CLI | Not planned | Ready (macOS/Linux) |
 | Java | `clients/java/` | security CLI | secret-tool CLI | JNA → Win32 API | Available (Windows: not fully tested) |
 | C# (.NET) | `clients/csharp/` | security CLI | secret-tool CLI | P/Invoke → Win32 API | Available (Windows: not fully tested) |

@@ -1,0 +1,79 @@
+# Coding assistants and keysync
+
+AI coding assistants (Cursor, Claude Code, Copilot, etc.) can help you configure keysync, edit `.keysync.json`, migrate application code away from `.env`, and run safe read-only or dry-run commands. They should **not** store secret values on your behalf.
+
+## Why some commands must be user-initiated
+
+Anything that **writes a secret value** needs that value in the conversation or terminal. If you ask an assistant to run `keysync set API_KEY=…`, you typically paste the real key into chat — which is a leak vector (logs, history, training policies, shared threads).
+
+**Rule of thumb:** You type secrets; the assistant helps with everything around them.
+
+| Command / action | Who should run it | Assistant can help with |
+|------------------|-------------------|-------------------------|
+| `keysync set KEY=value` | **You** (terminal) | Explain syntax, scopes, `--env` |
+| `keysync migrate` | **You** (terminal) | Interpret migrate output (key names only), update app code |
+| `keysync get` / `list --unmask` | **You** | Explain flags; avoid asking assistant to print values |
+| `keysync init` | Either | Scaffold project name; you confirm |
+| `keysync push --dry-run` | Assistant or you | Preview targets; confirm repo name |
+| `keysync push` | **You** (after dry-run) | Remind to dry-run first |
+| Edit `.keysync.json` | Assistant | Repo slugs, platform IDs, generic platform configs — **no tokens** |
+| `keysync export` / client libs | Assistant | Wiring app code; use placeholders in examples |
+| `keysync doctor` / `keysync trust` | Either | Diagnostics and macOS trust steps |
+
+## Safe assistant workflows
+
+### 1. Platform and repo configuration
+
+The assistant can author or update `.keysync.json`:
+
+- GitHub repo slug (`yourorg/yourapp`)
+- Vercel `projectId`, Railway service IDs, generic `cli` / `http` platform blocks
+- `exclude` / `allowlist` for push
+
+Store `VERCEL_TOKEN`, `GH_TOKEN`, etc. yourself:
+
+```bash
+keysync set VERCEL_TOKEN=...    # you run this locally, not in chat
+```
+
+### 2. Migrate from `.env`
+
+You run:
+
+```bash
+keysync migrate
+```
+
+Paste only the **`---MIGRATION_RESULT_START---`** block (key names and scopes) into the assistant if you want help updating source code — not the `.env` contents.
+
+### 3. Push to cloud
+
+Assistant may suggest:
+
+```bash
+keysync push -p my-app --dry-run
+```
+
+You review output, then run `keysync push` yourself.
+
+### 4. Application code
+
+Assistants should replace `process.env.X` / `os.Getenv` with keysync client libraries using **key names and scopes from migrate output**, never by reading secret values.
+
+## Working in the keysync repository
+
+If the open project is [github.com/dipockdas/keysync](https://github.com/dipockdas/keysync):
+
+- Do not `keysync init` or `keysync push` there (example config only; push is blocked).
+- Assistants should use `make test` and code changes — not real user secrets.
+
+## Agent skill in this repo
+
+Maintainers ship **[`.agents/skills/keysync-agent/SKILL.md`](../.agents/skills/keysync-agent/SKILL.md)** for tools that load project skills. See also [AGENTS.md](../AGENTS.md) and [CLAUDE.md](../CLAUDE.md).
+
+## Related docs
+
+- [getting-started.md](getting-started.md) — human quick start
+- [configuration.md](configuration.md) — `.keysync.json` schema
+- [pushing-secrets.md](pushing-secrets.md) — push behavior and dry-run
+- [migration-guide.md](migration-guide.md) — `.env` import details

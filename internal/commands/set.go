@@ -14,7 +14,7 @@ func newSetCmd() *cobra.Command {
 		Short: "Store a secret in the local OS secret store",
 		Long: F(`Stores a secret in the local OS secret store (macOS Keychain, Linux libsecret,
 Windows Credential Manager). This is a local-only operation — it does not push to
-GitHub or deployment platforms. Use {c}keysync sync{/c} to push secrets upstream.
+GitHub or deployment platforms. Use {c}keysync push{/c} to push secrets upstream.
 
 {b}Syntax:{/b}
   {c}keysync set KEY=VALUE{/c}        (use {c}={/c}, no space around it)
@@ -32,7 +32,7 @@ scope (no environment). Without {c}--project{/c}, secrets are stored {g}globally
   {c}keysync set DB_URL=staging-url --project my-app --env staging{/c}    {g}# project+env{/g}
 
 {b}See also:{/b}
-  {c}keysync sync --help{/c}
+  {c}keysync push --help{/c}
   Tutorial: {u}https://github.com/dipockdas/keysync#quick-start{/u}`),
 		Args: func(cmd *cobra.Command, args []string) error {
 			if len(args) == 0 {
