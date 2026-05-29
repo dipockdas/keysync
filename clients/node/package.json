@@ -1,0 +1,19 @@
+{
+  "name": "@dipockdas/keysync",
+  "version": "0.1.0",
+  "description": "Retrieve secrets managed by keysync from the OS keychain",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "test": "vitest run",
+    "test:watch": "vitest"
+  },
+  "keywords": ["keysync", "secrets", "keychain"],
+  "license": "MIT",
+  "devDependencies": {
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.7",
+    "@types/node": "^25.9.1"
+  }
+}

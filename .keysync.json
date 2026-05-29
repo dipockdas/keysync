@@ -1,0 +1,54 @@
+{
+  "repos": {
+    "YOUR_ORG/YOUR_REPO": {
+      "project": "your-project-name",
+      "globals": ["EXAMPLE_GLOBAL_KEY"],
+      "platforms": {
+        "github": {
+          "type": "cli",
+          "command": "gh secret set {KEY} --repo {REPO}",
+          "stdin": "{VALUE}",
+          "token_env": "GH_TOKEN",
+          "config": {
+            "REPO": "YOUR_ORG/YOUR_REPO"
+          }
+        },
+        "vercel": {
+          "projectId": "prj_xxxxx",
+          "target": ["production", "preview"]
+        },
+        "railway": {
+          "environment": "production",
+          "service": "your-service-id"
+        },
+        "cloudflare": {
+          "type": "cli",
+          "command": "wrangler secret put {KEY}",
+          "stdin": "{VALUE}",
+          "token_env": "CLOUDFLARE_API_TOKEN",
+          "validation": {
+            "command_check": "wrangler --version"
+          }
+        },
+        "gitlab": {
+          "type": "http",
+          "endpoint": "https://gitlab.com/api/v4/projects/{PROJECT_ID}/variables",
+          "method": "POST",
+          "headers": {
+            "PRIVATE-TOKEN": "{GITLAB_TOKEN}"
+          },
+          "body": {
+            "key": "{KEY}",
+            "value": "{VALUE}",
+            "protected": false,
+            "masked": true
+          },
+          "token_env": "GITLAB_TOKEN",
+          "config": {
+            "PROJECT_ID": "12345678"
+          }
+        }
+      }
+    }
+  }
+}

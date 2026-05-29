@@ -1,0 +1,13 @@
+[build-system]
+requires = ["setuptools>=82.0.1"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "keysync"
+version = "0.1.0"
+description = "Retrieve secrets managed by keysync from the OS keychain"
+requires-python = ">=3.11"
+license = { text = "MIT" }
+
+[tool.setuptools.packages.find]
+where = ["src"]

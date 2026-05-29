@@ -1,0 +1,14 @@
+name: keysync
+description: Keysync client library for Dart/Flutter - retrieve secrets from environment variables or OS keychain
+version: 1.0.0
+homepage: https://github.com/dipockdas/keysync
+repository: https://github.com/dipockdas/keysync/tree/main/clients/dart
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+# No external dependencies - uses only dart:io from the standard library
+dependencies:
+
+dev_dependencies:
+  lints: ^4.0.0

@@ -1,0 +1,15 @@
+# Gitleaks configuration — see docs/SECURITY-SCANNING.md
+title = "keysync gitleaks config"
+
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Documentation and test fixtures use intentional placeholder secrets"
+paths = [
+  '''(?i)docs/''',
+  '''(?i).*_test\.go$''',
+  '''(?i)test-results/''',
+  '''\.keysync\.json$''',
+  '''README\.md$''',
+]

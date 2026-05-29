@@ -1,0 +1,19 @@
+{
+  "type": "http",
+  "endpoint": "https://api.supabase.com/v1/projects/{REF}/secrets",
+  "method": "POST",
+  "token_env": "SUPABASE_TOKEN",
+  "headers": {
+    "Authorization": "Bearer {TOKEN}",
+    "Content-Type": "application/json"
+  },
+  "body": [
+    {
+      "name": "{KEY}",
+      "value": "{VALUE}"
+    }
+  ],
+  "template_vars": {
+    "REF": "YOUR_PROJECT_REF"
+  }
+}

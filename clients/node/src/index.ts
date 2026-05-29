@@ -1,0 +1,138 @@
+import { serviceName, parseServiceName } from "./types.js";
+import { darwinGet, darwinList } from "./darwin.js";
+import { linuxGet, linuxList } from "./linux.js";
+import { windowsGet, windowsList } from "./windows.js";
+
+// ---------------------------------------------------------------------------
+// Error types
+// ---------------------------------------------------------------------------
+
+/** Errors thrown by the keysync client. */
+export class KeySyncError extends Error {
+  constructor(
+    public readonly code: "notFound" | "keychainError" | "unsupportedPlatform",
+    message: string
+  ) {
+    super(message);
+    this.name = "KeySyncError";
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Platform selection
+// ---------------------------------------------------------------------------
+
+type PlatformImpl = {
+  get(service: string, account: string): Promise<string>;
+  list(): Promise<Array<{ service: string; account: string }>>;
+};
+
+function selectPlatform(): PlatformImpl {
+  const platform = process.platform;
+  switch (platform) {
+    case "darwin":
+      return { get: darwinGet, list: darwinList };
+    case "linux":
+      return { get: linuxGet, list: linuxList };
+    case "win32":
+      return { get: windowsGet, list: windowsList };
+    default:
+      throw new KeySyncError(
+        "unsupportedPlatform",
+        `unsupported platform: ${platform}`
+      );
+  }
+}
+
+const platform: PlatformImpl = selectPlatform();
+
+// ---------------------------------------------------------------------------
+// Public API
+// ---------------------------------------------------------------------------
+
+/**
+ * Retrieve a secret from the OS keychain.
+ *
+ * Checks the environment variable identified by `key` first. If set, returns
+ * it immediately without touching the OS keychain. This is the primary path
+ * for both local development (where secrets are injected via
+ * `eval $(keysync export)`) and cloud deployments (where platforms inject
+ * environment variables directly).
+ *
+ * If the env var is not set, falls back to the OS keychain. Resolution order:
+ * 1. Environment-specific project scope (`keysync/project/<name>/env/<env>`)
+ * 2. Project scope (`keysync/project/<name>`)
+ * 3. Global scope (`keysync/global`)
+ *
+ * @param key - The secret key name (e.g. "DATABASE_URL").
+ * @param project - Optional project name for project-scoped secrets.
+ * @param environment - Optional environment name for environment-specific overrides.
+ * @returns The secret value.
+ * @throws {KeySyncError} with code "notFound" if the secret doesn't exist.
+ */
+export async function getSecret(key: string, project?: string, environment?: string): Promise<string> {
+  // Primary path: check environment variable first.
+  // In local dev the user runs eval $(keysync export) at shell startup;
+  // in cloud/CI the platform injects env vars directly.
+  const envVal = process.env[key];
+  if (envVal !== undefined) {
+    return envVal;
+  }
+
+  if (project) {
+    // If environment is provided, try project/env scope first.
+    if (environment) {
+      const envSvc = serviceName("project", project, environment);
+      try {
+        return await platform.get(envSvc, key);
+      } catch (err) {
+        if (err instanceof KeySyncError && err.code !== "notFound") {
+          throw err;
+        }
+        // Fall through to project scope without environment.
+      }
+    }
+
+    // Try project scope without environment.
+    const svc = serviceName("project", project);
+    try {
+      return await platform.get(svc, key);
+    } catch (err) {
+      if (err instanceof KeySyncError && err.code !== "notFound") {
+        throw err;
+      }
+      // Fall through to global scope.
+    }
+  }
+
+  // Fall back to global scope.
+  const svc = serviceName("global");
+  return await platform.get(svc, key);
+}
+
+/**
+ * List all stored secret key names.
+ *
+ * @param scope - Filter by scope ("global" or "project").
+ * @param project - Filter by project name.
+ * @param environment - Filter by environment name.
+ * @returns Array of { scope, project?, environment?, key } tuples.
+ */
+export async function listSecrets(
+  scope?: string,
+  project?: string,
+  environment?: string
+): Promise<Array<{ scope: string; project?: string; environment?: string; key: string }>> {
+  const entries = await platform.list();
+  return entries
+    .map((entry) => {
+      const parsed = parseServiceName(entry.service);
+      return { scope: parsed.scope, project: parsed.project, environment: parsed.environment, key: entry.account };
+    })
+    .filter((entry) => {
+      if (scope && entry.scope !== scope) return false;
+      if (project && entry.project !== project) return false;
+      if (environment && entry.environment !== environment) return false;
+      return true;
+    });
+}
