@@ -29,26 +29,58 @@ At runtime, apps read **environment variables** (from `keysync export` locally o
 
 ## Quick start
 
-**Prerequisites:** [Go 1.25+](https://go.dev/dl/) (to build), [`gh` CLI](https://cli.github.com) (for GitHub Secrets sync).
+No compiler required — download a release, store secrets in your OS keychain, and sync when you are ready.
+
+**Optional:** [`gh` CLI](https://cli.github.com) for `keysync push` to GitHub Secrets (install from [cli.github.com](https://cli.github.com)).
+
+### Install from the releases page
+
+1. Open **[Releases](https://github.com/dipockdas/keysync/releases)** and download the archive for your system:
+   - **macOS (Apple Silicon):** `keysync_darwin_arm64.zip`
+   - **macOS (Intel):** `keysync_darwin_amd64.zip`
+   - **Linux:** `keysync_linux_amd64.tar.gz` or `keysync_linux_arm64.tar.gz`
+   - **Windows:** `keysync_windows_amd64.zip` or `keysync_windows_arm64.zip`
+2. Extract the archive and put `keysync` (or `keysync.exe` on Windows) on your `PATH`.
+3. Verify:
+
+   ```bash
+   keysync version
+   keysync doctor
+   ```
+
+4. **macOS only** (fewer keychain password prompts):
+
+   ```bash
+   keysync trust
+   ```
+
+5. In your project directory:
+
+   ```bash
+   keysync init --project my-app
+   keysync set API_KEY=your_value_here
+   keysync set -p my-app DATABASE_URL=postgres://localhost:5432/myapp
+   keysync push -p my-app --dry-run    # preview what would sync
+   keysync push -p my-app              # → GitHub Secrets + platforms (needs gh)
+   eval $(keysync export API_KEY)      # one secret into your shell
+   ```
+
+Edit `.keysync.json` with your repo name and platform IDs — see [configuration](docs/configuration.md). Platform tokens (`VERCEL_TOKEN`, etc.) are stored with `keysync set`, never in the config file.
+
+More install options (Homebrew, Go): [docs/install.md](docs/install.md).
+
+### Build from source (developers)
+
+**Prerequisites:** [Go 1.25+](https://go.dev/dl/), [`gh` CLI](https://cli.github.com) for push.
 
 ```bash
 git clone https://github.com/dipockdas/keysync.git
-cd keysync && make build-signed   # macOS: signed binary avoids keychain re-prompts
+cd keysync && make build-signed   # macOS: signed binary; use make build on Linux/Windows
 export PATH="$PWD/bin:$PATH"
-keysync trust                     # macOS: grant this binary access to existing secrets (once)
-
-cd your-project
-keysync init --project my-app
-
-keysync set API_KEY=your_value_here
-keysync set -p my-app DATABASE_URL=postgres://localhost:5432/myapp
-
-keysync push -p my-app          # → GitHub Secrets + configured platforms
-eval $(keysync export API_KEY)       # one secret → shell env
-eval $(keysync export -p my-app)     # all project + global secrets
+keysync trust                     # macOS: once after install
 ```
 
-Edit `.keysync.json` with your repo name and platform IDs — see [configuration](docs/configuration.md). Platform tokens (`VERCEL_TOKEN`, etc.) are stored with `keysync set`, never in the config file.
+Then use the same `keysync init` / `set` / `push` / `export` commands as above.
 
 ---
 
@@ -60,12 +92,9 @@ Terminal recording coming soon — see [docs/demo.md](docs/demo.md) for `asciine
 
 ## How it works
 
-```
-  .keysync.json          OS keychain              GitHub + platforms
-  (metadata only)   →    (secret values)    →     (keysync push)
-                              ↓
-                    keysync export → env vars → your app
-```
+<p align="center">
+  <img src="docs/assets/how-it-works.svg" alt="keysync flow: .keysync.json and set store secrets in the OS keychain; push syncs to GitHub and platforms; export loads env vars for your app" width="920"/>
+</p>
 
 Three scope levels: **global** → **project** → **environment** (higher wins on conflict). Move between scopes with `keysync mv`. Details: [architecture](docs/architecture.md).
 
@@ -105,10 +134,10 @@ Global flags: `--project` / `-p`, `--env` / `-e`, `--config`, `--store fallback`
 
 ## Installation
 
-| Method | Command / link |
-|--------|----------------|
+| Method | Best for |
+|--------|----------|
+| **[Releases](https://github.com/dipockdas/keysync/releases)** | Everyone — pre-built binaries (recommended) |
 | **Homebrew** | `brew tap dipockdas/keysync https://github.com/dipockdas/keysync && brew install keysync` |
-| **Releases** | [Download](https://github.com/dipockdas/keysync/releases) — `keysync_*` zip/tar.gz per OS/arch |
 | **Go install** | `go install github.com/dipockdas/keysync/cmd/keysync@latest` |
 | **From source** | `git clone … && make build` → `./bin/keysync` |
 

@@ -15,7 +15,6 @@ concurrency:
 
 permissions:
   contents: read
-  security-events: write
 
 jobs:
   govulncheck:
@@ -39,6 +38,10 @@ jobs:
   gitleaks:
     name: gitleaks
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6

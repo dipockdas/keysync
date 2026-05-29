@@ -1,0 +1,64 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 280" role="img" aria-labelledby="title desc">
+  <title id="title">How keysync works</title>
+  <desc id="desc">Configuration metadata flows to the OS keychain, secrets sync to GitHub and platforms via push, and export loads environment variables for your application.</desc>
+  <defs>
+    <marker id="arrow" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#4b5563"/>
+    </marker>
+    <style>
+      .box { fill: #f8fafc; stroke: #334155; stroke-width: 1.5; }
+      .box-accent { fill: #eff6ff; stroke: #2563eb; stroke-width: 1.5; }
+      .box-platform { fill: #f0fdf4; stroke: #16a34a; stroke-width: 1.5; }
+      .label { font: 600 15px system-ui, -apple-system, Segoe UI, sans-serif; fill: #0f172a; }
+      .sublabel { font: 400 12px system-ui, -apple-system, Segoe UI, sans-serif; fill: #475569; }
+      .arrow { stroke: #4b5563; stroke-width: 2; fill: none; marker-end: url(#arrow); }
+      .arrow-down { stroke: #2563eb; stroke-width: 2; fill: none; marker-end: url(#arrow-blue); }
+      .cmd { font: 500 11px ui-monospace, SFMono-Regular, Menlo, monospace; fill: #1e40af; }
+    </style>
+    <marker id="arrow-blue" markerWidth="10" markerHeight="10" refX="9" refY="3" orient="auto" markerUnits="strokeWidth">
+      <path d="M0,0 L9,3 L0,6 Z" fill="#2563eb"/>
+    </marker>
+  </defs>
+
+  <!-- Top row: store and push -->
+  <rect class="box" x="20" y="40" width="150" height="72" rx="8"/>
+  <text class="label" x="95" y="68" text-anchor="middle">.keysync.json</text>
+  <text class="sublabel" x="95" y="88" text-anchor="middle">metadata only</text>
+  <text class="sublabel" x="95" y="104" text-anchor="middle">(repo, platforms)</text>
+
+  <line class="arrow" x1="170" y1="76" x2="208" y2="76"/>
+  <text class="cmd" x="189" y="66" text-anchor="middle">set</text>
+
+  <rect class="box-accent" x="210" y="40" width="150" height="72" rx="8"/>
+  <text class="label" x="285" y="68" text-anchor="middle">OS keychain</text>
+  <text class="sublabel" x="285" y="88" text-anchor="middle">secret values</text>
+  <text class="sublabel" x="285" y="104" text-anchor="middle">(local machine)</text>
+
+  <line class="arrow" x1="360" y1="76" x2="398" y2="76"/>
+  <text class="cmd" x="379" y="66" text-anchor="middle">push</text>
+
+  <rect class="box-platform" x="400" y="40" width="200" height="72" rx="8"/>
+  <text class="label" x="500" y="68" text-anchor="middle">GitHub + platforms</text>
+  <text class="sublabel" x="500" y="88" text-anchor="middle">GitHub Secrets, Vercel,</text>
+  <text class="sublabel" x="500" y="104" text-anchor="middle">Railway, Supabase, &</text>
+
+  <!-- Export branch -->
+  <line class="arrow-down" x1="285" y1="112" x2="285" y2="148"/>
+  <text class="cmd" x="318" y="134">export</text>
+
+  <rect class="box-accent" x="210" y="150" width="150" height="56" rx="8"/>
+  <text class="label" x="285" y="176" text-anchor="middle">Shell env vars</text>
+  <text class="sublabel" x="285" y="194" text-anchor="middle">eval $(keysync export &)</text>
+
+  <line class="arrow" x1="360" y1="178" x2="618" y2="178"/>
+
+  <rect class="box" x="620" y="150" width="140" height="56" rx="8"/>
+  <text class="label" x="690" y="176" text-anchor="middle">Your app</text>
+  <text class="sublabel" x="690" y="194" text-anchor="middle">local dev / CI</text>
+
+  <!-- Scopes note -->
+  <rect fill="#fffbeb" stroke="#d97706" stroke-width="1" x="620" y="40" width="280" height="72" rx="8"/>
+  <text class="label" x="760" y="64" text-anchor="middle">Scopes</text>
+  <text class="sublabel" x="760" y="84" text-anchor="middle">global ’ project ’ environment</text>
+  <text class="sublabel" x="760" y="100" text-anchor="middle">higher scope wins on conflict · keysync mv</text>
+</svg>
