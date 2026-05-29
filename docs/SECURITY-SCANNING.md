@@ -7,7 +7,7 @@ Keysync runs automated security checks on every push and pull request to `main`,
 | Check | Tool | Purpose |
 |-------|------|---------|
 | Vulnerability scan | [govulncheck](https://go.dev/blog/vuln) | Known vulnerabilities in Go dependencies |
-| Secret detection | [Gitleaks](https://github.com/gitleaks/gitleaks) | Prevent accidental commit of API keys, tokens, `.env` files |
+| Secret detection | [Gitleaks](https://github.com/gitleaks/gitleaks) | Full-repo scan (`gitleaks detect`); avoids push-range errors on root/fresh history |
 | Static analysis | [CodeQL](https://codeql.github.com/) | Security and quality queries for Go |
 | Supply chain | [OpenSSF Scorecard](https://scorecard.dev/) | Repository security posture score |
 | Unit tests | `go test -race` | Regression and concurrency issues |

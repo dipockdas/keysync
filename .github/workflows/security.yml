@@ -38,17 +38,17 @@ jobs:
   gitleaks:
     name: gitleaks
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      pull-requests: read
-      security-events: write
     steps:
       - name: Checkout
         uses: actions/checkout@v6
         with:
           fetch-depth: 0
 
-      - name: Gitleaks
-        uses: gitleaks/gitleaks-action@v2
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      - name: Install Gitleaks
+        run: |
+          curl -sSfL "https://github.com/gitleaks/gitleaks/releases/download/v8.24.3/gitleaks_8.24.3_linux_x64.tar.gz" \
+            | tar -xz -C "$RUNNER_TEMP" gitleaks
+          echo "$RUNNER_TEMP" >> "$GITHUB_PATH"
+
+      - name: Detect secrets
+        run: gitleaks detect --source . --redact --verbose --config .gitleaks.toml
