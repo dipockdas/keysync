@@ -6,32 +6,32 @@
 #   brew install keysync
 #
 # Bump version/checksums after a release:
-#   ./scripts/update-homebrew-formula.sh v1.0.3
+#   ./scripts/update-homebrew-formula.sh v1.0.4
 class Keysync < Formula
   desc "Unified secret management — OS keychain, GitHub Secrets, deployment platforms"
   homepage "https://github.com/dipockdas/keysync"
-  version "1.0.3"
+  version "1.0.4"
   license "Apache-2.0"
 
   on_macos do
     on_arm do
       url "https://github.com/dipockdas/keysync/releases/download/v#{version}/keysync_darwin_arm64.zip"
-      sha256 "a86cfa5e0dc1d02a3f8d31d836596117c2e8f7a42d4aebfbd6b041df99d3102a"
+      sha256 "f618b2d49a60ac7793c8d6a52990d434e10795279a1ea1b8102449a45073da27"
     end
     on_intel do
       url "https://github.com/dipockdas/keysync/releases/download/v#{version}/keysync_darwin_amd64.zip"
-      sha256 "04fbc2517bcb034ac1b8e530695dcd692228d1a6b4729f6f0d31c6f90d8c7f87"
+      sha256 "f018e85c032b6dab67a243abedb196c2d6536b8df2bda4ec7404cbeadc5c2a69"
     end
   end
 
   on_linux do
     on_arm do
       url "https://github.com/dipockdas/keysync/releases/download/v#{version}/keysync_linux_arm64.tar.gz"
-      sha256 "658df890a66908a7a3f5f4b758deb31a80bd789ce600b7a17077ca61ebe2a01d"
+      sha256 "3f751d31e2cbd989030cec864bb791dcddfaa478fa832bd351ebbb8ac01f7927"
     end
     on_intel do
       url "https://github.com/dipockdas/keysync/releases/download/v#{version}/keysync_linux_amd64.tar.gz"
-      sha256 "993b7258be0b2b06b0714c679ffab05ef8d3c1563065a75e5c8bae188dcf7193"
+      sha256 "cabcf5689b36b620c0673e00933212c925e160c96fc0c6adb21dfd8b4e39b576"
     end
   end
 
