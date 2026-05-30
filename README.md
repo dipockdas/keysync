@@ -1,17 +1,19 @@
 # keysync
 
-[![keysync on GitHub](https://img.shields.io/badge/GitHub-dipockdas%2Fkeysync-181717?style=for-the-badge&logo=github)](https://github.com/dipockdas/keysync)
-[![Releases](https://img.shields.io/badge/Releases-view-1f6feb?style=for-the-badge&logo=github)](https://github.com/dipockdas/keysync/releases)
+[![GitHub stars](https://img.shields.io/github/stars/dipockdas/keysync?style=for-the-badge&logo=github)](https://github.com/dipockdas/keysync/stargazers)
+[![GitHub forks](https://img.shields.io/github/forks/dipockdas/keysync?style=for-the-badge&logo=github)](https://github.com/dipockdas/keysync/network/members)
+[![GitHub issues](https://img.shields.io/github/issues/dipockdas/keysync?style=for-the-badge&logo=github)](https://github.com/dipockdas/keysync/issues)
+[![GitHub contributors](https://img.shields.io/github/contributors/dipockdas/keysync?style=for-the-badge&logo=github)](https://github.com/dipockdas/keysync/graphs/contributors)
+[![Last commit](https://img.shields.io/github/last-commit/dipockdas/keysync/main?style=for-the-badge&logo=github)](https://github.com/dipockdas/keysync/commits/main)
 
+[![Release](https://img.shields.io/github/v/release/dipockdas/keysync?label=release)](https://github.com/dipockdas/keysync/releases)
 [![CI](https://github.com/dipockdas/keysync/actions/workflows/ci.yml/badge.svg)](https://github.com/dipockdas/keysync/actions/workflows/ci.yml)
 [![Security](https://github.com/dipockdas/keysync/actions/workflows/security.yml/badge.svg)](https://github.com/dipockdas/keysync/actions/workflows/security.yml)
 [![CodeQL](https://github.com/dipockdas/keysync/actions/workflows/codeql.yml/badge.svg)](https://github.com/dipockdas/keysync/actions/workflows/codeql.yml)
-[![Scorecard](https://github.com/dipockdas/keysync/actions/workflows/scorecard.yml/badge.svg)](https://github.com/dipockdas/keysync/actions/workflows/scorecard.yml)
+[![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/dipockdas/keysync/badge)](https://scorecard.dev/viewer/?uri=github.com/dipockdas/keysync)
+[![Go Report Card](https://goreportcard.com/badge/github.com/dipockdas/keysync)](https://goreportcard.com/report/github.com/dipockdas/keysync)
 [![Cross-Platform](https://github.com/dipockdas/keysync/actions/workflows/cross-platform.yml/badge.svg)](https://github.com/dipockdas/keysync/actions/workflows/cross-platform.yml)
 [![License](https://img.shields.io/badge/License-Apache_2.0-blue.svg)](LICENSE)
-
-<!-- Dynamic badges (stars, forks, Go Report Card, OpenSSF API score) need a public repo.
-     After launch, see docs/github-repository-settings.md#readme-badges-after-going-public -->
 
 **Stop checking secrets into git.** Keysync stores development secrets in your OS keychain (macOS Keychain, Linux libsecret, Windows Credential Manager) and syncs them to GitHub Secrets and deployment platforms with one command.
 

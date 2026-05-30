@@ -8,7 +8,7 @@ Install **keysync** from the official tap (formulas live in this repository unde
 - A published [GitHub release](https://github.com/dipockdas/keysync/releases) (the tap downloads pre-built binaries)
 - For `keysync push` / `pull`: [`gh`](https://cli.github.com) (`brew install gh`)
 
-> **Note:** The tap downloads release assets from GitHub. While the repository is **private**, only users with access can install via the tap. After the repo is **public**, anyone can run the commands below.
+> **Note:** The tap downloads release assets from GitHub. Anyone can install from the public repository.
 
 ## Install
 

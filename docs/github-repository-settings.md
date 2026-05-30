@@ -98,11 +98,11 @@ Discord server (optional): create when ready, then add to README:
 
 No Twitter/X link required.
 
-## 8. README badges after going public
+## 8. README badges (public repository)
 
-While the repo is **private**, shields.io and OpenSSF cannot read GitHub stats — badges show `REPO NOT FOUND` or `UNABLE TO SELECT NEXT GITHUB TOKEN FROM POOL`. The README uses **workflow badges** and static links until launch.
+The README includes dynamic shields.io badges (stars, forks, issues, contributors, last commit), release version, workflow status, OpenSSF Scorecard API badge, and Go Report Card.
 
-After making the repo public, optionally replace the top badge row with:
+Reference snippet if you need to restore or copy the layout:
 
 ```markdown
 [![GitHub stars](https://img.shields.io/github/stars/dipockdas/keysync?style=for-the-badge&logo=github)](https://github.com/dipockdas/keysync/stargazers)
@@ -120,9 +120,4 @@ And add (once a release is published and GoReportCard has indexed the repo):
 [![OpenSSF Scorecard](https://api.securityscorecards.dev/projects/github.com/dipockdas/keysync/badge)](https://scorecard.dev/viewer/?uri=github.com/dipockdas/keysync)
 ```
 
-Then enable full CodeQL / Scorecard upload:
-
-1. **Settings → Code security → Code scanning** → enable for the repository
-2. In `.github/workflows/codeql.yml` set `upload: true`
-3. In `.github/workflows/scorecard.yml` set `publish_results: true` and uncomment the SARIF upload step
-4. Remove `if: ${{ !github.event.repository.private }}` from the Scorecard job
+CodeQL and Scorecard uploads are enabled in the workflows (`upload: true`, `publish_results: true`, SARIF upload). Ensure **Settings → Code security → Code scanning** is enabled so results appear in the Security tab.

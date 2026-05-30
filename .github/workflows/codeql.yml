@@ -36,5 +36,4 @@ jobs:
         uses: github/codeql-action/analyze@v3
         with:
           category: "/language:go"
-          # Private repos: enable Code scanning in Settings or go public, then set upload: true
-          upload: false
+          upload: true

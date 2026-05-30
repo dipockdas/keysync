@@ -20,11 +20,7 @@ Workflows:
 
 ## Badges
 
-The README shows CI and security workflow status. After the repository is public:
-
-- **CI** — build and test health
-- **Security** — govulncheck + gitleaks
-- **Go Report Card** — static analysis summary (external)
+The README shows workflow status (CI, Security, CodeQL), [OpenSSF Scorecard](https://scorecard.dev/viewer/?uri=github.com/dipockdas/keysync), and [Go Report Card](https://goreportcard.com/report/github.com/dipockdas/keysync).
 
 ## Running locally
 
