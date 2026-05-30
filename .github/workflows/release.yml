@@ -9,7 +9,26 @@ permissions:
   contents: write
 
 jobs:
+  check-release:
+    runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.check.outputs.skip }}
+    steps:
+      - name: Skip if release already exists
+        id: check
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          if gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
+            echo "Release ${{ github.ref_name }} already exists — skipping build and upload."
+            echo "skip=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "skip=false" >> "$GITHUB_OUTPUT"
+          fi
+
   test:
+    needs: check-release
+    if: needs.check-release.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -20,7 +39,8 @@ jobs:
       - run: go test ./internal/store/... ./internal/config/... ./internal/crypto/... ./internal/commands/... -race -count=1
 
   build-linux:
-    needs: test
+    needs: [check-release, test]
+    if: needs.check-release.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
@@ -66,7 +86,8 @@ jobs:
             dist/keysync_*.zip
 
   build-darwin:
-    needs: test
+    needs: [check-release, test]
+    if: needs.check-release.outputs.skip != 'true'
     runs-on: macos-latest
     steps:
       - uses: actions/checkout@v6
@@ -170,7 +191,8 @@ jobs:
           path: dist/keysync_darwin_*.zip
 
   create-release:
-    needs: [build-linux, build-darwin]
+    needs: [check-release, build-linux, build-darwin]
+    if: needs.check-release.outputs.skip != 'true'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v6
