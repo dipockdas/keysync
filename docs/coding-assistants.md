@@ -10,7 +10,7 @@ Anything that **writes a secret value** needs that value in the conversation or 
 
 | Command / action | Who should run it | Assistant can help with |
 |------------------|-------------------|-------------------------|
-| `keysync set KEY=value` | **You** (terminal) | Explain syntax, scopes, `--env` |
+| `keysync set KEY=value` | **You** (terminal) | Explain syntax and scopes; **`--env` is optional** (omit for project-wide) |
 | `keysync migrate` | **You** (terminal) | Interpret migrate output (key names only), update app code |
 | `keysync get` / `list --unmask` | **You** | Explain flags; avoid asking assistant to print values |
 | `keysync init` | Either | Scaffold project name; you confirm |

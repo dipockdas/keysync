@@ -153,7 +153,7 @@ keysync push -p my-app
   <img src="docs/assets/how-it-works.png" alt="keysync flow: you set secrets in the OS keychain, push syncs to GitHub and platforms, export loads environment variables for your app" width="920"/>
 </p>
 
-Three scope levels: **global** → **project** → **environment** (higher wins on conflict). Move between scopes with `keysync mv`. Details: [architecture](docs/architecture.md).
+Three scope levels: **global** → **project** → **environment** (higher wins on conflict). **`--env` is optional** — omit it for project-wide secrets; use it only when you need per-environment values. Move between scopes with `keysync mv`. Details: [architecture](docs/architecture.md) · [configuration](docs/configuration.md#secret-scopes-and---env).
 
 ---
 
@@ -174,7 +174,7 @@ Three scope levels: **global** → **project** → **environment** (higher wins 
 | `keysync migrate` | Import from `.env` or cloud |
 | `keysync doctor` | Diagnostics |
 
-Global flags: `--project` / `-p`, `--env` / `-e`, `--config`, `--store fallback`. Full reference: `keysync --help`.
+Global flags: `--project` / `-p`, `--env` / `-e` (optional; only when you need env-scoped keys), `--config`, `--store fallback`. Full reference: `keysync --help`.
 
 Install reference: [docs/install.md](docs/install.md) · Platform keychain notes: [docs/platform-setup.md](docs/platform-setup.md)
 

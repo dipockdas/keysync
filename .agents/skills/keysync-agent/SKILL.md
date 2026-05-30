@@ -82,7 +82,7 @@ keysync push -p my-app --dry-run    # assistant or user
 keysync push -p my-app              # USER after reviewing dry-run
 ```
 
-Optional: `--platforms vercel,railway` · `--env production` for non-dev pushes.
+Optional: `--platforms vercel,railway` · `--env production` only when pushing env-scoped keys.
 
 ---
 
@@ -141,7 +141,7 @@ After each `make build` or copying a new binary, run `trust` again. Signed build
 
 ```bash
 keysync doctor
-keysync list -p PROJECT --env dev
+keysync list -p PROJECT              # project-wide; add --env NAME if needed
 gh auth status
 ```
 

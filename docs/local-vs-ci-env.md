@@ -1,6 +1,8 @@
 # Local vs CI environment secrets
 
-Use **project scope** for local development values and **environment scope** for what GitHub Actions should receive.
+Most projects only need **project-wide** secrets — use `-p` without `--env`. Add **`--env`** only when the same key must differ between local and CI (or between staging and production).
+
+Use **project scope** for local development values and **environment scope** for what GitHub Actions should receive when those values differ.
 
 ## Example: different base URLs
 

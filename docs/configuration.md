@@ -127,12 +127,28 @@ Environment variable fallbacks for CI/CD:
 | `SUPABASE_TOKEN` | Supabase Management API |
 | `GH_TOKEN` | GitHub (`gh` CLI) |
 
+## Secret scopes and `--env`
+
+Keysync stores secrets at three levels. **You do not need `--env` unless you want a named environment** (staging, production, `dev`, etc.).
+
+| Scope | When to use | Example |
+|-------|-------------|---------|
+| **Global** | Shared across all projects | `keysync set API_KEY=value` |
+| **Project** | One value for the whole project (typical local dev) | `keysync set -p my-app DB_URL=...` |
+| **Environment** | Different values per environment | `keysync set -p my-app DB_URL=... --env production` |
+
+With `-p` and **no** `--env`, `set`, `list`, and `push` use **project-wide** storage only. Environment-scoped keys are ignored until you pass `--env NAME`.
+
+`get` and `export` resolve: explicit `--env` (if passed) → project-wide → global. They never assume an environment name.
+
+See also: [architecture.md](architecture.md), [local-vs-ci-env.md](local-vs-ci-env.md), [pushing-secrets.md](pushing-secrets.md).
+
 ## CLI flags
 
 | Flag | Description |
 |------|-------------|
 | `--config` | Path to `.keysync.json` |
 | `-p, --project` | Project name from config |
-| `-e, --env` | Environment name for env-scoped secrets |
+| `-e, --env` | Optional environment name (`set`/`push`/`list` only when you need env-scoped keys) |
 | `--repo` | GitHub `owner/repo` (alternative to `--project` for push) |
 | `--store fallback` | Use encrypted file store instead of OS keychain |

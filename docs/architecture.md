@@ -61,6 +61,10 @@ Lowest:   Global
 | Project | `keysync set -p my-app API_KEY=value` |
 | Environment | `keysync set -p my-app API_KEY=value --env production` |
 
+**`--env` is optional.** With `-p` and no `--env`, secrets are project-wide (`keysync/project/<name>`). Use `--env` only when you need separate values per environment (local vs CI, staging vs production, etc.). `set`, `list`, and `push` do not pick a default environment name.
+
+`get` and `export` check an environment bucket only when you pass `--env`; otherwise they use project-wide → global fallback.
+
 Move secrets between scopes with `keysync mv` (see `keysync mv --help`).
 
 ## Keychain naming

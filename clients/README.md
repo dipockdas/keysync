@@ -29,8 +29,11 @@ Keysync stores secrets in the OS keychain with a consistent naming scheme:
 |-------|-------------|--------------|
 | Global | `keysync/global` | key name (e.g. `DATABASE_URL`) |
 | Project | `keysync/project/<name>` | key name (e.g. `DATABASE_URL`) |
+| Environment | `keysync/project/<name>/env/<env>` | key name (e.g. `DATABASE_URL`) |
 
-When looking up a secret, project scope takes precedence over global scope.
+The CLI stores project-wide secrets when you use `-p` without `--env`. Pass an `environment` argument to client libraries only when you use env-scoped keys in the keychain.
+
+When looking up a secret, resolution order is: environment (if requested) → project → global.
 
 ### Per-platform access
 

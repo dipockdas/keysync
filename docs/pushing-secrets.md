@@ -7,8 +7,10 @@
 | Source | Rule |
 |--------|------|
 | **Global** | Only keys listed in `"globals"` for that repo |
-| **Project** | **All** project-scoped keys, unless restricted |
-| **Environment** | All keys for `--env NAME` when set (wins over project for the same key name) |
+| **Project** | **Project-wide** keys only (no environment segment), unless restricted |
+| **Environment** | Only when you pass `--env NAME`: that environment’s keys **plus** project-wide keys (env wins on same name) |
+
+**You do not need `--env` for a normal push.** Omit it to sync project-wide secrets (and configured globals). Add `--env production` (or another name) only when you have environment-scoped keys to include — see [local-vs-ci-env.md](local-vs-ci-env.md).
 
 **Restrict project keys** (recommended for repos with local-only credentials):
 
@@ -74,10 +76,10 @@ This command:
 ## Examples
 
 ```bash
-# All configured platforms
+# Project-wide keys + globals (no --env required)
 keysync push -p my-app
 
-# Production environment scope only
+# Project-wide + production environment keys
 keysync push -p my-app --env production
 
 # Subset of platforms

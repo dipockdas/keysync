@@ -8,7 +8,7 @@ keysync list --project my-app
 keysync get KEY -p my-app -u    # print value to stdout
 ```
 
-Remember: `keysync get` falls back global ← project ← env when `-p` is set. `keysync rm` and `keysync mv` use **exact** scope from flags.
+Remember: `keysync get` with `-p` checks **env → project-wide → global** only when you pass `--env`; otherwise **project-wide → global**. `keysync rm` and `keysync mv` use **exact** scope from flags (omit `--env` for project-wide).
 
 ## Fallback storage (headless / no keychain)
 

@@ -26,6 +26,8 @@ For each secret, you'll be asked:
 2. **Project name** — if project-scoped, enter the project name (or use `--project my-app`)
 3. **Confirm** — verify you want to store it
 
+Project-scoped imports are stored **project-wide** (no environment). You do not need `--env` for typical `.env` migrations. Use `keysync set -p NAME KEY=value --env production` later only if you split local vs CI values — see [configuration.md](configuration.md#secret-scopes-and---env).
+
 Use `--dry-run` first to preview without storing:
 ```bash
 keysync migrate --file .env --dry-run

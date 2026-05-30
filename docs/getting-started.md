@@ -24,7 +24,7 @@ keysync list
 keysync list -p my-app
 ```
 
-**Note on `--env`:** With `-p`, omit `--env` for project-wide secrets. Use `--env staging` or `--env production` when you need environment-specific values. See [configuration](configuration.md) and [architecture](architecture.md).
+**Note on `--env`:** With `-p`, omit `--env` for project-wide secrets (the usual case). Use `--env staging` or `--env production` only when the same key needs different values per environment. See [Secret scopes and `--env`](configuration.md#secret-scopes-and---env).
 
 Load secrets into your shell when needed:
 
