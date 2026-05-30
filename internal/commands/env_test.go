@@ -19,19 +19,19 @@ func TestResolveEnvironment_NoProject(t *testing.T) {
 	}
 }
 
-func TestResolveEnvironment_DefaultsToDevForPush(t *testing.T) {
+func TestResolveEnvironment_ProjectWideWhenEnvOmitted(t *testing.T) {
 	project = "my-app"
 	envFlag = ""
 	cmd := &cobra.Command{Use: "push"}
 	cmd.Flags().StringVar(&envFlag, "env", "", "")
 
 	got := resolveEnvironmentForCommand(cmd)
-	if got != "dev" {
-		t.Errorf("resolveEnvironmentForCommand = %q, want dev", got)
+	if got != "" {
+		t.Errorf("resolveEnvironmentForCommand = %q, want empty for project-wide scope", got)
 	}
 }
 
-func TestResolveEnvironment_GetDoesNotDefaultToDev(t *testing.T) {
+func TestResolveEnvironment_GetDoesNotDefaultEnv(t *testing.T) {
 	project = "my-app"
 	envFlag = ""
 	cmd := &cobra.Command{Use: "get"}
@@ -58,6 +58,19 @@ func TestResolveEnvironment_ExplicitEnv(t *testing.T) {
 	}
 }
 
+func TestResolveEnvironment_ExplicitDev(t *testing.T) {
+	project = "my-app"
+	envFlag = "dev"
+	cmd := &cobra.Command{Use: "set"}
+	cmd.Flags().StringVar(&envFlag, "env", "", "")
+	_ = cmd.Flags().Set("env", "dev")
+
+	got := resolveEnvironmentForCommand(cmd)
+	if got != "dev" {
+		t.Errorf("resolveEnvironmentForCommand = %q, want dev", got)
+	}
+}
+
 func TestResolveEnvironment_ExplicitEmptyProjectScope(t *testing.T) {
 	project = "my-app"
 	envFlag = ""
@@ -71,18 +84,18 @@ func TestResolveEnvironment_ExplicitEmptyProjectScope(t *testing.T) {
 	}
 }
 
-func TestResolveEnvironmentFromArgs_GetNoDefault(t *testing.T) {
+func TestResolveEnvironmentFromArgs_NoEnvMeansProjectWide(t *testing.T) {
 	project = "my-app"
-	got := resolveEnvironmentFromArgs("get", nil)
+	got := resolveEnvironmentFromArgs("push", nil)
 	if got != "" {
-		t.Errorf("resolveEnvironmentFromArgs(get) = %q, want empty", got)
+		t.Errorf("resolveEnvironmentFromArgs(push) = %q, want empty", got)
 	}
 }
 
-func TestResolveEnvironmentFromArgs_PushDefaultsDev(t *testing.T) {
+func TestResolveEnvironmentFromArgs_ExplicitEnvInArgs(t *testing.T) {
 	project = "my-app"
-	got := resolveEnvironmentFromArgs("push", nil)
-	if got != "dev" {
-		t.Errorf("resolveEnvironmentFromArgs(push) = %q, want dev", got)
+	got := resolveEnvironmentFromArgs("push", []string{"--env", "staging"})
+	if got != "staging" {
+		t.Errorf("resolveEnvironmentFromArgs = %q, want staging", got)
 	}
 }

@@ -62,7 +62,7 @@ See {u}https://github.com/dipockdas/keysync{/u} for full documentation and tutor
 
 	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "path to .keysync.json (searches parents by default)")
 	cmd.PersistentFlags().StringVarP(&project, "project", "p", "", "project name (from .keysync.json)")
-	cmd.PersistentFlags().StringVarP(&envFlag, "env", "e", "", "environment name (push/set/list default to dev with --project; get uses --env only when passed)")
+	cmd.PersistentFlags().StringVarP(&envFlag, "env", "e", "", "environment name (with --project: omit for project-wide; get/export use --env only when passed)")
 	cmd.PersistentFlags().StringVar(&repoFlag, "repo", "", "GitHub repository (owner/repo). Auto-detected if not set.")
 	cmd.PersistentFlags().StringVar(&storeFlag, "store", "", `secret store backend ("fallback" to skip OS keychain and use NaCl-encrypted file)`)
 	cmd.RegisterFlagCompletionFunc("store", func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

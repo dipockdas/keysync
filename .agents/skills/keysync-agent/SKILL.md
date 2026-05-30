@@ -55,13 +55,13 @@ No `.keysync.json` required. **User runs `set` / `get` in their terminal** — p
 ```bash
 keysync set API_KEY=your_value_here
 keysync get API_KEY                    # clipboard; -u to print
-keysync set -p my-app DATABASE_URL=postgres://localhost/db --env ""
+keysync set -p my-app DATABASE_URL=postgres://localhost/db
 keysync get DATABASE_URL -p my-app
 keysync list
 keysync list -p my-app
 ```
 
-**Scope note:** With `-p`, `set` defaults to **`dev`** environment. Use `--env ""` for project-wide, or `--env production` for prod.
+**Scope note:** With `-p`, omit `--env` for project-wide secrets. Use `--env production` (or `--env dev`) for environment-scoped secrets.
 
 ### Stage 2 — Project repo
 

@@ -18,8 +18,8 @@ func newListCmd() *cobra.Command {
 		Long: F(`Lists all secrets in the local OS secret store.
 
 Without {c}--project{/c}, all secrets across every project and scope are shown.
-With {c}--project{/c}, only global secrets and secrets for that project are shown.
-With {c}--project{/c}, {c}--env{/c} defaults to {c}dev{/c} (project-wide + dev keys). Use {c}--env production{/c} for CI secrets.
+With {c}--project{/c}, global secrets and project-wide keys for that project are shown.
+Use {c}--env NAME{/c} to also include keys for a specific environment (e.g. {c}--env production{/c}).
 
 Use {c}--unmask{/c} to also display secret values (for verification purposes).
 

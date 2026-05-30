@@ -34,7 +34,8 @@ func entrySource(e store.SecretEntry) string {
 }
 
 // collectPushEntries lists candidate secrets for push without reading values.
-// When env is set, only project-wide keys (no environment) and that environment are included.
+// When env is empty, only project-wide keys (no environment) are included.
+// When env is set, project-wide keys and that environment are included (env overrides on name clash).
 func collectPushEntries(ctx context.Context, project, env string, globals []string) ([]store.SecretEntry, error) {
 	merged := make(map[string]store.SecretEntry)
 
@@ -66,17 +67,15 @@ func collectPushEntries(ctx context.Context, project, env string, globals []stri
 	if err != nil {
 		return nil, fmt.Errorf("list project secrets: %w", err)
 	}
-	if env == "" {
-		add(projectEntries)
-	} else {
-		var projectWide []store.SecretEntry
-		for _, e := range projectEntries {
-			if e.Environment == "" {
-				projectWide = append(projectWide, e)
-			}
+	var projectWide []store.SecretEntry
+	for _, e := range projectEntries {
+		if e.Environment == "" {
+			projectWide = append(projectWide, e)
 		}
-		add(projectWide)
+	}
+	add(projectWide)
 
+	if env != "" {
 		envEntries, err := secretSt.List(ctx, store.ScopeProject, project, env)
 		if err != nil {
 			return nil, fmt.Errorf("list environment secrets: %w", err)

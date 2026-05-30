@@ -18,7 +18,7 @@ Full policy: **[docs/coding-assistants.md](docs/coding-assistants.md)**. Agent s
 - **Never** log, commit, or paste secret values — key names and scopes only.
 - **Never `keysync init` or `keysync push` in the `dipockdas/keysync` repo** — example config only.
 
-Other rules: **`set` is local only** (use `push` for cloud); with **`-p`**, `set`/`push`/`list` default to **`dev`** unless `--env` is set (`--env ""` = project-wide).
+Other rules: **`set` is local only** (use `push` for cloud); with **`-p`**, omit `--env` for project-wide scope; pass **`--env NAME`** for environment scope.
 
 User flow: [docs/getting-started.md](docs/getting-started.md).
 

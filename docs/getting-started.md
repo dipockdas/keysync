@@ -15,8 +15,8 @@ Try keysync from any directory. No `.keysync.json` required.
 keysync set API_KEY=your_value_here
 keysync get API_KEY              # clipboard by default; -u prints to stdout
 
-# Project-scoped secret (project-wide, not tied to dev/staging/prod)
-keysync set -p my-app DATABASE_URL=postgres://localhost:5432/myapp --env ""
+# Project-scoped secret (project-wide; use --env NAME for staging/production)
+keysync set -p my-app DATABASE_URL=postgres://localhost:5432/myapp
 keysync get DATABASE_URL -p my-app
 
 # See what is stored
@@ -24,13 +24,13 @@ keysync list
 keysync list -p my-app
 ```
 
-**Note on `--env`:** If you use `-p` without `--env`, `keysync set` stores under the `dev` environment. For a single project-wide value, pass `--env ""` as above. For staging or production, use `--env staging` or `--env production`. See [configuration](configuration.md) and [architecture](architecture.md).
+**Note on `--env`:** With `-p`, omit `--env` for project-wide secrets. Use `--env staging` or `--env production` when you need environment-specific values. See [configuration](configuration.md) and [architecture](architecture.md).
 
 Load secrets into your shell when needed:
 
 ```bash
 eval $(keysync export API_KEY)
-eval $(keysync export DATABASE_URL -p my-app --env "")
+eval $(keysync export DATABASE_URL -p my-app)
 ```
 
 ---
@@ -74,7 +74,7 @@ Requires the [`gh` CLI](https://cli.github.com) authenticated for your repositor
    keysync push -p my-app
    ```
 
-By default, `push` syncs keys for the `dev` environment plus project-wide keys. Use `--env production` for CI/production secrets.
+By default, `push` syncs project-wide keys only. Use `--env production` (or another name) to include environment-scoped secrets for CI/production.
 
 Full reference: [pushing secrets](pushing-secrets.md).
 

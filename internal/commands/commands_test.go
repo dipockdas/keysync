@@ -244,7 +244,7 @@ func TestSetCmd_ProjectScope(t *testing.T) {
 		t.Errorf("stdout = %q, want 'Set project/test-app/PROJ_KEY'", stdout)
 	}
 
-	val, err := secretSt.Get(context.Background(), store.ScopeProject, "test-app", "dev", "PROJ_KEY")
+	val, err := secretSt.Get(context.Background(), store.ScopeProject, "test-app", "", "PROJ_KEY")
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
@@ -317,7 +317,7 @@ func TestListCmd_ProjectFilter(t *testing.T) {
 	project = "test-app"
 	ctx := context.Background()
 	secretSt.Set(ctx, store.ScopeGlobal, "", "", "G_KEY", "gv")
-	secretSt.Set(ctx, store.ScopeProject, "test-app", "dev", "P_KEY", "pv")
+	secretSt.Set(ctx, store.ScopeProject, "test-app", "", "P_KEY", "pv")
 	secretSt.Set(ctx, store.ScopeProject, "other-app", "production", "O_KEY", "ov")
 
 	cmd := newListCmd()

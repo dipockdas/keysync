@@ -7,29 +7,29 @@ import (
 	"github.com/dipockdas/keysync/internal/store"
 )
 
-// TestSet_DevScope_WhenEnvDefaults verifies that project-scoped set uses dev when --env is omitted.
-func TestSet_DevScope_WhenEnvDefaults(t *testing.T) {
+// TestSet_ProjectScope_WhenEnvOmitted verifies project-scoped set uses project-wide storage.
+func TestSet_ProjectScope_WhenEnvOmitted(t *testing.T) {
 	defer setupTest(t)()
 	project = "test-app"
-	effectiveEnv = "dev"
+	effectiveEnv = ""
 
 	ctx := context.Background()
 
-	if err := secretSt.Set(ctx, store.ScopeProject, project, effectiveEnv, "API_KEY", "dev-value"); err != nil {
+	if err := secretSt.Set(ctx, store.ScopeProject, project, effectiveEnv, "API_KEY", "project-value"); err != nil {
 		t.Fatalf("Set failed: %v", err)
 	}
 
-	val, err := secretSt.Get(ctx, store.ScopeProject, project, "dev", "API_KEY")
+	val, err := secretSt.Get(ctx, store.ScopeProject, project, "", "API_KEY")
 	if err != nil {
 		t.Fatalf("Get failed: %v", err)
 	}
-	if val != "dev-value" {
-		t.Errorf("Get returned %q, want dev-value", val)
+	if val != "project-value" {
+		t.Errorf("Get returned %q, want project-value", val)
 	}
 
-	_, err = secretSt.Get(ctx, store.ScopeProject, project, "", "API_KEY")
+	_, err = secretSt.Get(ctx, store.ScopeProject, project, "dev", "API_KEY")
 	if err == nil {
-		t.Error("secret found in project-wide scope when it should be in dev environment scope")
+		t.Error("secret found in dev environment when it should be project-wide only")
 	}
 }
 
@@ -94,8 +94,8 @@ func TestGet_ExplicitEnvBeforeProject(t *testing.T) {
 	}
 }
 
-// TestPush_DevScope_WhenEnvDefaults verifies default env includes dev + project-wide keys only.
-func TestPush_DevScope_WhenEnvDefaults(t *testing.T) {
+// TestPush_ProjectWideOnly_WhenEnvOmitted verifies push with no env excludes environment-scoped keys.
+func TestPush_ProjectWideOnly_WhenEnvOmitted(t *testing.T) {
 	defer setupTest(t)()
 	project = "test-app"
 
@@ -105,7 +105,7 @@ func TestPush_DevScope_WhenEnvDefaults(t *testing.T) {
 	secretSt.Set(ctx, store.ScopeProject, project, "dev", "DEV_SECRET", "value2")
 	secretSt.Set(ctx, store.ScopeProject, project, "production", "PROD_SECRET", "value3")
 
-	secrets, err := collectSecrets(ctx, project, "dev", nil)
+	secrets, err := collectSecrets(ctx, project, "", nil)
 	if err != nil {
 		t.Fatalf("collectSecrets failed: %v", err)
 	}
@@ -113,16 +113,16 @@ func TestPush_DevScope_WhenEnvDefaults(t *testing.T) {
 	if _, ok := secrets["PROJECT_SECRET"]; !ok {
 		t.Error("PROJECT_SECRET not included")
 	}
-	if _, ok := secrets["DEV_SECRET"]; !ok {
-		t.Error("DEV_SECRET not included for default dev env")
+	if _, ok := secrets["DEV_SECRET"]; ok {
+		t.Error("DEV_SECRET must not be included when env is omitted")
 	}
 	if _, ok := secrets["PROD_SECRET"]; ok {
-		t.Error("PROD_SECRET must not be included when env defaults to dev")
+		t.Error("PROD_SECRET must not be included when env is omitted")
 	}
 }
 
-// TestList_DevAndProject_WhenEnvDefaults verifies list shows dev + project-wide keys only.
-func TestList_DevAndProject_WhenEnvDefaults(t *testing.T) {
+// TestPush_IncludesEnvWhenExplicit verifies --env includes project-wide + that environment.
+func TestPush_IncludesEnvWhenExplicit(t *testing.T) {
 	defer setupTest(t)()
 	project = "test-app"
 
@@ -146,7 +146,7 @@ func TestList_DevAndProject_WhenEnvDefaults(t *testing.T) {
 		t.Errorf("missing expected keys, got %v", found)
 	}
 	if found["PROD_KEY"] {
-		t.Error("PROD_KEY must not appear when env defaults to dev")
+		t.Error("PROD_KEY must not appear when --env dev")
 	}
 }
 
@@ -161,9 +161,9 @@ func TestScopeResolution_Precedence(t *testing.T) {
 	secretSt.Set(ctx, store.ScopeProject, project, "", "SHARED", "project-value")
 	secretSt.Set(ctx, store.ScopeProject, project, "production", "SHARED", "production-value")
 
-	secrets, _ := collectSecrets(ctx, project, "dev", []string{"SHARED"})
+	secrets, _ := collectSecrets(ctx, project, "", []string{"SHARED"})
 	if secrets["SHARED"] != "project-value" {
-		t.Errorf("with default dev env, got %q, want project-value", secrets["SHARED"])
+		t.Errorf("with no env, got %q, want project-value", secrets["SHARED"])
 	}
 
 	secrets, _ = collectSecrets(ctx, project, "production", []string{"SHARED"})

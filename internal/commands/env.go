@@ -6,30 +6,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// defaultEnvironment is used for push/set/list when --project is set and --env is omitted.
-const defaultEnvironment = "dev"
-
-// commandDefaultsEnvToDev reports whether a command applies the dev default when --env is omitted.
-// get, pull, and export must NOT default: each extra keychain lookup can trigger a macOS password prompt.
-func commandDefaultsEnvToDev(name string) bool {
-	switch name {
-	case "get", "pull", "export":
-		return false
-	default:
-		return true
-	}
-}
-
-// resolveEnvironmentForCommand picks the environment for project-scoped operations.
+// resolveEnvironmentForCommand returns the environment for project-scoped operations.
+// Omitted --env means project-wide (empty string). Pass --env NAME for environment scope.
 func resolveEnvironmentForCommand(cmd *cobra.Command) string {
 	if project == "" {
 		return ""
 	}
 	if envFlagChanged(cmd) {
 		return envFlag
-	}
-	if commandDefaultsEnvToDev(cmd.Name()) {
-		return defaultEnvironment
 	}
 	return ""
 }
@@ -81,9 +65,6 @@ func resolveEnvironmentFromArgs(cmdName string, args []string) string {
 		case strings.HasPrefix(a, "--env="):
 			return strings.TrimPrefix(a, "--env=")
 		}
-	}
-	if commandDefaultsEnvToDev(cmdName) {
-		return defaultEnvironment
 	}
 	return ""
 }

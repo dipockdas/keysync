@@ -157,6 +157,28 @@ func TestCollectSecrets_EnvOverridesProject(t *testing.T) {
 	}
 }
 
+func TestCollectSecrets_ExcludesEnvScopedWhenEnvOmitted(t *testing.T) {
+	defer setupTest(t)()
+	ctx := context.Background()
+	secretSt.Set(ctx, store.ScopeProject, "test-app", "", "P_KEY", "pv")
+	secretSt.Set(ctx, store.ScopeProject, "test-app", "dev", "DEV_KEY", "dv")
+	secretSt.Set(ctx, store.ScopeProject, "test-app", "production", "PROD_KEY", "prodv")
+
+	secrets, err := collectSecrets(ctx, "test-app", "", nil)
+	if err != nil {
+		t.Fatalf("collectSecrets failed: %v", err)
+	}
+	if secrets["P_KEY"] != "pv" {
+		t.Errorf("P_KEY = %q, want pv", secrets["P_KEY"])
+	}
+	if _, ok := secrets["DEV_KEY"]; ok {
+		t.Error("DEV_KEY should not be included without --env")
+	}
+	if _, ok := secrets["PROD_KEY"]; ok {
+		t.Error("PROD_KEY should not be included without --env")
+	}
+}
+
 func TestCollectSecrets_NoGlobalsFilter(t *testing.T) {
 	defer setupTest(t)()
 	ctx := context.Background()

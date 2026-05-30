@@ -69,7 +69,7 @@ Next steps:
   3. Optional: set "secrets" to an allowlist if you do not want every project key pushed
   4. keysync set GLOBAL_KEY=value   (or --project for project-scoped secrets)
   5. keysync push --project ` + project + ` --dry-run   (review keys and scopes)
-  6. keysync push --project ` + project + `   (defaults to dev; use --env production for CI)
+  6. keysync push --project ` + project + `   (project-wide; use --env production for CI)
 
 See docs/pushing-secrets.md and docs/local-vs-ci-env.md`)
 			}

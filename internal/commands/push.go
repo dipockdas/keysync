@@ -32,8 +32,8 @@ Provide either {c}--project{/c} or {c}--repo{/c} to identify which repo to push 
 
 {b}Which keys are pushed:{/b}
   • {c}globals{/c} — only global keys listed in the repo's {c}"globals"{/c} array
-  • {c}project{/c} — {g}all{/g} project-scoped keys unless restricted (see below)
-  • {c}environment{/c} — keys for {c}--env{/c} (defaults to {c}dev{/c} when omitted; overrides project for same name)
+  • {c}project{/c} — project-wide keys (no environment) unless restricted (see below)
+  • {c}environment{/c} — with {c}--env NAME{/c}, also keys for that environment (overrides project for same name)
 
 {b}Restricting project keys:{/b}
   • {c}"secrets"{/c} in {c}.keysync.json{/c} — allowlist; only these key names are pushed

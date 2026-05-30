@@ -76,7 +76,7 @@ The `keysync push` command includes validation to prevent users from accidentall
 
 Full guide: [docs/getting-started.md](docs/getting-started.md). README: [README.md](README.md#first-steps-any-install-method).
 
-**Scopes:** With `-p`, `set`/`push`/`list` default to `dev` unless `--env` is passed; `--env ""` = project-wide. `get`/`export` use `--env` only when explicitly passed.
+**Scopes:** With `-p`, omit `--env` for project-wide; pass `--env NAME` for environment scope. `get`/`export` use `--env` only when explicitly passed.
 
 ## Platform configuration
 

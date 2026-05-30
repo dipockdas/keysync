@@ -118,13 +118,13 @@ No project folder or `.keysync.json` required.
 ```bash
 keysync set API_KEY=your_value_here
 keysync get API_KEY
-keysync set -p my-app DATABASE_URL=postgres://localhost:5432/myapp --env ""
+keysync set -p my-app DATABASE_URL=postgres://localhost:5432/myapp
 keysync get DATABASE_URL -p my-app
 keysync list
 keysync list -p my-app
 ```
 
-With `-p`, `set` defaults to the `dev` environment unless you pass `--env` (use `--env ""` for project-wide secrets).
+With `-p`, `set` stores project-wide secrets unless you pass `--env` (e.g. `--env production` for CI).
 
 #### 2. In your project — init and migrate
 

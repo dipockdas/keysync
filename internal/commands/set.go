@@ -20,10 +20,9 @@ GitHub or deployment platforms. Use {c}keysync push{/c} to push secrets upstream
   {c}keysync set KEY=VALUE{/c}        (use {c}={/c}, no space around it)
   {c}keysync set KEY=VALUE --project NAME --env ENV{/c}
 
-If {c}--project{/c} is provided, the secret is scoped to that project.
-With {c}--project{/c}, secrets default to the {c}dev{/c} environment unless you pass
-{c}--env{/c} (e.g. {c}--env production{/c} for CI). Use {c}--env \"\"{/c} for project-wide
-scope (no environment). Without {c}--project{/c}, secrets are stored {g}globally{/g}.
+If {c}--project{/c} is provided, the secret is scoped to that project (project-wide).
+Pass {c}--env NAME{/c} for an environment (e.g. {c}--env production{/c} for CI,
+{c}--env dev{/c} for a dev environment). Without {c}--project{/c}, secrets are stored {g}globally{/g}.
 
 {b}Examples:{/b}
   {c}keysync set DATABASE_URL=postgres://user:pass@host/db{/c}            {g}# global{/g}
