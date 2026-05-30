@@ -42,9 +42,11 @@ Oh and it's just handy to get your secrets without having to remember where you 
 
 ## Demo
 
-See keysync in action before you install — same flow as [First steps](#first-steps-any-install-method): `set` → `get` → `list`, then `init` → `migrate`, then `push`.
+See keysync in action before you install — local `init`, `set`, `list`, and `get` (placeholder values only).
 
-Terminal recording coming soon — see [docs/demo.md](docs/demo.md) for `asciinema` recording and embed instructions.
+[![asciinema demo](https://asciinema.org/a/1162047.svg)](https://asciinema.org/a/1162047)
+
+More recording tips: [docs/demo.md](docs/demo.md).
 
 ---
 
