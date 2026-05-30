@@ -1,131 +1,85 @@
-# Keysync Test Suite
+# Keysync test suite
 
-## Running Tests
+Quick reference for running unit tests and CI security checks. For contributor patterns (table-driven tests, `httptest`, command helpers), see [testing.md](testing.md).
+
+## Running tests locally
 
 ```bash
-# Core packages: store, config, crypto, commands
+# All internal packages (with race detector)
 make test
 
-# Core packages (no verbose output)
+# Same, less verbose
 make test-short
 
-# Platform API tests (Vercel, Railway, Supabase)
+# Platform client tests (generic engine + first-party configs)
 make test-platform
 
-# Go client library
-cd clients/go && go test ./...
+# Go client library only
+make test-clients
 
-# Python client library
-cd clients/python && uv run pytest
+# Internal + Go client
+make test-all
 ```
 
-## Test Coverage
+### Per-package
 
-| Package | File | Tests | Description |
-|---------|------|-------|-------------|
-| `internal/store` | `store_test.go` | 11 | Service naming, MemoryStore CRUD, concurrency |
-| `internal/store` | `fallback_test.go` | 7 | FallbackStore CRUD, persistence, concurrency |
-| `internal/config` | `config_test.go` | 9 | Config load/save, search, parsing |
-| `internal/crypto` | `crypto_test.go` | 12 | Key generation, encrypt/decrypt, wrong key rejection |
-| `internal/platforms` | `platform_test.go` | 3 | Platform registry |
-| `internal/platforms` | `vercel_test.go` | 5 | Vercel API upsert, errors, token validation |
-| `internal/platforms` | `railway_test.go` | 5 | Railway API upsert, errors, token validation |
-| `internal/platforms` | `supabase_test.go` | 5 | Supabase API upsert, errors, token validation |
-| `internal/commands` | `commands_test.go` | 16 | set/get/list/rotate/doctor/migrate commands |
-| `clients/go/` | `keysync_test.go` | 13 | Go client library get/list/service names |
-| `clients/python/` | `test_client.py` | 11 | Python client service names, error types |
-| **Total** | | **97** | |
-
-## Test Conventions
-
-### Table-driven tests (Go)
-
-All Go packages use table-driven tests with `t.Run` subtests. Each test case is a struct in a slice with a `name` field for readable output:
-
-```go
-tests := []struct {
-    name    string
-    scope   Scope
-    project string
-    want    string
-}{
-    {"global no project", ScopeGlobal, "", "keysync/global"},
-    // ...
-}
-for _, tt := range tests {
-    t.Run(tt.name, func(t *testing.T) { ... })
-}
+```bash
+go test ./internal/commands/... -v -count=1 -run 'TestSetCmd_ProjectScope'
+go test ./internal/store/... -count=1
+go test ./internal/platforms/... -count=1
 ```
 
-### Platform API tests
+### Other client libraries
 
-Each platform (Vercel, Railway, Supabase) uses `net/http/httptest` to mock API servers:
-
-```go
-ts := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-    // Validate request method, headers, body
-    w.WriteHeader(http.StatusOK)
-    w.Write([]byte(`{}`))
-}))
-defer ts.Close()
-
-client := &VercelClient{baseURL: ts.URL, client: ts.Client(), ...}
+```bash
+cd clients/go && go test ./... -race -count=1
+cd clients/python && uv run pytest    # if uv/pytest configured
+cd clients/dart && dart test          # when tests exist
 ```
 
-Tests cover success, API errors, and missing tokens.
+## What is covered
 
-### Command tests
+| Area | Package / path | Focus |
+|------|----------------|-------|
+| CLI commands | `internal/commands` | `set`, `get`, `list`, `export`, `push` planning, `migrate`, `doctor`, `rotate`, scope/env resolution |
+| Keychain store | `internal/store` | Service naming, MemoryStore, FallbackStore (NaCl), concurrency |
+| Config | `internal/config` | `.keysync.json` load/save, repo lookup |
+| Crypto | `internal/crypto` | NaCl box encrypt/decrypt, key handling |
+| GitHub client | `internal/github` | `gh` integration (mocked) |
+| Platforms | `internal/platforms` | Generic CLI/HTTP engine, Vercel/Railway/Supabase equivalence, token lookup, response sanitization |
+| Go client | `clients/go` | `GetSecret`, service names, Windows cred targets |
 
-Commands use a `setupTest()` helper that saves and restores package-level global variables, since the CLI package uses globals rather than dependency injection:
+Test counts change as the project grows; run `go test ./internal/... -list . | rg '^Test' | wc -l` for a current count.
 
-```go
-func setupTest(t *testing.T) func() {
-    t.Helper()
-    origSecretSt := secretSt
-    secretSt = store.NewMemoryStore()
-    // ...
-    return func() {
-        secretSt = origSecretSt
-        // ...
-    }
-}
-// Usage:
-defer setupTest(t)()
+## Conventions (summary)
+
+- **Go:** table-driven tests with `t.Run`; see [testing.md](testing.md).
+- **Commands:** `setupTest()` + in-memory `MemoryStore`; output via `os.Pipe()`.
+- **Platforms:** `httptest.NewServer` for HTTP APIs; no live network in unit tests.
+- **Stores:** `t.TempDir()` for FallbackStore persistence tests.
+
+## CI security checks (required on `main`)
+
+These run on GitHub Actions for pushes and pull requests to `main` (and on a schedule for some workflows). They are not `go test`, but they gate merges alongside unit tests.
+
+| Check | Workflow | Tool | Purpose |
+|-------|----------|------|---------|
+| Unit tests + race | [ci.yml](../.github/workflows/ci.yml) | `go test -race ./internal/...` | Regressions and data races |
+| Cross-platform build | [cross-platform.yml](../.github/workflows/cross-platform.yml) | `go test` on macOS, Linux, Windows | OS-specific store code |
+| Vulnerability scan | [security.yml](../.github/workflows/security.yml) | [govulncheck](https://go.dev/blog/vuln) | Known Go dependency CVEs |
+| Secret detection | [security.yml](../.github/workflows/security.yml) | [Gitleaks](https://github.com/gitleaks/gitleaks) | Leaked secrets in the repo |
+| Static analysis | [codeql.yml](../.github/workflows/codeql.yml) | [CodeQL](https://codeql.github.com/) | Go security/quality queries |
+| Supply chain score | [scorecard.yml](../.github/workflows/scorecard.yml) | [OpenSSF Scorecard](https://scorecard.dev/) | Repository security posture |
+
+Branch protection on `main` requires **`test`**, **`govulncheck`**, and **`gitleaks`** to pass before merge.
+
+### Run security checks locally
+
+```bash
+go install golang.org/x/vuln/cmd/govulncheck@latest
+govulncheck ./...
+
+gitleaks detect --source . --verbose
 ```
 
-Command output is captured via OS-level pipe redirection (`os.Pipe()` with stdout/stderr substitution).
-
-### Encryption tests
-
-The crypto package tests verify:
-- Key generation produces non-nil keys
-- Encrypt/decrypt round-trips for empty, small, and 1MB payloads
-- Decryption with the wrong key fails
-- Decryption of corrupted ciphertext fails
-- Two random keys are unique
-
-### Store tests
-
-Both `MemoryStore` and `FallbackStore` cover:
-- Set and Get round-trip
-- Get returns `ErrNotFound` for missing keys
-- Delete removes keys
-- Delete returns `ErrNotFound` for missing keys
-- List returns all entries, with scope/project filtering
-- Concurrent reads and writes are safe
-- Persistence (FallbackStore): data survives store close/reopen
-
-### FallbackStore encryption
-
-The FallbackStore encrypts data using NaCl box (Curve25519 + XSalsa20-Poly1305) before writing to disk. On load, it transparently migrates plaintext JSON from previous versions to encrypted format.
-
-## Key test patterns
-
-| Pattern | Used in |
-|---------|---------|
-| `t.TempDir()` | Config, Fallback, Go client tests |
-| `httptest.NewServer` | Vercel, Railway, Supabase tests |
-| `os.Pipe()` output capture | Command tests |
-| `t.Setenv()` | Platform token validation tests |
-| `sync.WaitGroup` | Store concurrency tests |
-| `bytes.Equal` | Crypto round-trip verification |
+Details and reporting: [SECURITY-SCANNING.md](SECURITY-SCANNING.md).

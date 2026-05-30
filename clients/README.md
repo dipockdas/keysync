@@ -18,6 +18,7 @@ convention that `keysync` uses internally.
 | **Rust** | `clients/rust/` | `security` CLI | `secret-tool` CLI | `windows-sys` crate | Available (Windows: not fully tested) |
 | **C++** | `clients/cpp/` | `security` CLI | `secret-tool` CLI | Win32 API (wincred.h) | Available (Windows: not fully tested) |
 | **Ruby** | `clients/ruby/` | `security` CLI | `secret-tool` CLI | PowerShell + inline C# | Available (Windows: not fully tested) |
+| **Dart** | `clients/dart/` | `security` CLI | `secret-tool` CLI | PowerShell + Credential Manager | Ready (Flutter desktop only) |
 
 ## Design
 
@@ -137,3 +138,4 @@ instructions), and AGENTS.md (AI agent instructions):
 - [Rust client](rust/) — `clients/rust/`
 - [C++ client](cpp/) — `clients/cpp/`
 - [Ruby client](ruby/) — `clients/ruby/`
+- [Dart client](dart/) — `clients/dart/` (Flutter desktop)

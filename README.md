@@ -45,16 +45,6 @@ Oh and it's just handy to get your secrets without having to remember where you 
 
 ---
 
-## Demo
-
-See keysync in action before you install — local `init`, `set`, `list`, and `get` (placeholder values only).
-
-[![asciinema demo](https://asciinema.org/a/1162047.svg)](https://asciinema.org/a/1162047)
-
-More recording tips: [docs/demo.md](docs/demo.md).
-
----
-
 ## Quick start
 
 Pick one way to install, then follow **First steps** below.
@@ -213,9 +203,9 @@ Per-language guides: [`clients/README.md`](clients/README.md).
 | Coding assistants | [docs/coding-assistants.md](docs/coding-assistants.md) |
 | Installation | [docs/install.md](docs/install.md) · [Homebrew](docs/homebrew.md) |
 | Configuration & platforms | [docs/configuration.md](docs/configuration.md) |
-| Testing & CI | [docs/testing.md](docs/testing.md) |
+| Testing & CI | [docs/testing.md](docs/testing.md) · [docs/tests.md](docs/tests.md) |
 | Pushing secrets | [docs/pushing-secrets.md](docs/pushing-secrets.md) |
-| GitHub settings (open source) | [docs/github-repository-settings.md](docs/github-repository-settings.md) |
+| Security scanning | [docs/SECURITY-SCANNING.md](docs/SECURITY-SCANNING.md) |
 | Platform setup (macOS/Linux/Windows) | [docs/platform-setup.md](docs/platform-setup.md) |
 | Migration from `.env` | [docs/migration-guide.md](docs/migration-guide.md) |
 | Troubleshooting | [docs/troubleshooting.md](docs/troubleshooting.md) |

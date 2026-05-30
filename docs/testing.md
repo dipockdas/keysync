@@ -237,6 +237,8 @@ Tests run on GitHub Actions across three OSes (ubuntu, macos, windows):
 
 The CI configuration is in `.github/workflows/ci.yml`.
 
+For security workflows (govulncheck, Gitleaks, CodeQL, Scorecard) and branch protection checks, see [tests.md](tests.md#ci-security-checks-required-on-main).
+
 ## Coverage Summary by Package
 
 | Package | What's Tested |

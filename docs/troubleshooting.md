@@ -41,15 +41,36 @@ GitHub Actions typically receives secrets from repository settings; keysync is u
 
 ## macOS repeated keychain prompts
 
-Each keychain read can prompt if the binary is unsigned or was rebuilt/copied to a new path.
+Each keychain read can prompt if the binary is unsigned, was rebuilt, or was copied to a new path (macOS ties keychain access to the binary identity).
 
-**Recommended (local dev):**
+### `keysync trust` (run this first)
+
+`keysync trust` updates macOS keychain ACLs so **this** `keysync` binary can read secrets that keysync already knows about (from its index). It does **not** read or print secret values.
+
+Run it:
+
+- After **every** `make build` or copying a new binary into `PATH`
+- After installing from [GitHub Releases](https://github.com/dipockdas/keysync/releases) or Homebrew, once per machine/binary location
+- When `keysync get`, `list`, or `export` starts asking for your password on every key
 
 ```bash
-make build-signed          # Developer ID sign (persists "Always Allow" across rebuilds)
-make install-signed        # installs to ~/.local/bin/keysync
-keysync trust              # updates ACLs for all indexed secrets (no values printed)
+keysync trust
+# Keychain trust updated for this binary.
 ```
+
+If you see `trust is only supported on macOS keychain`, you are not using the native macOS store (e.g. you passed `--store fallback`).
+
+### Signed builds (fewer prompts across rebuilds)
+
+For day-to-day development on macOS, a **Developer ID–signed** binary keeps “Always Allow” stable across rebuilds better than an unsigned `make build` binary:
+
+```bash
+make build-signed          # build + codesign (macOS only)
+make install-signed        # install to ~/.local/bin/keysync
+keysync trust              # once after install or rebuild
+```
+
+### Reduce reads (fewer prompts)
 
 **Export one secret** (one keychain read):
 

@@ -4,6 +4,27 @@ This document is a **recipe for AI coding assistants** (and human developers) to
 
 A keysync client library reads secrets directly from the OS keychain at runtime — no dependency on the `keysync` binary. The library exposes a simple `getSecret` / `listSecrets` API and handles platform-specific keychain access internally.
 
+## Existing client libraries
+
+Use these as reference implementations before writing a new language binding:
+
+| Library | Location | macOS | Linux | Windows | Status |
+|---------|----------|-------|-------|---------|--------|
+| **Go** | `clients/go/` | `security` CLI | `secret-tool` CLI | `wincred` Go lib | Ready |
+| **Python** | `clients/python/` | `security` CLI | `secret-tool` CLI | ctypes Win32 API | Ready |
+| **TypeScript** | `clients/node/` | `security` CLI | `secret-tool` CLI | PowerShell + Win32 | Ready (macOS/Linux) |
+| **Swift** | `clients/swift/` | Security.framework | `secret-tool` CLI | Not planned | Ready (macOS/Linux) |
+| **Java** | `clients/java/` | `security` CLI | `secret-tool` CLI | JNA → Win32 API | Available (Windows: not fully tested) |
+| **C# (.NET)** | `clients/csharp/` | `security` CLI | `secret-tool` CLI | P/Invoke → Win32 API | Available (Windows: not fully tested) |
+| **Rust** | `clients/rust/` | `security` CLI | `secret-tool` CLI | `windows-sys` crate | Available (Windows: not fully tested) |
+| **C++** | `clients/cpp/` | `security` CLI | `secret-tool` CLI | Win32 API (`wincred.h`) | Available (Windows: not fully tested) |
+| **Ruby** | `clients/ruby/` | `security` CLI | `secret-tool` CLI | PowerShell + inline C# | Available (Windows: not fully tested) |
+| **Dart** | `clients/dart/` | `security` CLI | `secret-tool` CLI | PowerShell + Credential Manager | Ready (Flutter **desktop** only) |
+
+Per-library READMEs: [clients/README.md](../clients/README.md).
+
+---
+
 ## Table of Contents
 
 1. [Service Naming](#1-service-naming)
