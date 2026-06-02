@@ -35,6 +35,8 @@ import (
 	"strings"
 	"sync"
 	"unsafe"
+
+	"golang.org/x/term"
 )
 
 // macOS Security framework error codes.
@@ -265,34 +267,128 @@ func (k *KeychainStore) Set(_ context.Context, scope Scope, project, environment
 	if k.index != nil {
 		_ = k.index.add(SecretEntry{Scope: scope, Project: project, Environment: environment, Key: key})
 	}
-	trustBinaryForItem(svcName, acctName)
+	// Do not call trustBinaryForItem here — macOS prompts for the login keychain password on
+	// every ACL change. New items trust the creating binary by default; use keysync trust to
+	// repair partition lists after upgrading the keysync binary.
 	return nil
 }
 
-// trustBinaryForItem grants the running keysync binary access to a keychain item
-// so macOS does not prompt on every read. Re-run after copying to a new path, or use
-// a Developer-ID-signed binary (make build-signed) so "Always Allow" persists across rebuilds.
-func trustBinaryForItem(service, account string) {
-	exe, err := os.Executable()
-	if err != nil {
-		return
+// keychainPartitionList returns the partition list for set-generic-password-partition-list.
+// Modern macOS grants access by code-signing team ID, not -T on this subcommand (see TN3127).
+func keychainPartitionList(exe string) string {
+	const base = "apple-tool:,apple:,codesign:"
+	if tid := teamIDFromExecutable(exe); tid != "" {
+		return base + ",teamid:" + tid
 	}
-	_ = exec.Command("security", "set-generic-password-partition-list",
+	return base
+}
+
+// teamIDFromExecutable reads TeamIdentifier from codesign -dv output (empty if unsigned).
+func teamIDFromExecutable(exe string) string {
+	out, err := exec.Command("codesign", "-dv", exe).CombinedOutput()
+	if err != nil {
+		return ""
+	}
+	return parseTeamIdentifier(string(out))
+}
+
+func parseTeamIdentifier(codesignOutput string) string {
+	for line := range strings.SplitSeq(codesignOutput, "\n") {
+		line = strings.TrimSpace(line)
+		if strings.HasPrefix(line, "TeamIdentifier=") {
+			tid := strings.TrimPrefix(line, "TeamIdentifier=")
+			if tid != "" && tid != "not set" {
+				return tid
+			}
+		}
+	}
+	return ""
+}
+
+// loginKeychainPath returns the path to the user's login keychain, or "" if not found.
+func loginKeychainPath() string {
+	home, err := os.UserHomeDir()
+	if err != nil {
+		return ""
+	}
+	for _, name := range []string{"login.keychain-db", "login.keychain"} {
+		p := filepath.Join(home, "Library", "Keychains", name)
+		if _, err := os.Stat(p); err == nil {
+			return p
+		}
+	}
+	return ""
+}
+
+// readLoginKeychainPassword prompts once for the login keychain password (not stored).
+func readLoginKeychainPassword() ([]byte, error) {
+	fd := int(os.Stdin.Fd())
+	if !term.IsTerminal(fd) {
+		return nil, fmt.Errorf("keysync trust must be run in an interactive terminal")
+	}
+	fmt.Fprint(os.Stderr, "Login keychain password (used once for trust, not stored): ")
+	pw, err := term.ReadPassword(fd)
+	fmt.Fprintln(os.Stderr)
+	if err != nil {
+		return nil, err
+	}
+	return pw, nil
+}
+
+func trustBinaryForItemOnKeychain(keychain, partitions, service, account string, keychainPassword []byte) error {
+	args := []string{
+		"set-generic-password-partition-list",
 		"-s", service,
 		"-a", account,
-		"-S", "apple-tool:,apple:,codesign:",
-		"-T", exe,
-	).Run()
+		"-S", partitions,
+	}
+	if len(keychainPassword) > 0 {
+		args = append(args, "-k", string(keychainPassword))
+	}
+	if keychain != "" {
+		args = append(args, keychain)
+	}
+	return exec.Command("security", args...).Run()
 }
 
 // RepairTrust re-applies keychain ACLs for every indexed secret (no value reads).
-func (k *KeychainStore) RepairTrust() {
+// Prompts once for the login keychain password, then updates all indexed items.
+func (k *KeychainStore) RepairTrust() (succeeded, failed int, err error) {
 	if k.index == nil {
-		return
+		return 0, 0, nil
 	}
-	for _, e := range k.index.list("", "", "") {
-		trustBinaryForItem(serviceName(e.Scope, e.Project, e.Environment), accountName(e.Key))
+	entries := k.index.list("", "", "")
+	if len(entries) == 0 {
+		return 0, 0, nil
 	}
+
+	keychainPassword, err := readLoginKeychainPassword()
+	if err != nil {
+		return 0, 0, err
+	}
+	defer func() {
+		for i := range keychainPassword {
+			keychainPassword[i] = 0
+		}
+	}()
+
+	exe, err := os.Executable()
+	if err != nil {
+		return 0, len(entries), err
+	}
+	partitions := keychainPartitionList(exe)
+	keychain := loginKeychainPath()
+
+	for _, e := range entries {
+		svc := serviceName(e.Scope, e.Project, e.Environment)
+		acct := accountName(e.Key)
+		if err := trustBinaryForItemOnKeychain(keychain, partitions, svc, acct, keychainPassword); err != nil {
+			failed++
+		} else {
+			succeeded++
+		}
+	}
+	return succeeded, failed, nil
 }
 
 // Delete removes a secret from the macOS keychain using the Security framework API.
