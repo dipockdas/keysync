@@ -45,7 +45,13 @@ Each keychain read can prompt if the binary is unsigned, was rebuilt, or was cop
 
 ### `keysync trust` (run this first)
 
-`keysync trust` updates macOS keychain ACLs so **this** `keysync` binary can read secrets that keysync already knows about (from its index). It does **not** read or print secret values.
+`keysync trust` updates macOS keychain **partition lists** so **this** `keysync` binary can read secrets that keysync already knows about (from its index). For signed builds it includes your Developer ID team ID; it does **not** read or print secret values.
+
+You should be prompted **once** for your login keychain password (hidden input). Older builds asked repeatedly or prompted on every `keysync mv` — upgrade, run `make install-signed`, then `keysync trust` again.
+
+`keysync mv` and `keysync set` should **not** ask for your keychain password. If they do, upgrade keysync (a regression briefly called ACL repair on every write). You may still see the graphical **“keysync wants to access your keychain”** dialog once — click **Always Allow**.
+
+**Use the same binary you run day to day** (e.g. `~/.local/bin/keysync` after `make install-signed`). Trusting one copy does not apply to another path (such as `./bin/keysync` from `make build`).
 
 Run it:
 

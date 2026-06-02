@@ -19,8 +19,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          if gh release view "${{ github.ref_name }}" --repo "${{ github.repository }}" >/dev/null 2>&1; then
-            echo "Release ${{ github.ref_name }} already exists — skipping build and upload."
+          TAG="${{ github.ref_name }}"
+          REPO="${{ github.repository }}"
+          if gh api "repos/${REPO}/releases" --paginate \
+            --jq ".[] | select(.tag_name == \"${TAG}\") | .id" | grep -q .; then
+            echo "Release ${TAG} already exists (draft or published) — skipping build and upload."
             echo "skip=true" >> "$GITHUB_OUTPUT"
           else
             echo "skip=false" >> "$GITHUB_OUTPUT"
@@ -242,5 +245,4 @@ jobs:
           gh release create "$GITHUB_REF_NAME" \
             --title "$GITHUB_REF_NAME" \
             --notes "$NOTES" \
-            --draft \
             release-assets/*
