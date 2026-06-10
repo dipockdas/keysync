@@ -1,9 +1,9 @@
 # keysync — Handover
 
-**Last updated:** 2026-05-29  
+**Last updated:** 2026-06-10  
 **Purpose:** Resume work after macOS upgrade / reboot.  
 **Repo:** https://github.com/dipockdas/keysync (public, default branch `main`)  
-**Local branch:** `clean-main` (tracks `origin/main`)
+**Local branch:** `main` (tracks `origin/main`)
 
 ---
 
@@ -11,15 +11,17 @@
 
 keysync is **public and launch-ready** from a product/docs perspective. Recent work focused on:
 
+- **v1.0.6:** grouped `keysync ls` output, `-g` / `--global` flag, release notes in `docs/releases/`
+- macOS keychain trust fixes (v1.0.5)
 - Open-source polish (badges, security CI, branch protection)
 - **Breaking CLI fix:** no silent `dev` environment default — project-wide scope when `--env` is omitted
 - README trust positioning (“no server, no cloud”)
 - Doc cleanup (removed internal-only guides)
 - Marketing strategy documented in personal folder (not in this repo)
 
-**Published release:** [v1.0.4](https://github.com/dipockdas/keysync/releases) (Windows ARM validated by maintainer).
+**Published release:** [v1.0.6](https://github.com/dipockdas/keysync/releases/tag/v1.0.6) — grouped `ls`, `-g` flag.
 
-**Latest commit on `main`:** `4158225` — Restore README asciinema demo without internal recording doc link.
+**Latest commit on `main`:** `21fb56c` — Improve keysync ls with grouped output and -g scope flag.
 
 ---
 
@@ -29,23 +31,38 @@ keysync is **public and launch-ready** from a product/docs perspective. Recent w
 |------|--------|
 | Visibility | Public |
 | Default branch | `main` |
-| Working tree | Clean (as of handover write) |
+| **Git remote (only)** | `origin` → https://github.com/dipockdas/keysync.git |
+| Local tracking | `main` → `origin/main` |
+| Archived (do not use) | [original-keysync](https://github.com/dipockdas/original-keysync) — pre-rewrite history (email in commits); **archived 2026-06-10** |
 | Demo | [asciinema.org/a/1162047](https://asciinema.org/a/1162047) embedded in README |
 | OpenSSF / CodeQL / Security workflows | Enabled; uploads on public repo |
 | Branch protection | `main`: PR required, checks `test`, `govulncheck`, `gitleaks` |
 | Private vulnerability reporting | Enabled via API |
 | Dependabot security updates | Enabled |
 
+### Git remotes — read this if `git status` looks wrong
+
+**Only push and pull from `origin` (public repo).** The local `original` remote was removed; `original-keysync` is archived on GitHub.
+
+History was rewritten at public launch to strip maintainer email from commits. That old line lives only in the archived repo — it shares **no merge-base** with current `main`, so tracking it showed fake “ahead/behind” counts.
+
+```bash
+git remote -v          # should show origin only
+git status -sb         # should show main...origin/main
+git push origin main   # commits and tags
+```
+
+Release notes for each version: `docs/releases/vX.Y.Z.md` (used by the release workflow when present).
+
 ### Recent commits (newest first)
 
 | Commit | Summary |
 |--------|---------|
-| `4158225` | Restore README asciinema embed (removed only `docs/demo.md` link, not video) |
-| `0f10a13` | Doc cleanup: remove `demo.md`, `SEND_COMMAND_REDESIGN.md`, `github-repository-settings.md`; refresh `tests.md`, troubleshooting `keysync trust` |
-| `09f77b2` | README: “No keysync server / no keysync cloud” blockquote |
-| `c6bf153` | Docs: optional `--env`, project-wide default |
-| `9f82957` | **Code:** stop defaulting project commands to `dev` environment |
-| `da475b3` | Public badges + full security workflow uploads |
+| `21fb56c` | Grouped `keysync ls`, `-g` flag, v1.0.6 release notes |
+| `6695bca` | Merge PR #3 — v1.0.5 release (macOS keychain trust) |
+| `c1d1226` | Fix macOS keychain trust for signed builds |
+| `92518a1` | Add HANDOVER.md |
+| `4158225` | Restore README asciinema embed |
 
 ### Recover deleted maintainer doc (if needed)
 
@@ -104,7 +121,9 @@ make test-platform      # platform engine tests
 keysync trust           # updates keychain ACLs for this binary
 ```
 
-**Do not** force-push all tags (re-triggers release workflow). Tag only when cutting a real release (e.g. v1.0.5).
+**Do not** force-push all tags (re-triggers release workflow). Tag only when cutting a real release (e.g. `v1.0.7`).
+
+Release workflow reads `docs/releases/<tag>.md` for GitHub release notes when that file exists.
 
 ---
 
@@ -231,7 +250,7 @@ Documented in prior sessions — not in git:
 | `~/.codex/config.toml` → `commit_attribution = ""` | No Codex co-author |
 | `~/.bootstrap/git-hooks/commit-msg` + global `core.hooksPath` | Strip AI co-author trailers |
 
-Git history was rewritten earlier for contributor graph / email privacy — **do not** force-push all tags.
+Git history was rewritten at public launch for contributor-graph / email privacy — **do not** force-push all tags. Pre-rewrite history is in archived [original-keysync](https://github.com/dipockdas/original-keysync) (read-only).
 
 ---
 
@@ -247,7 +266,6 @@ Git history was rewritten earlier for contributor graph / email privacy — **do
 ### Not started / backlog
 
 - Hermes opportunity-monitoring agent (spec in marketing plan Section 8)  
-- v1.0.5 release (only when there are real code changes)  
 - README “AI assistants” paragraph higher on page (marketing audit suggestion)  
 - Comparison table on README (marketing audit suggestion)  
 - Catalyst / NZ press (optional)  
