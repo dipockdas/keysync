@@ -27,6 +27,8 @@ func setupTest(t *testing.T) func() {
 	origEffectiveEnv := effectiveEnv
 	origConfigPath := configPath
 	origRepoFlag := repoFlag
+	origListGlobal := listGlobal
+	origListUnmask := listUnmask
 
 	secretSt = store.NewMemoryStore()
 	cfg = &config.Config{
@@ -41,6 +43,8 @@ func setupTest(t *testing.T) func() {
 	effectiveEnv = ""
 	configPath = "/tmp/test/.keysync.json"
 	repoFlag = "test/repo"
+	listGlobal = false
+	listUnmask = false
 
 	return func() {
 		secretSt = origSecretSt
@@ -50,6 +54,8 @@ func setupTest(t *testing.T) func() {
 		effectiveEnv = origEffectiveEnv
 		configPath = origConfigPath
 		repoFlag = origRepoFlag
+		listGlobal = origListGlobal
+		listUnmask = origListUnmask
 	}
 }
 
@@ -307,8 +313,77 @@ func TestListCmd_WithSecrets(t *testing.T) {
 	if !strings.Contains(stdout, "GLOBAL_KEY") {
 		t.Errorf("stdout missing GLOBAL_KEY: %s", stdout)
 	}
-	if !strings.Contains(stdout, "global") {
-		t.Errorf("stdout missing 'global' scope: %s", stdout)
+	if !strings.Contains(stdout, "Global") {
+		t.Errorf("stdout missing Global section: %s", stdout)
+	}
+	if !strings.Contains(stdout, "Project: test-app") {
+		t.Errorf("stdout missing Project section: %s", stdout)
+	}
+}
+
+func TestListCmd_GlobalOnly(t *testing.T) {
+	defer setupTest(t)()
+	ctx := context.Background()
+	secretSt.Set(ctx, store.ScopeGlobal, "", "", "G_KEY", "gv")
+	secretSt.Set(ctx, store.ScopeProject, "test-app", "", "P_KEY", "pv")
+
+	cmd := newListCmd()
+	stdout, _, err := captureCommand(cmd, []string{"-g"})
+	if err != nil {
+		t.Fatalf("RunE failed: %v", err)
+	}
+	if !strings.Contains(stdout, "G_KEY") {
+		t.Errorf("stdout missing G_KEY: %s", stdout)
+	}
+	if strings.Contains(stdout, "P_KEY") {
+		t.Errorf("stdout should not contain P_KEY: %s", stdout)
+	}
+	if !strings.Contains(stdout, "Global") {
+		t.Errorf("stdout missing Global section: %s", stdout)
+	}
+}
+
+func TestListCmd_ProjectOnly(t *testing.T) {
+	defer setupTest(t)()
+	ctx := context.Background()
+	secretSt.Set(ctx, store.ScopeGlobal, "", "", "G_KEY", "gv")
+	secretSt.Set(ctx, store.ScopeProject, "test-app", "", "P_KEY", "pv")
+	secretSt.Set(ctx, store.ScopeProject, "other-app", "", "O_KEY", "ov")
+
+	project = "test-app"
+	cmd := newListCmd()
+	stdout, _, err := captureCommand(cmd, []string{})
+	if err != nil {
+		t.Fatalf("RunE failed: %v", err)
+	}
+	if strings.Contains(stdout, "G_KEY") {
+		t.Errorf("stdout should not contain G_KEY (global): %s", stdout)
+	}
+	if !strings.Contains(stdout, "P_KEY") {
+		t.Errorf("stdout missing P_KEY: %s", stdout)
+	}
+	if strings.Contains(stdout, "O_KEY") {
+		t.Errorf("stdout should not contain O_KEY (different project): %s", stdout)
+	}
+}
+
+func TestListCmd_GlobalAndProject(t *testing.T) {
+	defer setupTest(t)()
+	ctx := context.Background()
+	secretSt.Set(ctx, store.ScopeGlobal, "", "", "G_KEY", "gv")
+	secretSt.Set(ctx, store.ScopeProject, "test-app", "", "P_KEY", "pv")
+
+	project = "test-app"
+	cmd := newListCmd()
+	stdout, _, err := captureCommand(cmd, []string{"-g"})
+	if err != nil {
+		t.Fatalf("RunE failed: %v", err)
+	}
+	if !strings.Contains(stdout, "G_KEY") {
+		t.Errorf("stdout missing G_KEY: %s", stdout)
+	}
+	if !strings.Contains(stdout, "P_KEY") {
+		t.Errorf("stdout missing P_KEY: %s", stdout)
 	}
 }
 
@@ -321,7 +396,7 @@ func TestListCmd_ProjectFilter(t *testing.T) {
 	secretSt.Set(ctx, store.ScopeProject, "other-app", "production", "O_KEY", "ov")
 
 	cmd := newListCmd()
-	stdout, _, err := captureCommand(cmd, []string{})
+	stdout, _, err := captureCommand(cmd, []string{"-g"})
 	if err != nil {
 		t.Fatalf("RunE failed: %v", err)
 	}
@@ -333,6 +408,68 @@ func TestListCmd_ProjectFilter(t *testing.T) {
 	}
 	if strings.Contains(stdout, "O_KEY") {
 		t.Errorf("stdout should not contain O_KEY (different project): %s", stdout)
+	}
+}
+
+func TestListCmd_GroupedOutput(t *testing.T) {
+	defer setupTest(t)()
+	ctx := context.Background()
+	secretSt.Set(ctx, store.ScopeGlobal, "", "", "B_GLOBAL", "gv")
+	secretSt.Set(ctx, store.ScopeGlobal, "", "", "A_GLOBAL", "gv")
+	secretSt.Set(ctx, store.ScopeProject, "zebra", "", "Z_KEY", "pv")
+	secretSt.Set(ctx, store.ScopeProject, "alpha", "", "A_KEY", "pv")
+	secretSt.Set(ctx, store.ScopeProject, "alpha", "production", "P_KEY", "pv")
+
+	cmd := newListCmd()
+	stdout, _, err := captureCommand(cmd, []string{})
+	if err != nil {
+		t.Fatalf("RunE failed: %v", err)
+	}
+	if !strings.Contains(stdout, "Global") {
+		t.Errorf("stdout missing Global section: %s", stdout)
+	}
+	if !strings.Contains(stdout, "Project: alpha") {
+		t.Errorf("stdout missing Project: alpha: %s", stdout)
+	}
+	if !strings.Contains(stdout, "Project: zebra") {
+		t.Errorf("stdout missing Project: zebra: %s", stdout)
+	}
+	if !strings.Contains(stdout, "project-wide") {
+		t.Errorf("stdout missing project-wide subgroup: %s", stdout)
+	}
+	if !strings.Contains(stdout, "production") {
+		t.Errorf("stdout missing production subgroup: %s", stdout)
+	}
+	if strings.Index(stdout, "Project: alpha") > strings.Index(stdout, "Project: zebra") {
+		t.Errorf("projects not sorted alphabetically: %s", stdout)
+	}
+	if strings.Index(stdout, "A_GLOBAL") > strings.Index(stdout, "B_GLOBAL") {
+		t.Errorf("global keys not sorted: %s", stdout)
+	}
+}
+
+func TestListCmd_EnvSubgroup(t *testing.T) {
+	defer setupTest(t)()
+	project = "my-app"
+	effectiveEnv = "production"
+	ctx := context.Background()
+	secretSt.Set(ctx, store.ScopeProject, "my-app", "", "WIDE_KEY", "pv")
+	secretSt.Set(ctx, store.ScopeProject, "my-app", "production", "ENV_KEY", "pv")
+	secretSt.Set(ctx, store.ScopeProject, "my-app", "staging", "STAGE_KEY", "pv")
+
+	cmd := newListCmd()
+	stdout, _, err := captureCommand(cmd, []string{"--env", "production"})
+	if err != nil {
+		t.Fatalf("RunE failed: %v", err)
+	}
+	if !strings.Contains(stdout, "WIDE_KEY") {
+		t.Errorf("stdout missing WIDE_KEY: %s", stdout)
+	}
+	if !strings.Contains(stdout, "ENV_KEY") {
+		t.Errorf("stdout missing ENV_KEY: %s", stdout)
+	}
+	if strings.Contains(stdout, "STAGE_KEY") {
+		t.Errorf("stdout should not contain STAGE_KEY (different env): %s", stdout)
 	}
 }
 

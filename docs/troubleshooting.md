@@ -3,8 +3,9 @@
 ## Secret not found
 
 ```bash
-keysync list                    # see scope and key names
-keysync list --project my-app
+keysync list                    # all secrets, grouped by scope
+keysync list -g                 # global keys only
+keysync list -p my-app          # project keys only (add -g to include globals)
 keysync get KEY -p my-app -u    # print value to stdout
 ```
 

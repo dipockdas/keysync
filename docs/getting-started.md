@@ -20,8 +20,10 @@ keysync set -p my-app DATABASE_URL=postgres://localhost:5432/myapp
 keysync get DATABASE_URL -p my-app
 
 # See what is stored
-keysync list
-keysync list -p my-app
+keysync list                    # all secrets, grouped by scope
+keysync list -g                 # global keys only
+keysync list -p my-app          # project keys only
+keysync list -g -p my-app       # global + project
 ```
 
 **Note on `--env`:** With `-p`, omit `--env` for project-wide secrets (the usual case). Use `--env staging` or `--env production` only when the same key needs different values per environment. See [Secret scopes and `--env`](configuration.md#secret-scopes-and---env).

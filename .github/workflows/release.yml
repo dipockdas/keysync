@@ -219,7 +219,15 @@ jobs:
         shell: bash
         run: |
           set -e
-          NOTES="## keysync ${GITHUB_REF_NAME}
+          TAG="${GITHUB_REF_NAME}"
+          NOTES_FILE="docs/releases/${TAG}.md"
+          if [ -f "$NOTES_FILE" ]; then
+            NOTES="$(cat "$NOTES_FILE")"
+          else
+            NOTES="## keysync ${TAG}"
+          fi
+
+          NOTES="${NOTES}
 
           ### Install (macOS / Linux)
 
