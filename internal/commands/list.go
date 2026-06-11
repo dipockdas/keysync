@@ -19,8 +19,18 @@ var (
 	listGlobal bool
 )
 
-func isListProjectsOnly() bool {
-	return project == ProjectListSentinel
+// resolveListProjectFlag handles bare -p / --project (project names list) vs -p NAME.
+// With NoOptDefVal, cobra sets project to ProjectListSentinel when the flag has no =value;
+// a separate-arg name (keysync ls --project hyperdx) arrives as a positional arg instead.
+func resolveListProjectFlag(cmdArgs []string) (projectsOnly bool) {
+	if project != ProjectListSentinel {
+		return false
+	}
+	if len(cmdArgs) > 0 && !strings.HasPrefix(cmdArgs[0], "-") {
+		project = cmdArgs[0]
+		return false
+	}
+	return true
 }
 
 func newListCmd() *cobra.Command {
@@ -55,7 +65,7 @@ Use {c}--unmask{/c} to also display secret values (for verification purposes).
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
 
-			if isListProjectsOnly() {
+			if resolveListProjectFlag(args) {
 				return printProjectsList(ctx, cmd.OutOrStdout(), listGlobal)
 			}
 
@@ -83,7 +93,7 @@ Use {c}--unmask{/c} to also display secret values (for verification purposes).
 
 // collectListEntries returns secret entries for the current list flags.
 func collectListEntries(ctx context.Context) ([]store.SecretEntry, error) {
-	hasProject := project != "" && !isListProjectsOnly()
+	hasProject := project != "" && project != ProjectListSentinel
 
 	switch {
 	case !listGlobal && !hasProject:

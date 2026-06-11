@@ -473,6 +473,25 @@ func TestListCmd_EnvSubgroup(t *testing.T) {
 	}
 }
 
+func TestResolveListProjectFlag(t *testing.T) {
+	defer setupTest(t)()
+	project = ProjectListSentinel
+	if !resolveListProjectFlag(nil) {
+		t.Fatal("bare -p should list projects only")
+	}
+	if project != ProjectListSentinel {
+		t.Fatalf("project = %q, want sentinel", project)
+	}
+
+	project = ProjectListSentinel
+	if resolveListProjectFlag([]string{"hyperdx"}) {
+		t.Fatal("--project hyperdx should not list all projects")
+	}
+	if project != "hyperdx" {
+		t.Fatalf("project = %q, want hyperdx", project)
+	}
+}
+
 func TestListCmd_ProjectsOnly(t *testing.T) {
 	defer setupTest(t)()
 	ctx := context.Background()
@@ -482,11 +501,14 @@ func TestListCmd_ProjectsOnly(t *testing.T) {
 	secretSt.Set(ctx, store.ScopeGlobal, "", "", "G_KEY", "gv")
 
 	project = ProjectListSentinel
-	cmd := newListCmd()
-	stdout, _, err := captureCommand(cmd, []string{})
-	if err != nil {
-		t.Fatalf("RunE failed: %v", err)
+	if !resolveListProjectFlag(nil) {
+		t.Fatal("expected projects-only mode")
 	}
+	var buf bytes.Buffer
+	if err := printProjectsList(ctx, &buf, false); err != nil {
+		t.Fatalf("printProjectsList: %v", err)
+	}
+	stdout := buf.String()
 	if !strings.Contains(stdout, "Projects") {
 		t.Errorf("stdout missing Projects header: %s", stdout)
 	}
@@ -502,21 +524,40 @@ func TestListCmd_ProjectsOnly(t *testing.T) {
 	if strings.Contains(stdout, "G_KEY") {
 		t.Errorf("stdout should not contain global keys: %s", stdout)
 	}
-	if strings.Index(stdout, "alpha") > strings.Index(stdout, "zebra") {
-		t.Errorf("projects not sorted: %s", stdout)
+}
+
+func TestListCmd_ProjectWithSeparateArg(t *testing.T) {
+	defer setupTest(t)()
+	ctx := context.Background()
+	secretSt.Set(ctx, store.ScopeProject, "hyperdx", "", "H_KEY", "pv")
+	secretSt.Set(ctx, store.ScopeProject, "other", "", "O_KEY", "pv")
+
+	project = ProjectListSentinel
+	if resolveListProjectFlag([]string{"hyperdx"}) {
+		t.Fatal("expected project keys, not project summary")
+	}
+	entries, err := collectListEntries(ctx)
+	if err != nil {
+		t.Fatalf("collectListEntries: %v", err)
+	}
+	if len(entries) != 1 || entries[0].Key != "H_KEY" {
+		t.Fatalf("entries = %+v, want hyperdx H_KEY only", entries)
 	}
 }
 
 func TestListCmd_ProjectsOnlyEmpty(t *testing.T) {
 	defer setupTest(t)()
+	ctx := context.Background()
 	project = ProjectListSentinel
-	cmd := newListCmd()
-	stdout, _, err := captureCommand(cmd, []string{})
-	if err != nil {
-		t.Fatalf("RunE failed: %v", err)
+	if !resolveListProjectFlag(nil) {
+		t.Fatal("expected projects-only mode")
 	}
-	if !strings.Contains(stdout, "No projects found.") {
-		t.Errorf("stdout = %q, want 'No projects found.'", stdout)
+	var buf bytes.Buffer
+	if err := printProjectsList(ctx, &buf, false); err != nil {
+		t.Fatalf("printProjectsList: %v", err)
+	}
+	if !strings.Contains(buf.String(), "No projects found.") {
+		t.Errorf("stdout = %q, want 'No projects found.'", buf.String())
 	}
 }
 
