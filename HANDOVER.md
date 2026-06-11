@@ -1,9 +1,39 @@
 # keysync — Handover
 
-**Last updated:** 2026-06-10  
-**Purpose:** Resume work after macOS upgrade / reboot.  
+**Last updated:** 2026-06-11  
+**Purpose:** Resume work after macOS upgrade / reboot, or pick up an AI-assisted session.  
 **Repo:** https://github.com/dipockdas/keysync (public, default branch `main`)  
 **Local branch:** `main` (tracks `origin/main`)
+
+---
+
+## 0. Session handoff — paste this to resume with an AI assistant
+
+Copy the block below into a new Cursor chat (or point the assistant at this file):
+
+```
+Continuing keysync work from HANDOVER.md (2026-06-10 session).
+
+Done and shipped:
+- v1.0.6 released — grouped `keysync ls`, `-g` flag
+  https://github.com/dipockdas/keysync/releases/tag/v1.0.6
+- Git cleanup: `main` tracks `origin/main` only; `original-keysync` archived on GitHub
+- HANDOVER.md updated (bc6f5c7 on main)
+- Maintainer machine: `make build` + cp to ~/.local/bin/keysync (v1.0.6 verified)
+
+Shipped in v1.0.7:
+- macOS `keysync trust` fix (signed partition lists, unsigned ACL, progress bar)
+- `keysync ls -p` → project names + key counts
+
+Backlog:
+- Bump Homebrew formula: ./scripts/update-homebrew-formula.sh v1.0.7
+- Phase 2 ls ideas: -q quiet mode, --json, duplicate-key hints (see plan doc)
+
+Reference docs:
+- Repo: HANDOVER.md, docs/releases/v1.0.6.md
+- Obsidian: ~/Documents/personal/Keysync/plan-ls-improvements.md
+- Agent skill: .agents/skills/keysync-agent/SKILL.md (never run --unmask in agent sessions)
+```
 
 ---
 
@@ -19,9 +49,9 @@ keysync is **public and launch-ready** from a product/docs perspective. Recent w
 - Doc cleanup (removed internal-only guides)
 - Marketing strategy documented in personal folder (not in this repo)
 
-**Published release:** [v1.0.6](https://github.com/dipockdas/keysync/releases/tag/v1.0.6) — grouped `ls`, `-g` flag.
+**Published release:** [v1.0.7](https://github.com/dipockdas/keysync/releases/tag/v1.0.7) — macOS trust fix, `ls -p` project names.
 
-**Latest commit on `main`:** `21fb56c` — Improve keysync ls with grouped output and -g scope flag.
+**Previous:** [v1.0.6](https://github.com/dipockdas/keysync/releases/tag/v1.0.6) — grouped `ls`, `-g` flag.
 
 ---
 
@@ -58,6 +88,7 @@ Release notes for each version: `docs/releases/vX.Y.Z.md` (used by the release w
 
 | Commit | Summary |
 |--------|---------|
+| `bc6f5c7` | HANDOVER: single-origin git, archived original-keysync |
 | `21fb56c` | Grouped `keysync ls`, `-g` flag, v1.0.6 release notes |
 | `6695bca` | Merge PR #3 — v1.0.5 release (macOS keychain trust) |
 | `c1d1226` | Fix macOS keychain trust for signed builds |

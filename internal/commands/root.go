@@ -15,15 +15,15 @@ import (
 var Version = "dev"
 
 var (
-	cfgFile    string
-	project    string
+	cfgFile      string
+	project      string
 	envFlag      string
 	effectiveEnv string // resolved in PersistentPreRunE (see env.go)
-	repoFlag   string
-	storeFlag  string
-	cfg        *config.Config
-	secretSt   store.Store
-	configPath string
+	repoFlag     string
+	storeFlag    string
+	cfg          *config.Config
+	secretSt     store.Store
+	configPath   string
 )
 
 // Execute is the entry point for the CLI.
@@ -52,6 +52,9 @@ See {u}https://github.com/dipockdas/keysync{/u} for full documentation and tutor
 				effectiveEnv = ""
 				return nil
 			}
+			if project == ProjectListSentinel && cmd.Name() != "list" {
+				return fmt.Errorf("--project requires a project name")
+			}
 			if err := initializeRuntime(); err != nil {
 				return err
 			}
@@ -62,6 +65,7 @@ See {u}https://github.com/dipockdas/keysync{/u} for full documentation and tutor
 
 	cmd.PersistentFlags().StringVar(&cfgFile, "config", "", "path to .keysync.json (searches parents by default)")
 	cmd.PersistentFlags().StringVarP(&project, "project", "p", "", "project name (from .keysync.json)")
+	cmd.PersistentFlags().Lookup("project").NoOptDefVal = ProjectListSentinel
 	cmd.PersistentFlags().StringVarP(&envFlag, "env", "e", "", "environment name (with --project: omit for project-wide; get/export use --env only when passed)")
 	cmd.PersistentFlags().StringVar(&repoFlag, "repo", "", "GitHub repository (owner/repo). Auto-detected if not set.")
 	cmd.PersistentFlags().StringVar(&storeFlag, "store", "", `secret store backend ("fallback" to skip OS keychain and use NaCl-encrypted file)`)

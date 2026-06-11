@@ -22,7 +22,8 @@ keysync get DATABASE_URL -p my-app
 # See what is stored
 keysync list                    # all secrets, grouped by scope
 keysync list -g                 # global keys only
-keysync list -p my-app          # project keys only
+keysync list -p                 # project names only
+keysync list -p my-app          # one project's keys
 keysync list -g -p my-app       # global + project
 ```
 

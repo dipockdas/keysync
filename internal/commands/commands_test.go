@@ -473,6 +473,53 @@ func TestListCmd_EnvSubgroup(t *testing.T) {
 	}
 }
 
+func TestListCmd_ProjectsOnly(t *testing.T) {
+	defer setupTest(t)()
+	ctx := context.Background()
+	secretSt.Set(ctx, store.ScopeProject, "alpha", "", "A_KEY", "pv")
+	secretSt.Set(ctx, store.ScopeProject, "alpha", "production", "P_KEY", "pv")
+	secretSt.Set(ctx, store.ScopeProject, "zebra", "", "Z_KEY", "pv")
+	secretSt.Set(ctx, store.ScopeGlobal, "", "", "G_KEY", "gv")
+
+	project = ProjectListSentinel
+	cmd := newListCmd()
+	stdout, _, err := captureCommand(cmd, []string{})
+	if err != nil {
+		t.Fatalf("RunE failed: %v", err)
+	}
+	if !strings.Contains(stdout, "Projects") {
+		t.Errorf("stdout missing Projects header: %s", stdout)
+	}
+	if !strings.Contains(stdout, "alpha") {
+		t.Errorf("stdout missing alpha: %s", stdout)
+	}
+	if !strings.Contains(stdout, "zebra") {
+		t.Errorf("stdout missing zebra: %s", stdout)
+	}
+	if strings.Contains(stdout, "A_KEY") || strings.Contains(stdout, "P_KEY") {
+		t.Errorf("stdout should not list secret keys: %s", stdout)
+	}
+	if strings.Contains(stdout, "G_KEY") {
+		t.Errorf("stdout should not contain global keys: %s", stdout)
+	}
+	if strings.Index(stdout, "alpha") > strings.Index(stdout, "zebra") {
+		t.Errorf("projects not sorted: %s", stdout)
+	}
+}
+
+func TestListCmd_ProjectsOnlyEmpty(t *testing.T) {
+	defer setupTest(t)()
+	project = ProjectListSentinel
+	cmd := newListCmd()
+	stdout, _, err := captureCommand(cmd, []string{})
+	if err != nil {
+		t.Fatalf("RunE failed: %v", err)
+	}
+	if !strings.Contains(stdout, "No projects found.") {
+		t.Errorf("stdout = %q, want 'No projects found.'", stdout)
+	}
+}
+
 // ---------------------------------------------------------------------------
 // Doctor command tests
 // ---------------------------------------------------------------------------

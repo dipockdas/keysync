@@ -11,10 +11,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// ProjectListSentinel is the --project value when -p is passed without a name (list only).
+const ProjectListSentinel = "*"
+
 var (
-	listUnmask  bool
-	listGlobal  bool
+	listUnmask bool
+	listGlobal bool
 )
+
+func isListProjectsOnly() bool {
+	return project == ProjectListSentinel
+}
 
 func newListCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -27,7 +34,8 @@ Without flags, all secrets across every project and scope are shown (grouped).
 Use {c}-g{/c} / {c}--global{/c} for global keys only, or together with {c}--project{/c}
 to include both global and project keys.
 
-With {c}--project{/c} alone, only that project's keys are shown (not globals).
+With {c}--project NAME{/c}, only that project's keys are shown (not globals).
+Pass {c}-p{/c} or {c}--project{/c} with no name to list project names only.
 Use {c}--env NAME{/c} to also include keys for a specific environment.
 
 Use {c}--unmask{/c} to also display secret values (for verification purposes).
@@ -35,7 +43,8 @@ Use {c}--unmask{/c} to also display secret values (for verification purposes).
 {b}Examples:{/b}
   {c}keysync list{/c}  (alias: {c}ls{/c})                 # all secrets, grouped
   {c}keysync list -g{/c}                                  # global keys only
-  {c}keysync list -p my-app{/c}                           # project keys only
+  {c}keysync list -p{/c}                                   # project names only
+  {c}keysync list -p my-app{/c}                           # one project's keys
   {c}keysync list -g -p my-app{/c}                        # global + project
   {c}keysync list -p my-app --env production{/c}          # project-wide + env
   {c}keysync list --unmask{/c}                            # show values
@@ -45,6 +54,10 @@ Use {c}--unmask{/c} to also display secret values (for verification purposes).
   Tutorial: {u}https://github.com/dipockdas/keysync#quick-start{/u}`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
+
+			if isListProjectsOnly() {
+				return printProjectsList(ctx, cmd.OutOrStdout(), listGlobal)
+			}
 
 			all, err := collectListEntries(ctx)
 			if err != nil {
@@ -70,7 +83,7 @@ Use {c}--unmask{/c} to also display secret values (for verification purposes).
 
 // collectListEntries returns secret entries for the current list flags.
 func collectListEntries(ctx context.Context) ([]store.SecretEntry, error) {
-	hasProject := project != ""
+	hasProject := project != "" && !isListProjectsOnly()
 
 	switch {
 	case !listGlobal && !hasProject:
@@ -252,4 +265,65 @@ func colorKey(key string) string {
 		return key
 	}
 	return cGreen + key
+}
+
+type projectSummary struct {
+	name  string
+	count int
+}
+
+func collectProjectSummaries(ctx context.Context) ([]projectSummary, error) {
+	entries, err := secretSt.List(ctx, store.ScopeProject, "", "")
+	if err != nil {
+		return nil, fmt.Errorf("list project secrets: %w", err)
+	}
+	counts := make(map[string]int)
+	for _, e := range entries {
+		if e.Project != "" {
+			counts[e.Project]++
+		}
+	}
+	summaries := make([]projectSummary, 0, len(counts))
+	for name, count := range counts {
+		summaries = append(summaries, projectSummary{name: name, count: count})
+	}
+	sort.Slice(summaries, func(i, j int) bool {
+		return strings.ToLower(summaries[i].name) < strings.ToLower(summaries[j].name)
+	})
+	return summaries, nil
+}
+
+func printProjectsList(ctx context.Context, w io.Writer, includeGlobal bool) error {
+	if includeGlobal {
+		globals, err := secretSt.List(ctx, store.ScopeGlobal, "", "")
+		if err != nil {
+			return fmt.Errorf("list global secrets: %w", err)
+		}
+		if len(globals) > 0 {
+			fmt.Fprintf(w, "%sGlobal (%s)%s\n", cBold+cGold, keyCountLabel(len(globals)), cReset)
+			sortEntriesByKey(globals)
+			printSectionEntries(w, globals, false, nil, "  ")
+			fmt.Fprintln(w)
+		}
+	}
+
+	summaries, err := collectProjectSummaries(ctx)
+	if err != nil {
+		return err
+	}
+	if len(summaries) == 0 {
+		fmt.Fprintln(w, "No projects found.")
+		return nil
+	}
+
+	label := "Projects"
+	if len(summaries) == 1 {
+		fmt.Fprintf(w, "%s%s (%d project)%s\n", cBold+cGold, label, len(summaries), cReset)
+	} else {
+		fmt.Fprintf(w, "%s%s (%d projects)%s\n", cBold+cGold, label, len(summaries), cReset)
+	}
+	for _, s := range summaries {
+		fmt.Fprintf(w, "  %s%s (%s)\n", colorKey(s.name), cReset, keyCountLabel(s.count))
+	}
+	return nil
 }
