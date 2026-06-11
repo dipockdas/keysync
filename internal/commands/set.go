@@ -37,12 +37,16 @@ Pass {c}--env NAME{/c} for an environment (e.g. {c}--env production{/c} for CI,
 			if len(args) == 0 {
 				return fmt.Errorf("requires KEY=value argument (e.g. keysync set DATABASE_URL=postgres://localhost/db)")
 			}
-			if len(args) > 1 {
+			if len(args) > 2 {
+				return fmt.Errorf("too many arguments — did you forget to quote? Use KEY=value syntax")
+			}
+			if len(args) == 2 && !mightBeTrailingProjectArg(args) {
 				return fmt.Errorf("too many arguments — did you forget to quote? Use KEY=value syntax")
 			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			args = commandArgs(args)
 			kv := args[0]
 			eq := strings.IndexByte(kv, '=')
 			if eq < 1 {

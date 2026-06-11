@@ -1,4 +1,4 @@
-.PHONY: build clean sign build-signed run test test-short test-platform test-clients test-all release distclean bump-formula
+.PHONY: build clean sign build-signed run test test-short test-userpath test-platform test-clients test-all release distclean bump-formula
 
 BINDIR  := ./bin
 BINARY  := keysync
@@ -53,6 +53,10 @@ test:
 
 test-short:
 	go test ./internal/... -race -count=1
+
+# Full user-path tests: in-process root CLI (always) + subprocess binary (integration tag).
+test-userpath:
+	go test ./internal/commands/... -v -race -count=1 -run 'TestUserPath|TestBinaryUserPath' -tags=integration
 
 test-platform:
 	go test ./internal/platforms/... -v -count=1

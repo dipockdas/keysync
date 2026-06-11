@@ -44,13 +44,17 @@ after install to avoid repeated keychain password prompts.
   {c}keysync get --help{/c}
   {c}keysync list --help{/c}`),
 		Args: func(cmd *cobra.Command, args []string) error {
-			if len(args) > 1 {
+			if len(args) > 2 {
+				return fmt.Errorf("accepts at most one KEY (e.g. keysync export API_KEY)")
+			}
+			if len(args) == 2 && !mightBeTrailingProjectArg(args) {
 				return fmt.Errorf("accepts at most one KEY (e.g. keysync export API_KEY)")
 			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
+			args = commandArgs(args)
 
 			if len(args) == 1 {
 				return exportOne(ctx, cmd, args[0])

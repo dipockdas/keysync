@@ -473,22 +473,31 @@ func TestListCmd_EnvSubgroup(t *testing.T) {
 	}
 }
 
-func TestResolveListProjectFlag(t *testing.T) {
+func TestResolveTrailingProjectName(t *testing.T) {
 	defer setupTest(t)()
+
 	project = ProjectListSentinel
-	if !resolveListProjectFlag(nil) {
-		t.Fatal("bare -p should list projects only")
-	}
-	if project != ProjectListSentinel {
-		t.Fatalf("project = %q, want sentinel", project)
+	args := commandArgs(nil)
+	if len(args) != 0 || project != ProjectListSentinel {
+		t.Fatalf("bare -p: args=%v project=%q", args, project)
 	}
 
 	project = ProjectListSentinel
-	if resolveListProjectFlag([]string{"hyperdx"}) {
-		t.Fatal("--project hyperdx should not list all projects")
+	args = commandArgs([]string{"hyperdx"})
+	if len(args) != 0 || project != "hyperdx" {
+		t.Fatalf("list -p hyperdx: args=%v project=%q", args, project)
 	}
-	if project != "hyperdx" {
-		t.Fatalf("project = %q, want hyperdx", project)
+
+	project = ProjectListSentinel
+	args = commandArgs([]string{"LANGCHAIN_API_KEY=lsv2_test", "geo"})
+	if len(args) != 1 || args[0] != "LANGCHAIN_API_KEY=lsv2_test" || project != "geo" {
+		t.Fatalf("set -p geo: args=%v project=%q", args, project)
+	}
+
+	project = "geo"
+	args = commandArgs([]string{"MY_KEY", "geo"})
+	if len(args) != 1 || args[0] != "MY_KEY" {
+		t.Fatalf("trim after pre-run: args=%v", args)
 	}
 }
 
@@ -501,9 +510,6 @@ func TestListCmd_ProjectsOnly(t *testing.T) {
 	secretSt.Set(ctx, store.ScopeGlobal, "", "", "G_KEY", "gv")
 
 	project = ProjectListSentinel
-	if !resolveListProjectFlag(nil) {
-		t.Fatal("expected projects-only mode")
-	}
 	var buf bytes.Buffer
 	if err := printProjectsList(ctx, &buf, false); err != nil {
 		t.Fatalf("printProjectsList: %v", err)
@@ -533,9 +539,7 @@ func TestListCmd_ProjectWithSeparateArg(t *testing.T) {
 	secretSt.Set(ctx, store.ScopeProject, "other", "", "O_KEY", "pv")
 
 	project = ProjectListSentinel
-	if resolveListProjectFlag([]string{"hyperdx"}) {
-		t.Fatal("expected project keys, not project summary")
-	}
+	commandArgs([]string{"hyperdx"})
 	entries, err := collectListEntries(ctx)
 	if err != nil {
 		t.Fatalf("collectListEntries: %v", err)
@@ -549,9 +553,6 @@ func TestListCmd_ProjectsOnlyEmpty(t *testing.T) {
 	defer setupTest(t)()
 	ctx := context.Background()
 	project = ProjectListSentinel
-	if !resolveListProjectFlag(nil) {
-		t.Fatal("expected projects-only mode")
-	}
 	var buf bytes.Buffer
 	if err := printProjectsList(ctx, &buf, false); err != nil {
 		t.Fatalf("printProjectsList: %v", err)

@@ -52,6 +52,7 @@ See {u}https://github.com/dipockdas/keysync{/u} for full documentation and tutor
 				effectiveEnv = ""
 				return nil
 			}
+			resolveTrailingProjectName(args)
 			if project == ProjectListSentinel && cmd.Name() != "list" {
 				return fmt.Errorf("--project requires a project name")
 			}

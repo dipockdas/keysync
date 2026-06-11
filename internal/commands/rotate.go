@@ -35,12 +35,16 @@ If {c}--env{/c} is also provided, it targets a specific environment scope.
 			if len(args) == 0 {
 				return fmt.Errorf("requires a KEY to rotate (e.g. keysync rotate DB_PASSWORD)")
 			}
-			if len(args) > 1 {
+			if len(args) > 2 {
+				return fmt.Errorf("accepts only one KEY at a time")
+			}
+			if len(args) == 2 && !mightBeTrailingProjectArg(args) {
 				return fmt.Errorf("accepts only one KEY at a time")
 			}
 			return nil
 		},
 		RunE: func(cobraCmd *cobra.Command, args []string) error {
+			args = commandArgs(args)
 			key := args[0]
 			if err := validateKeyName(key); err != nil {
 				return err

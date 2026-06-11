@@ -30,12 +30,16 @@ secrets from GitHub or deployment platforms.
 			if len(args) == 0 {
 				return fmt.Errorf("requires a KEY to delete (e.g. keysync rm OLD_SECRET)")
 			}
-			if len(args) > 1 {
+			if len(args) > 2 {
+				return fmt.Errorf("accepts only one KEY at a time")
+			}
+			if len(args) == 2 && !mightBeTrailingProjectArg(args) {
 				return fmt.Errorf("accepts only one KEY at a time")
 			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			args = commandArgs(args)
 			key := args[0]
 
 			if err := validateKeyName(key); err != nil {

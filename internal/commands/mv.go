@@ -43,12 +43,16 @@ operation — it does not update GitHub Secrets or deployment platforms. Run
 			if len(args) == 0 {
 				return fmt.Errorf("requires a KEY to move (e.g. keysync mv DATABASE_URL --to-project my-app)")
 			}
-			if len(args) > 1 {
+			if len(args) > 2 {
+				return fmt.Errorf("accepts only one KEY at a time")
+			}
+			if len(args) == 2 && !mightBeTrailingProjectArg(args) {
 				return fmt.Errorf("accepts only one KEY at a time")
 			}
 			return nil
 		},
 		RunE: func(cmd *cobra.Command, args []string) error {
+			args = commandArgs(args)
 			key := args[0]
 			if err := validateKeyName(key); err != nil {
 				return err

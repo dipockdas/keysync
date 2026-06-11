@@ -11,27 +11,10 @@ import (
 	"github.com/spf13/cobra"
 )
 
-// ProjectListSentinel is the --project value when -p is passed without a name (list only).
-const ProjectListSentinel = "*"
-
 var (
 	listUnmask bool
 	listGlobal bool
 )
-
-// resolveListProjectFlag handles bare -p / --project (project names list) vs -p NAME.
-// With NoOptDefVal, cobra sets project to ProjectListSentinel when the flag has no =value;
-// a separate-arg name (keysync ls --project hyperdx) arrives as a positional arg instead.
-func resolveListProjectFlag(cmdArgs []string) (projectsOnly bool) {
-	if project != ProjectListSentinel {
-		return false
-	}
-	if len(cmdArgs) > 0 && !strings.HasPrefix(cmdArgs[0], "-") {
-		project = cmdArgs[0]
-		return false
-	}
-	return true
-}
 
 func newListCmd() *cobra.Command {
 	cmd := &cobra.Command{
@@ -64,8 +47,9 @@ Use {c}--unmask{/c} to also display secret values (for verification purposes).
   Tutorial: {u}https://github.com/dipockdas/keysync#quick-start{/u}`),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			ctx := cmd.Context()
+			commandArgs(args)
 
-			if resolveListProjectFlag(args) {
+			if project == ProjectListSentinel {
 				return printProjectsList(ctx, cmd.OutOrStdout(), listGlobal)
 			}
 
