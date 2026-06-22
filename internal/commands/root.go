@@ -90,6 +90,7 @@ See {u}https://github.com/dipockdas/keysync{/u} for full documentation and tutor
 	cmd.AddCommand(newMigrateCmd())
 	cmd.AddCommand(newExportCmd())
 	cmd.AddCommand(newShareCmd())
+	cmd.AddCommand(newAcceptCmd())
 	cmd.AddCommand(newTrustCmd())
 	cmd.AddCommand(newCompletionCmd())
 
