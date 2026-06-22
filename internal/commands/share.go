@@ -32,8 +32,17 @@ func newShareCmd() *cobra.Command {
 		Use:          "share --project name [--key KEY] [--file|--wormhole] [--out path]",
 		Short:        "Create an encrypted, short-lived secret share",
 		SilenceUsage: true,
-		Args:         cobra.NoArgs,
-		RunE: func(cmd *cobra.Command, _ []string) error {
+		Args: func(cmd *cobra.Command, args []string) error {
+			if len(args) > 1 {
+				return fmt.Errorf("share accepts no positional arguments")
+			}
+			if len(args) == 1 && !mightBeTrailingProjectArg(args) {
+				return fmt.Errorf("unknown argument %q — use --project NAME", args[0])
+			}
+			return nil
+		},
+		RunE: func(cmd *cobra.Command, args []string) error {
+			commandArgs(args)
 			if project == "" || project == ProjectListSentinel {
 				return fmt.Errorf("--project requires a project name")
 			}

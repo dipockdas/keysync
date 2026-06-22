@@ -89,6 +89,39 @@ func TestShareDefaultsToFileAndSupportsOneKey(t *testing.T) {
 	}
 }
 
+func TestShareResolvesTrailingProjectFlag(t *testing.T) {
+	env := newUserPathEnv(t)
+	env.resetStore(t)
+
+	if _, _, err := runUserCLI(t, "set", "SHARE_FLAG_TEST=1", "-p", "geo"); err != nil {
+		t.Fatalf("set: %v", err)
+	}
+
+	outPath := filepath.Join(t.TempDir(), "geo.keysync.ksx")
+	for _, args := range [][]string{
+		{"share", "-p", "geo", "--file", "--out", outPath},
+		{"share", "--project", "geo", "--file", "--out", outPath},
+	} {
+		name := strings.Join(args, " ")
+		t.Run(name, func(t *testing.T) {
+			resetCLIGlobals()
+			root := newRootCmd()
+			root.SetIn(strings.NewReader("n\n"))
+			var output bytes.Buffer
+			root.SetOut(&output)
+			root.SetErr(&output)
+			root.SetArgs(append([]string{"--store", "fallback"}, args...))
+			err := root.Execute()
+			if err != nil && strings.Contains(err.Error(), "unknown command") {
+				t.Fatalf("unexpected parse error: %v", err)
+			}
+			if !strings.Contains(output.String(), "Project: geo") {
+				t.Fatalf("output missing project geo: %s", output.String())
+			}
+		})
+	}
+}
+
 func TestShareCancellationAndPassphraseFailureCreateNoFile(t *testing.T) {
 	defer setupTest(t)()
 	project = "test-app"
