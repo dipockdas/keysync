@@ -53,13 +53,8 @@ func BuildPlan(ctx context.Context, secretStore store.Store, project, key string
 		if entry.Scope != store.ScopeProject || entry.Project != project || entry.Environment != "" {
 			continue
 		}
-		value, err := secretStore.Get(ctx, entry.Scope, entry.Project, entry.Environment, entry.Key)
-		if err != nil {
-			return Plan{}, fmt.Errorf("read project secret %q for sharing: %w", entry.Key, err)
-		}
 		secrets = append(secrets, ksx.Secret{
 			Name:    entry.Key,
-			Value:   value,
 			Scope:   entry.Scope,
 			Project: entry.Project,
 		})
@@ -72,22 +67,39 @@ func BuildPlan(ctx context.Context, secretStore store.Store, project, key string
 }
 
 func selectOne(ctx context.Context, secretStore store.Store, project, key string) (ksx.Secret, error) {
-	value, err := secretStore.Get(ctx, store.ScopeProject, project, "", key)
-	if err == nil {
-		return ksx.Secret{Name: key, Value: value, Scope: store.ScopeProject, Project: project}, nil
+	entries, err := secretStore.List(ctx, store.ScopeProject, project, "")
+	if err != nil {
+		return ksx.Secret{}, fmt.Errorf("list project secrets for sharing: %w", err)
 	}
-	if !errors.Is(err, store.ErrNotFound) {
-		return ksx.Secret{}, fmt.Errorf("read project secret %q for sharing: %w", key, err)
+	for _, entry := range entries {
+		if entry.Key == key && entry.Environment == "" {
+			return ksx.Secret{Name: key, Scope: store.ScopeProject, Project: project}, nil
+		}
 	}
 
-	value, err = secretStore.Get(ctx, store.ScopeGlobal, "", "", key)
-	if err == nil {
-		return ksx.Secret{Name: key, Value: value, Scope: store.ScopeGlobal}, nil
+	entries, err = secretStore.List(ctx, store.ScopeGlobal, "", "")
+	if err != nil {
+		return ksx.Secret{}, fmt.Errorf("list global secrets for sharing: %w", err)
 	}
-	if !errors.Is(err, store.ErrNotFound) {
-		return ksx.Secret{}, fmt.Errorf("read global secret %q for sharing: %w", key, err)
+	for _, entry := range entries {
+		if entry.Key == key {
+			return ksx.Secret{Name: key, Scope: store.ScopeGlobal}, nil
+		}
 	}
 	return ksx.Secret{}, fmt.Errorf("%w: %q", ErrSecretNotFound, key)
+}
+
+func (p Plan) LoadSecrets(ctx context.Context, secretStore store.Store) ([]ksx.Secret, error) {
+	secrets := make([]ksx.Secret, len(p.Secrets))
+	for i, selected := range p.Secrets {
+		value, err := secretStore.Get(ctx, selected.Scope, selected.Project, selected.Environment, selected.Name)
+		if err != nil {
+			return nil, fmt.Errorf("read selected secret %q for sharing: %w", selected.Name, err)
+		}
+		selected.Value = value
+		secrets[i] = selected
+	}
+	return secrets, nil
 }
 
 func (p Plan) Preview() Preview {

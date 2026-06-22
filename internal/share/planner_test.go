@@ -26,8 +26,8 @@ func TestBuildPlanSelectsProjectWideSecretsInDeterministicOrder(t *testing.T) {
 	if got := []string{plan.Secrets[0].Name, plan.Secrets[1].Name}; !reflect.DeepEqual(got, []string{"A_KEY", "Z_KEY"}) {
 		t.Fatalf("selected keys = %v", got)
 	}
-	if plan.Secrets[0].Value != "synthetic-a" || plan.Secrets[1].Value != "synthetic-z" {
-		t.Fatal("selected values do not match store")
+	if plan.Secrets[0].Value != "" || plan.Secrets[1].Value != "" {
+		t.Fatal("BuildPlan() read secret values before confirmation")
 	}
 
 	preview := plan.Preview()
@@ -39,6 +39,13 @@ func TestBuildPlanSelectsProjectWideSecretsInDeterministicOrder(t *testing.T) {
 	}
 	if strings.Contains(preview.String(), "synthetic-") {
 		t.Fatalf("preview leaks values: %s", preview.String())
+	}
+	loaded, err := plan.LoadSecrets(ctx, secretStore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded[0].Value != "synthetic-a" || loaded[1].Value != "synthetic-z" {
+		t.Fatal("LoadSecrets() values do not match store")
 	}
 }
 
@@ -53,16 +60,24 @@ func TestBuildPlanSingleKeyUsesProjectThenGlobalFallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := projectPlan.Secrets[0]; got.Scope != store.ScopeProject || got.Value != "synthetic-project" {
+	if got := projectPlan.Secrets[0]; got.Scope != store.ScopeProject || got.Value != "" {
 		t.Fatalf("project secret = %#v", got)
+	}
+	projectSecrets, err := projectPlan.LoadSecrets(ctx, secretStore)
+	if err != nil || projectSecrets[0].Value != "synthetic-project" {
+		t.Fatalf("loaded project secret = %#v, %v", projectSecrets, err)
 	}
 
 	globalPlan, err := BuildPlan(ctx, secretStore, "example-app", "GLOBAL_ONLY")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got := globalPlan.Secrets[0]; got.Scope != store.ScopeGlobal || got.Value != "synthetic-global-only" {
+	if got := globalPlan.Secrets[0]; got.Scope != store.ScopeGlobal || got.Value != "" {
 		t.Fatalf("global fallback = %#v", got)
+	}
+	globalSecrets, err := globalPlan.LoadSecrets(ctx, secretStore)
+	if err != nil || globalSecrets[0].Value != "synthetic-global-only" {
+		t.Fatalf("loaded global secret = %#v, %v", globalSecrets, err)
 	}
 	if globalPlan.Preview().Scope != "global" {
 		t.Fatalf("global preview = %#v", globalPlan.Preview())
