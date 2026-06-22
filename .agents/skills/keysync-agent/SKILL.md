@@ -22,6 +22,7 @@ Help users manage secrets with [keysync](https://github.com/dipockdas/keysync) w
 
 - `keysync set KEY=value` requires the secret in the message or shell — pasting into chat exposes the value (history, logs, retention).
 - `keysync migrate` reads local `.env` files; the user should run it locally and may share only the **`---MIGRATION_RESULT_START---`** block (key names + scopes, no values) for code migration help.
+- `keysync share` and `keysync accept` require interactive passphrases and move secret values — never run these commands, create/import `.ksx` bundles, or request share passphrases in chat.
 
 **What you should do instead**
 
@@ -43,6 +44,7 @@ Help users manage secrets with [keysync](https://github.com/dipockdas/keysync) w
 6. **Never `keysync init` or `keysync push` in the `dipockdas/keysync` repository** — template config only; push is blocked.
 7. **Reject placeholder config** — if `.keysync.json` still has `YOUR_ORG/YOUR_REPO`, user must fix it before push.
 8. **Real `keysync push`** — user-initiated after they review dry-run (same reasoning as `set`: confirms intent and auth on their machine).
+9. **`keysync share` / `keysync accept`** — user-only. Never run, create/import `.ksx` bundles, or handle share passphrases. Explain syntax only; users type `SHARE` to send and `ACCEPT` to import.
 
 ---
 
@@ -84,6 +86,24 @@ keysync push -p my-app              # USER after reviewing dry-run
 
 Optional: `--platforms vercel,railway` · `--env production` only when pushing env-scoped keys.
 
+### Stage 4 — Share with teammates (optional)
+
+**User runs `share` / `accept` in their terminal** — provide commands only.
+
+```bash
+keysync share -p my-app --file          # default transport
+keysync accept ./my-app.keysync.ksx     # type ACCEPT after reviewing manifest
+
+keysync share -p my-app --wormhole
+keysync accept 7-purple-dolphin
+
+keysync share -p my-app -k DATABASE_URL --file   # one key only
+```
+
+- File bundles expire in **10 minutes**; Wormhole sessions time out in **5 minutes**.
+- Send the file/code and passphrase through **different channels**.
+- Confirmation: type **`SHARE`** to create/send, **`ACCEPT`** to import.
+
 ---
 
 ## Command cheat sheet
@@ -97,6 +117,8 @@ Optional: `--platforms vercel,railway` · `--env production` only when pushing e
 | `list` | OK without `--unmask` (names only) |
 | `push --dry-run` | OK — no secret values in output |
 | `push` | **User only** after dry-run |
+| `share` | **User only** — encrypted `.ksx`; type `SHARE`; never run or handle passphrases |
+| `accept` | **User only** — file or Wormhole code; type `ACCEPT`; never run or handle passphrases |
 | `init` | OK to scaffold; user confirms project name |
 | Edit `.keysync.json` | OK — no secret values in file |
 | `doctor` / `trust` | OK |

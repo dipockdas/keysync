@@ -9,6 +9,7 @@ Full policy: **[docs/coding-assistants.md](docs/coding-assistants.md)**. Agent s
 - **`keysync set`** — requires the secret in chat or terminal; tell the user to run it locally. Never ask them to paste secret values into the conversation.
 - **`keysync migrate`** — reads `.env` on their machine; user runs it. For code help they may paste only the migrate **result JSON** (key names + scopes), not `.env` contents.
 - **`keysync push`** (real push) — user runs after reviewing `keysync push --dry-run`.
+- **`keysync share`** / **`keysync accept`** — interactive passphrases and secret transfer; user runs in terminal. Agents must not run these, create/import `.ksx` bundles, or handle passphrases.
 
 ### Assistant-friendly
 

@@ -110,6 +110,40 @@ keysync includes several security features:
 - **Encrypted fallback store** - Uses NaCl box encryption (Curve25519+XSalsa20-Poly1305)
 - **No network calls in runtime** - Client libraries read from local keychain only
 - **Platform token fallback** - Reads from env vars when keychain unavailable (CI/CD)
+- **Encrypted team sharing** - `.ksx` bundles use Argon2id + XChaCha20-Poly1305; Wormhole is transport-only
+
+## Sharing secrets with teammates
+
+`keysync share` and `keysync accept` let you transfer selected project keys to another keysync user without a keysync-hosted service.
+
+### Security model
+
+```text
+selected keys
+  → encrypted .ksx payload (passphrase + Argon2id + XChaCha20-Poly1305)
+  → file or Magic Wormhole transport
+  → recipient enters passphrase and confirms with ACCEPT
+  → import into local OS keychain
+```
+
+- **Passphrase** — Required to decrypt the bundle. Entered interactively only; never via a CLI flag. Share it through a **different channel** than the `.ksx` file or Wormhole code.
+- **Wormhole code** — Pairing token for Magic Wormhole only. It is **not** the encryption key. The transferred bytes remain passphrase-encrypted.
+- **No keysync server** — File mode writes a local `.ksx` bundle. Wormhole mode uses the public Magic Wormhole relay (`wormhole-william` defaults). Plaintext secrets never pass through keysync infrastructure because keysync does not operate sharing infrastructure.
+- **Expiry** — File bundles expire **10 minutes** after creation. Wormhole send/receive sessions time out after **5 minutes**. Expired bundles cannot be imported, even with the correct passphrase.
+- **Confirmation** — Sharing requires typing `SHARE`; importing requires typing `ACCEPT`. Accidental `y` confirmation is not accepted.
+- **Conflicts** — Existing keys at the destination are skipped in v1 (no silent overwrite).
+
+### Safe sharing practices
+
+1. **Use separate channels** — Send the `.ksx` file (or Wormhole code) and the passphrase via different paths (e.g. file in Slack, passphrase in person or a phone call).
+2. **Prefer short-lived shares** — Create a new share when one expires; do not archive `.ksx` files.
+3. **Share minimum scope** — Use `-k KEY` when you only need one secret, not the whole project.
+4. **Do not use in CI** — Sharing is interactive and user-only; agents and automation must not run `share` or `accept`.
+5. **Review before import** — The accept flow shows key names (not values) after decryption; type `ACCEPT` only when the manifest matches expectations.
+
+### What assistants must not do
+
+AI coding assistants must **not** run `keysync share` or `keysync accept`, create or import `.ksx` bundles, request share passphrases, or handle secret payload values. They may explain command syntax and non-secret metadata only. See [docs/coding-assistants.md](docs/coding-assistants.md).
 
 ## Acknowledgments
 

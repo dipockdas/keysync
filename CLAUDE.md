@@ -6,6 +6,8 @@ Read **[docs/coding-assistants.md](docs/coding-assistants.md)** and **[`.agents/
 
 **Do not run `keysync set` or `keysync migrate` for the user** — secret values must not enter chat. Give terminal commands for the user to run. They may share migrate output JSON (key names/scopes only) for code updates.
 
+**Do not run `keysync share` or `keysync accept` for the user** — these require interactive passphrases and transfer secret values. Explain syntax only; users type `SHARE` to send and `ACCEPT` to import.
+
 **OK for assistants:** `.keysync.json` edits, `push --dry-run`, init scaffolding, client migration, export docs (user runs `eval $(keysync export …)` locally).
 
 When editing **this repository**: do not run `keysync init` or `keysync push` here; `.keysync.json` is an example template only. Use `make test` — never store real user secrets in the keysync repo.
@@ -20,6 +22,7 @@ internal/crypto/        # NaCl box encryption (Curve25519+XSalsa20-Poly1305)
 internal/github/        # GitHub Secrets client via `gh` CLI
 internal/platforms/     # Vercel, Railway, Supabase API clients
 internal/store/         # OS keychain backends + fallback store
+internal/share/         # Encrypted .ksx sharing (ksx codec, planner, wormhole transport)
 client/                 # Legacy Go client (shells out to `keysync get`)
 clients/                # Native language client libraries
   go/                   #   Go client (build-tagged, direct keychain)

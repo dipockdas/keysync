@@ -6,7 +6,7 @@
 ┌──────────────────────────────────────────────────────────┐
 │                  CLI (cobra commands)                     │
 │  init │ set │ get │ list │ export │ mv │ push │ pull     │
-│  rotate │ migrate │ doctor │ test-secrets                │
+│  share │ accept │ rotate │ migrate │ doctor             │
 └──────────┬───────────────────────────────────────────────┘
            │
      ┌─────┴─────┐
@@ -21,6 +21,33 @@
      │  Platform Sync          │── Declarative CLI/HTTP configs in .keysync.json
      └────────────────────────┘
 ```
+
+## Sharing secrets
+
+Team sharing is a **local encrypted-payload pipeline** with two transports. There is no keysync sharing server.
+
+```text
+Store (selected keys)
+  ↓
+Share planner (manifest preview, no values in output)
+  ↓
+KSX codec (Argon2id + XChaCha20-Poly1305, interactive passphrase)
+  ↓
+Encrypted .ksx bytes
+  ├── File transport (atomic write, 10-minute expiry)
+  └── Magic Wormhole transport (wormhole-william, 5-minute session timeout)
+          ↓
+Accept pipeline (expiry check → passphrase → manifest → ACCEPT → store writes)
+```
+
+| Piece | Location | Notes |
+|-------|----------|-------|
+| KSX codec | `internal/share/ksx` | Versioned `.ksx` envelope; encrypts full manifest including key names |
+| Share planner | `internal/share` | Project-wide or single-key selection |
+| Wormhole adapter | `internal/share/wormhole` | Transport only; default public Magic Wormhole infrastructure |
+| CLI | `keysync share`, `keysync accept` | Interactive; user-only (not for agents or CI) |
+
+Wormhole pairing codes and share passphrases are independent controls. See [SECURITY.md](../SECURITY.md#sharing-secrets-with-teammates).
 
 ## What goes where
 

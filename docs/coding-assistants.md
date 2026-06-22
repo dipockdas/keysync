@@ -16,6 +16,8 @@ Anything that **writes a secret value** needs that value in the conversation or 
 | `keysync init` | Either | Scaffold project name; you confirm |
 | `keysync push --dry-run` | Assistant or you | Preview targets; confirm repo name |
 | `keysync push` | **You** (after dry-run) | Remind to dry-run first |
+| `keysync share` | **You** (terminal) | Explain syntax and safety; never run, create `.ksx`, or handle passphrases |
+| `keysync accept` | **You** (terminal) | Explain syntax; never run, import bundles, or handle passphrases |
 | Edit `.keysync.json` | Assistant | Repo slugs, platform IDs, generic platform configs — **no tokens** |
 | `keysync export` / client libs | Assistant | Wiring app code; use placeholders in examples |
 | `keysync doctor` / `keysync trust` | Either | Diagnostics and macOS trust steps |
@@ -59,6 +61,36 @@ You review output, then run `keysync push` yourself.
 ### 4. Application code
 
 Assistants should replace `process.env.X` / `os.Getenv` with keysync client libraries using **key names and scopes from migrate output**, never by reading secret values.
+
+### 5. Share secrets with teammates
+
+`keysync share` and `keysync accept` are **user-only** — same reasoning as `set`: they require interactive passphrases and move secret values.
+
+**Agents must not:**
+
+- Run `keysync share` or `keysync accept`
+- Create, read, or import `.ksx` bundles
+- Request, echo, or transform share passphrases or payload values
+
+**Agents may:**
+
+- Explain command syntax and flags (`--file`, `--wormhole`, `-k KEY`)
+- Describe the security model (encrypted `.ksx`, separate passphrase channel, 10-minute file expiry, 5-minute Wormhole timeout)
+- Help inspect non-secret metadata (project name, key count)
+
+Example commands for **users** to run locally:
+
+```bash
+keysync share -p my-app --file
+keysync accept ./my-app.keysync.ksx
+
+keysync share -p my-app --wormhole
+keysync accept 7-purple-dolphin
+```
+
+Confirmation vocabulary: type **`SHARE`** to create/send, **`ACCEPT`** to import. There is no `IMPORT` confirmation step.
+
+See [SECURITY.md](../SECURITY.md#sharing-secrets-with-teammates) and [architecture.md](architecture.md#sharing-secrets).
 
 ## Working in the keysync repository
 

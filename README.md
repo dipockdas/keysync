@@ -41,6 +41,7 @@ Oh and it's just handy to get your secrets without having to remember where you 
 - `keysync push` to GitHub Secrets + declarative platform configs (CLI or HTTP)
 - Import from `.env` or cloud CLIs (`keysync migrate`)
 - Secret rotation, export, shell completion, `keysync doctor`
+- Encrypted team sharing via `.ksx` bundles (file or Magic Wormhole) — `keysync share` / `keysync accept`
 - Client libraries: Go, Python, TypeScript, Dart, Swift, Java, C#, Rust, C++, Ruby
 
 ---
@@ -146,6 +147,25 @@ keysync push -p my-app --dry-run
 keysync push -p my-app
 ```
 
+#### 4. Share with teammates (optional)
+
+Share selected project keys with another keysync user — no keysync server, no accounts. Bundles are encrypted with a passphrase you choose interactively; file bundles expire after **10 minutes**; Wormhole sessions time out after **5 minutes**.
+
+```bash
+# File mode (default): write an encrypted bundle
+keysync share -p my-app --file
+keysync accept ./my-app.keysync.ksx
+
+# Magic Wormhole: transfer the same encrypted bundle over a pairing code
+keysync share -p my-app --wormhole
+keysync accept 7-purple-dolphin
+
+# Share one key instead of the whole project
+keysync share -p my-app -k DATABASE_URL --file
+```
+
+Send the `.ksx` file and passphrase through **different channels**. The Wormhole code is only for pairing — it is not the encryption key. See [SECURITY.md](SECURITY.md#sharing-secrets-with-teammates) and [architecture](docs/architecture.md#sharing-secrets).
+
 ---
 
 ## How it works
@@ -173,6 +193,8 @@ Three scope levels: **global** → **project** → **environment** (higher wins 
 | `keysync pull` | Reconcile names with GitHub |
 | `keysync rotate KEY` | New random value + push |
 | `keysync migrate` | Import from `.env` or cloud |
+| `keysync share` | Create encrypted `.ksx` share (`--file` default, `--wormhole`, `-k KEY`) |
+| `keysync accept` | Accept a `.ksx` file or Wormhole pairing code |
 | `keysync doctor` | Diagnostics |
 
 Global flags: `--project` / `-p`, `--env` / `-e` (optional; only when you need env-scoped keys), `--config`, `--store fallback`. Full reference: `keysync --help`.
@@ -213,6 +235,7 @@ Per-language guides: [`clients/README.md`](clients/README.md).
 | Configuration & platforms | [docs/configuration.md](docs/configuration.md) |
 | Testing & CI | [docs/testing.md](docs/testing.md) · [docs/tests.md](docs/tests.md) |
 | Pushing secrets | [docs/pushing-secrets.md](docs/pushing-secrets.md) |
+| Sharing secrets | [SECURITY.md](SECURITY.md#sharing-secrets-with-teammates) · [architecture](docs/architecture.md#sharing-secrets) |
 | Security scanning | [docs/SECURITY-SCANNING.md](docs/SECURITY-SCANNING.md) |
 | Platform setup (macOS/Linux/Windows) | [docs/platform-setup.md](docs/platform-setup.md) |
 | Migration from `.env` | [docs/migration-guide.md](docs/migration-guide.md) |
@@ -264,7 +287,7 @@ Apache 2.0 — see [LICENSE](LICENSE).
 
 ## For AI coding assistants
 
-- [docs/coding-assistants.md](docs/coding-assistants.md) — what assistants should and should not do (`set` / `migrate` are user-only)
+- [docs/coding-assistants.md](docs/coding-assistants.md) — what assistants should and should not do (`set`, `migrate`, `share`, and `accept` are user-only)
 - [`.agents/skills/keysync-agent/SKILL.md`](.agents/skills/keysync-agent/SKILL.md) — agent skill (same policy)
 - [AGENTS.md](AGENTS.md) — architecture and client-library conventions
 - [CLAUDE.md](CLAUDE.md) — build commands and repo layout
