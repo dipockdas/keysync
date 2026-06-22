@@ -2,6 +2,7 @@ package ksx
 
 import (
 	"bytes"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"strings"
@@ -116,9 +117,12 @@ func TestDecryptRejectsWrongPassphraseAndTampering(t *testing.T) {
 	if err := json.Unmarshal(bundle, &envelope); err != nil {
 		t.Fatal(err)
 	}
-	ciphertext := []byte(envelope.EncryptedPayload)
+	ciphertext, err := base64.RawStdEncoding.DecodeString(envelope.EncryptedPayload)
+	if err != nil {
+		t.Fatal(err)
+	}
 	ciphertext[len(ciphertext)/2] ^= 1
-	envelope.EncryptedPayload = string(ciphertext)
+	envelope.EncryptedPayload = base64.RawStdEncoding.EncodeToString(ciphertext)
 	tamperedCiphertext, err := json.Marshal(envelope)
 	if err != nil {
 		t.Fatal(err)

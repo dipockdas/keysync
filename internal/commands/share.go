@@ -13,6 +13,7 @@ import (
 
 	sharepkg "github.com/dipockdas/keysync/internal/share"
 	"github.com/dipockdas/keysync/internal/share/ksx"
+	wormholepkg "github.com/dipockdas/keysync/internal/share/wormhole"
 	"github.com/spf13/cobra"
 	"golang.org/x/term"
 )
@@ -20,6 +21,7 @@ import (
 var (
 	shareNow            = time.Now
 	readSharePassphrase = readSharePassphraseTerminal
+	commandWormhole     = wormholepkg.New()
 )
 
 func newShareCmd() *cobra.Command {
@@ -41,11 +43,11 @@ func newShareCmd() *cobra.Command {
 			if wormholeMode && outPath != "" {
 				return fmt.Errorf("--out only applies to --file")
 			}
-			if wormholeMode {
-				return fmt.Errorf("Wormhole sharing is not available yet; use --file")
-			}
 			if outPath == "" {
 				outPath = project + ".keysync.ksx"
+			}
+			if wormholeMode {
+				return runWormholeShare(cmd, key)
 			}
 			return runFileShare(cmd, key, outPath)
 		},
@@ -58,10 +60,61 @@ func newShareCmd() *cobra.Command {
 }
 
 func runFileShare(cmd *cobra.Command, key, outPath string) error {
+	bundle, err := prepareShareBundle(cmd, key)
+	if err != nil {
+		return err
+	}
+	if err := writeBundleAtomic(outPath, bundle); err != nil {
+		return err
+	}
+
+	out := cmd.OutOrStdout()
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, "Created encrypted share bundle:")
+	fmt.Fprintln(out, outPath)
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, "Send this file separately from its passphrase. It expires in 10 minutes.")
+	return nil
+}
+
+func runWormholeShare(cmd *cobra.Command, key string) error {
+	bundle, err := prepareShareBundle(cmd, key)
+	if err != nil {
+		return err
+	}
+	filename := project + ".keysync.ksx"
+	code, result, err := commandWormhole.Send(cmd.Context(), filename, bundle)
+	if err != nil {
+		return wormholeShareError(err)
+	}
+	out := cmd.OutOrStdout()
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, "Wormhole code:")
+	fmt.Fprintln(out, code)
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, "Recipient should run:")
+	fmt.Fprintf(out, "keysync accept %s\n", code)
+	fmt.Fprintln(out)
+	fmt.Fprintln(out, "Waiting for recipient...")
+	transfer, ok := <-result
+	if !ok {
+		return wormholeShareError(wormholepkg.ErrInterrupted)
+	}
+	if transfer.Err != nil {
+		return wormholeShareError(transfer.Err)
+	}
+	if !transfer.OK {
+		return wormholeShareError(wormholepkg.ErrInterrupted)
+	}
+	fmt.Fprintln(out, "Transfer complete.")
+	return nil
+}
+
+func prepareShareBundle(cmd *cobra.Command, key string) ([]byte, error) {
 	ctx := cmd.Context()
 	plan, err := sharepkg.BuildPlan(ctx, secretSt, project, key)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	out := cmd.OutOrStdout()
@@ -72,25 +125,25 @@ func runFileShare(cmd *cobra.Command, key, outPath string) error {
 	fmt.Fprint(out, "Type SHARE to continue: ")
 	confirmation, err := bufio.NewReader(cmd.InOrStdin()).ReadString('\n')
 	if err != nil && !errors.Is(err, io.EOF) {
-		return fmt.Errorf("read share confirmation: %w", err)
+		return nil, fmt.Errorf("read share confirmation: %w", err)
 	}
 	confirmation = strings.TrimSuffix(strings.TrimSuffix(confirmation, "\n"), "\r")
 	if confirmation != "SHARE" {
-		return fmt.Errorf("share cancelled: confirmation did not match SHARE")
+		return nil, fmt.Errorf("share cancelled: confirmation did not match SHARE")
 	}
 
 	passphrase, err := readSharePassphrase()
 	if err != nil {
-		return fmt.Errorf("read share passphrase: %w", err)
+		return nil, fmt.Errorf("read share passphrase: %w", err)
 	}
 	defer clear(passphrase)
 	if len(passphrase) == 0 {
-		return fmt.Errorf("read share passphrase: passphrase must not be empty")
+		return nil, fmt.Errorf("read share passphrase: passphrase must not be empty")
 	}
 
 	secrets, err := plan.LoadSecrets(ctx, secretSt)
 	if err != nil {
-		return err
+		return nil, err
 	}
 	now := shareNow().UTC()
 	payload := ksx.Payload{
@@ -101,18 +154,13 @@ func runFileShare(cmd *cobra.Command, key, outPath string) error {
 	}
 	bundle, err := ksx.Encrypt(payload, passphrase)
 	if err != nil {
-		return err
+		return nil, err
 	}
-	if err := writeBundleAtomic(outPath, bundle); err != nil {
-		return err
-	}
+	return bundle, nil
+}
 
-	fmt.Fprintln(out)
-	fmt.Fprintln(out, "Created encrypted share bundle:")
-	fmt.Fprintln(out, outPath)
-	fmt.Fprintln(out)
-	fmt.Fprintln(out, "Send this file separately from its passphrase. It expires in 10 minutes.")
-	return nil
+func wormholeShareError(err error) error {
+	return fmt.Errorf("%w\n\nWormhole transfer failed. You can use file mode instead:\nkeysync share -p %s --file", err, project)
 }
 
 func fprintPreview(w io.Writer, preview sharepkg.Preview) {

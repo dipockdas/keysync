@@ -29,16 +29,34 @@ func newAcceptCmd() *cobra.Command {
 		SilenceUsage: true,
 		Args:         cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runFileAccept(cmd, args[0])
+			return runAccept(cmd, args[0])
 		},
 	}
 }
 
-func runFileAccept(cmd *cobra.Command, path string) error {
-	bundle, err := readBundleFile(path)
-	if err != nil {
-		return err
+func runAccept(cmd *cobra.Command, source string) error {
+	info, err := os.Stat(source)
+	if err == nil {
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("accept source is not a regular file")
+		}
+		bundle, readErr := readBundleFile(source)
+		if readErr != nil {
+			return readErr
+		}
+		return runAcceptBundle(cmd, bundle, "Encrypted keysync share bundle detected.")
 	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return fmt.Errorf("inspect accept source: %w", err)
+	}
+	_, bundle, err := commandWormhole.Receive(cmd.Context(), source)
+	if err != nil {
+		return wormholeAcceptError(err)
+	}
+	return runAcceptBundle(cmd, bundle, "Received encrypted share via Wormhole.")
+}
+
+func runAcceptBundle(cmd *cobra.Command, bundle []byte, detectedMessage string) error {
 	now := acceptNow().UTC()
 	metadata, err := ksx.Inspect(bundle, now)
 	if err != nil {
@@ -49,7 +67,7 @@ func runFileAccept(cmd *cobra.Command, path string) error {
 	}
 
 	out := cmd.OutOrStdout()
-	fmt.Fprintln(out, "Encrypted keysync share bundle detected.")
+	fmt.Fprintln(out, detectedMessage)
 	passphrase, err := readAcceptPassphrase()
 	if err != nil {
 		return fmt.Errorf("read share passphrase: %w", err)
@@ -102,12 +120,13 @@ func runFileAccept(cmd *cobra.Command, path string) error {
 	return nil
 }
 
+func wormholeAcceptError(err error) error {
+	return fmt.Errorf("%w\n\nWormhole transfer failed. Ask the sender to create a file share with --file", err)
+}
+
 func readBundleFile(path string) ([]byte, error) {
 	file, err := os.Open(path)
 	if err != nil {
-		if errors.Is(err, os.ErrNotExist) {
-			return nil, fmt.Errorf("accept source is not an existing local file; Wormhole acceptance is not available yet")
-		}
 		return nil, fmt.Errorf("open share bundle: %w", err)
 	}
 	defer file.Close()
