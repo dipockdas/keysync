@@ -50,7 +50,7 @@ Oh and it's just handy to get your secrets without having to remember where you 
 
 See keysync in action before you install — local `init`, `set`, `list`, and `get` (placeholder values only).
 
-[![asciinema demo](https://asciinema.org/a/1162047.svg)](https://asciinema.org/a/1162047)
+[![keysync demo](docs/assets/demo.gif)](https://asciinema.org/a/1162047)
 
 ---
 
