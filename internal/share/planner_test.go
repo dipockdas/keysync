@@ -23,18 +23,21 @@ func TestBuildPlanSelectsProjectWideSecretsInDeterministicOrder(t *testing.T) {
 	if err != nil {
 		t.Fatalf("BuildPlan() error = %v", err)
 	}
-	if got := []string{plan.Secrets[0].Name, plan.Secrets[1].Name}; !reflect.DeepEqual(got, []string{"A_KEY", "Z_KEY"}) {
+	if got := []string{plan.Secrets[0].Name, plan.Secrets[1].Name, plan.Secrets[2].Name}; !reflect.DeepEqual(got, []string{"A_KEY", "Z_KEY", "ENV_KEY"}) {
 		t.Fatalf("selected keys = %v", got)
 	}
-	if plan.Secrets[0].Value != "" || plan.Secrets[1].Value != "" {
+	if plan.Secrets[2].Environment != "production" {
+		t.Fatalf("env secret environment = %q", plan.Secrets[2].Environment)
+	}
+	if plan.Secrets[0].Value != "" || plan.Secrets[1].Value != "" || plan.Secrets[2].Value != "" {
 		t.Fatal("BuildPlan() read secret values before confirmation")
 	}
 
 	preview := plan.Preview()
-	if preview.Project != "example-app" || preview.Count != 2 || preview.Scope != "project" {
+	if preview.Project != "example-app" || preview.Count != 3 || preview.Scope != "project + env" {
 		t.Fatalf("preview = %#v", preview)
 	}
-	if !reflect.DeepEqual(preview.Keys, []string{"A_KEY", "Z_KEY"}) {
+	if !reflect.DeepEqual(preview.Keys, []string{"A_KEY", "ENV_KEY (env: production)", "Z_KEY"}) {
 		t.Fatalf("preview keys = %v", preview.Keys)
 	}
 	if strings.Contains(preview.String(), "synthetic-") {
@@ -44,8 +47,33 @@ func TestBuildPlanSelectsProjectWideSecretsInDeterministicOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if loaded[0].Value != "synthetic-a" || loaded[1].Value != "synthetic-z" {
+	if loaded[0].Value != "synthetic-a" || loaded[1].Value != "synthetic-z" || loaded[2].Value != "synthetic-env" {
 		t.Fatal("LoadSecrets() values do not match store")
+	}
+}
+
+func TestBuildPlanSingleKeyIncludesEnvironmentScopedMatches(t *testing.T) {
+	ctx := context.Background()
+	secretStore := store.NewMemoryStore()
+	mustSet(t, secretStore, store.ScopeProject, "example-app", "dev", "ENV_ONLY", "synthetic-dev")
+	mustSet(t, secretStore, store.ScopeProject, "example-app", "production", "ENV_ONLY", "synthetic-prod")
+
+	plan, err := BuildPlan(ctx, secretStore, "example-app", "ENV_ONLY")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(plan.Secrets) != 2 {
+		t.Fatalf("secrets = %#v", plan.Secrets)
+	}
+	loaded, err := plan.LoadSecrets(ctx, secretStore)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if loaded[0].Environment != "dev" || loaded[0].Value != "synthetic-dev" {
+		t.Fatalf("dev secret = %#v", loaded[0])
+	}
+	if loaded[1].Environment != "production" || loaded[1].Value != "synthetic-prod" {
+		t.Fatalf("prod secret = %#v", loaded[1])
 	}
 }
 
@@ -60,6 +88,9 @@ func TestBuildPlanSingleKeyUsesProjectThenGlobalFallback(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	if len(projectPlan.Secrets) != 1 {
+		t.Fatalf("project secrets = %#v", projectPlan.Secrets)
+	}
 	if got := projectPlan.Secrets[0]; got.Scope != store.ScopeProject || got.Value != "" {
 		t.Fatalf("project secret = %#v", got)
 	}
@@ -71,6 +102,9 @@ func TestBuildPlanSingleKeyUsesProjectThenGlobalFallback(t *testing.T) {
 	globalPlan, err := BuildPlan(ctx, secretStore, "example-app", "GLOBAL_ONLY")
 	if err != nil {
 		t.Fatal(err)
+	}
+	if len(globalPlan.Secrets) != 1 {
+		t.Fatalf("global secrets = %#v", globalPlan.Secrets)
 	}
 	if got := globalPlan.Secrets[0]; got.Scope != store.ScopeGlobal || got.Value != "" {
 		t.Fatalf("global fallback = %#v", got)

@@ -160,7 +160,7 @@ func TestAcceptWormholeFailuresImportNothingAndSuggestFileMode(t *testing.T) {
 			if !strings.Contains(err.Error(), "--file") {
 				t.Fatalf("error lacks file fallback: %v", err)
 			}
-			assertSecretMissing(t, secretSt, store.ScopeProject, "shared-app", "PROJECT_KEY")
+			assertSecretMissing(t, secretSt, store.ScopeProject, "shared-app", "", "PROJECT_KEY")
 		})
 	}
 }

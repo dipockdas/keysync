@@ -2,6 +2,7 @@ package commands
 
 import (
 	"bufio"
+	"context"
 	"errors"
 	"fmt"
 	"io"
@@ -156,9 +157,6 @@ func validateAcceptPayload(payload ksx.Payload) error {
 		if err := validateKeyName(secret.Name); err != nil {
 			return fmt.Errorf("invalid shared key name: %w", err)
 		}
-		if secret.Environment != "" {
-			return fmt.Errorf("invalid share bundle: environment-scoped keys are not supported in v1")
-		}
 		switch secret.Scope {
 		case store.ScopeProject:
 			if secret.Project != payload.Project {
@@ -171,7 +169,7 @@ func validateAcceptPayload(payload ksx.Payload) error {
 		default:
 			return fmt.Errorf("invalid share bundle: unsupported secret scope")
 		}
-		target := fmt.Sprintf("%s\x00%s\x00%s", secret.Scope, secret.Project, secret.Name)
+		target := secretIdentity(secret)
 		if _, exists := seen[target]; exists {
 			return fmt.Errorf("invalid share bundle: duplicate key %q", secret.Name)
 		}
@@ -180,41 +178,46 @@ func validateAcceptPayload(payload ksx.Payload) error {
 	return nil
 }
 
+func secretIdentity(secret ksx.Secret) string {
+	return fmt.Sprintf("%s\x00%s\x00%s\x00%s", secret.Scope, secret.Project, secret.Environment, secret.Name)
+}
+
 func preflightAccept(cmd *cobra.Command, secrets []ksx.Secret) (toWrite, skipped []ksx.Secret, err error) {
-	type bucket struct {
-		scope   store.Scope
-		project string
-	}
-	buckets := make(map[bucket]map[string]struct{})
 	for _, secret := range secrets {
-		key := bucket{scope: secret.Scope, project: secret.Project}
-		if _, loaded := buckets[key]; !loaded {
-			entries, listErr := secretSt.List(cmd.Context(), secret.Scope, secret.Project, "")
-			if listErr != nil {
-				return nil, nil, fmt.Errorf("check existing keys before acceptance: %w", listErr)
-			}
-			names := make(map[string]struct{}, len(entries))
-			for _, entry := range entries {
-				if entry.Scope == secret.Scope && entry.Project == secret.Project && entry.Environment == "" {
-					names[entry.Key] = struct{}{}
-				}
-			}
-			buckets[key] = names
+		exists, checkErr := secretExists(cmd.Context(), secret)
+		if checkErr != nil {
+			return nil, nil, fmt.Errorf("check existing keys before acceptance: %w", checkErr)
 		}
-		if _, exists := buckets[key][secret.Name]; exists {
+		if exists {
 			skipped = append(skipped, secret)
 		} else {
 			toWrite = append(toWrite, secret)
 		}
 	}
-	sort.Slice(skipped, func(i, j int) bool { return skipped[i].Name < skipped[j].Name })
+	sort.Slice(skipped, func(i, j int) bool {
+		if skipped[i].Environment != skipped[j].Environment {
+			return skipped[i].Environment < skipped[j].Environment
+		}
+		return skipped[i].Name < skipped[j].Name
+	})
 	return toWrite, skipped, nil
+}
+
+func secretExists(ctx context.Context, secret ksx.Secret) (bool, error) {
+	_, err := secretSt.Get(ctx, secret.Scope, secret.Project, secret.Environment, secret.Name)
+	if errors.Is(err, store.ErrNotFound) {
+		return false, nil
+	}
+	if err != nil {
+		return false, err
+	}
+	return true, nil
 }
 
 func writeAcceptedSecrets(cmd *cobra.Command, secrets []ksx.Secret) error {
 	written := make([]ksx.Secret, 0, len(secrets))
 	for _, secret := range secrets {
-		if err := secretSt.Set(cmd.Context(), secret.Scope, secret.Project, "", secret.Name, secret.Value); err != nil {
+		if err := secretSt.Set(cmd.Context(), secret.Scope, secret.Project, secret.Environment, secret.Name, secret.Value); err != nil {
 			rollbackErr := rollbackAcceptedSecrets(cmd, written)
 			if rollbackErr != nil {
 				return fmt.Errorf("import key %q failed after %d writes; rollback also failed: %v", secret.Name, len(written), rollbackErr)
@@ -230,7 +233,7 @@ func rollbackAcceptedSecrets(cmd *cobra.Command, written []ksx.Secret) error {
 	var failures []string
 	for i := len(written) - 1; i >= 0; i-- {
 		secret := written[i]
-		if err := secretSt.Delete(cmd.Context(), secret.Scope, secret.Project, "", secret.Name); err != nil {
+		if err := secretSt.Delete(cmd.Context(), secret.Scope, secret.Project, secret.Environment, secret.Name); err != nil {
 			failures = append(failures, secret.Name)
 		}
 	}

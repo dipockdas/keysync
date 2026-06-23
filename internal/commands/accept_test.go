@@ -15,6 +15,29 @@ import (
 	"github.com/dipockdas/keysync/internal/store"
 )
 
+func TestAcceptFileImportsEnvironmentScopedKeys(t *testing.T) {
+	defer setupTest(t)()
+	now := acceptTestTime()
+	passphrase := []byte("synthetic-accept-passphrase")
+	bundlePath := writeAcceptTestBundle(t, now, passphrase, []ksx.Secret{
+		{Name: "ENV_KEY", Value: "synthetic-env-value", Scope: store.ScopeProject, Project: "shared-app", Environment: "production"},
+	})
+	restore := stubAcceptDependencies(t, now, passphrase)
+	defer restore()
+
+	cmd := newAcceptCmd()
+	cmd.SetIn(strings.NewReader("ACCEPT\n"))
+	cmd.SetOut(&bytes.Buffer{})
+	cmd.SetArgs([]string{bundlePath})
+	if err := cmd.Execute(); err != nil {
+		t.Fatalf("accept error = %v", err)
+	}
+	got, err := secretSt.Get(context.Background(), store.ScopeProject, "shared-app", "production", "ENV_KEY")
+	if err != nil || got != "synthetic-env-value" {
+		t.Fatalf("env secret = %q, %v", got, err)
+	}
+}
+
 func TestAcceptFileImportsNewKeysAndSkipsExistingKeys(t *testing.T) {
 	defer setupTest(t)()
 	now := acceptTestTime()
@@ -90,7 +113,7 @@ func TestAcceptRejectsExpiredBundleBeforePassphrase(t *testing.T) {
 	if !strings.Contains(err.Error(), created.Format(time.RFC3339)) || !strings.Contains(err.Error(), created.Add(ksx.FileTTL).Format(time.RFC3339)) {
 		t.Fatalf("expiry error lacks timestamps: %v", err)
 	}
-	assertSecretMissing(t, secretSt, store.ScopeProject, "shared-app", "PROJECT_KEY")
+	assertSecretMissing(t, secretSt, store.ScopeProject, "shared-app", "", "PROJECT_KEY")
 }
 
 func TestAcceptAuthenticationAndFormatFailuresWriteNothing(t *testing.T) {
@@ -140,7 +163,7 @@ func TestAcceptAuthenticationAndFormatFailuresWriteNothing(t *testing.T) {
 			if strings.Contains(output.String(), "synthetic-value") {
 				t.Fatalf("output leaks secret: %s", output.String())
 			}
-			assertSecretMissing(t, secretSt, store.ScopeProject, "shared-app", "PROJECT_KEY")
+			assertSecretMissing(t, secretSt, store.ScopeProject, "shared-app", "", "PROJECT_KEY")
 		})
 	}
 }
@@ -164,7 +187,7 @@ func TestAcceptRequiresExactConfirmationAndValidatesAllKeysBeforeWriting(t *test
 		if err := cmd.Execute(); err == nil {
 			t.Fatal("lowercase confirmation unexpectedly succeeded")
 		}
-		assertSecretMissing(t, secretSt, store.ScopeProject, "shared-app", "PROJECT_KEY")
+		assertSecretMissing(t, secretSt, store.ScopeProject, "shared-app", "", "PROJECT_KEY")
 	})
 
 	t.Run("mismatched project", func(t *testing.T) {
@@ -182,8 +205,8 @@ func TestAcceptRequiresExactConfirmationAndValidatesAllKeysBeforeWriting(t *test
 		if err := cmd.Execute(); err == nil {
 			t.Fatal("invalid payload unexpectedly succeeded")
 		}
-		assertSecretMissing(t, secretSt, store.ScopeProject, "shared-app", "FIRST_KEY")
-		assertSecretMissing(t, secretSt, store.ScopeProject, "other-app", "INVALID_KEY")
+		assertSecretMissing(t, secretSt, store.ScopeProject, "shared-app", "", "FIRST_KEY")
+		assertSecretMissing(t, secretSt, store.ScopeProject, "other-app", "", "INVALID_KEY")
 	})
 }
 
@@ -215,8 +238,8 @@ func TestAcceptRollsBackPriorWritesWhenStoreSetFails(t *testing.T) {
 			t.Fatalf("failure leaks value %q", value)
 		}
 	}
-	assertSecretMissing(t, baseStore, store.ScopeProject, "shared-app", "FIRST_KEY")
-	assertSecretMissing(t, baseStore, store.ScopeProject, "shared-app", "SECOND_KEY")
+	assertSecretMissing(t, baseStore, store.ScopeProject, "shared-app", "", "FIRST_KEY")
+	assertSecretMissing(t, baseStore, store.ScopeProject, "shared-app", "", "SECOND_KEY")
 }
 
 func TestAcceptRejectsMissingAndNonRegularFiles(t *testing.T) {
@@ -276,9 +299,9 @@ func (s *failingSetStore) Set(ctx context.Context, scope store.Scope, project, e
 	return s.Store.Set(ctx, scope, project, environment, key, value)
 }
 
-func assertSecretMissing(t *testing.T, secretStore store.Store, scope store.Scope, project, key string) {
+func assertSecretMissing(t *testing.T, secretStore store.Store, scope store.Scope, project, environment, key string) {
 	t.Helper()
-	_, err := secretStore.Get(context.Background(), scope, project, "", key)
+	_, err := secretStore.Get(context.Background(), scope, project, environment, key)
 	if !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("secret %s unexpectedly exists: %v", key, err)
 	}

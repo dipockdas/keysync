@@ -37,11 +37,11 @@ func BuildPlan(ctx context.Context, secretStore store.Store, project, key string
 		return Plan{}, fmt.Errorf("build share plan: secret store is unavailable")
 	}
 	if key != "" {
-		secret, err := selectOne(ctx, secretStore, project, key)
+		secrets, err := selectOne(ctx, secretStore, project, key)
 		if err != nil {
 			return Plan{}, err
 		}
-		return Plan{Project: project, Secrets: []ksx.Secret{secret}}, nil
+		return Plan{Project: project, Secrets: secrets}, nil
 	}
 
 	entries, err := secretStore.List(ctx, store.ScopeProject, project, "")
@@ -50,43 +50,62 @@ func BuildPlan(ctx context.Context, secretStore store.Store, project, key string
 	}
 	secrets := make([]ksx.Secret, 0, len(entries))
 	for _, entry := range entries {
-		if entry.Scope != store.ScopeProject || entry.Project != project || entry.Environment != "" {
+		if entry.Scope != store.ScopeProject || entry.Project != project {
 			continue
 		}
-		secrets = append(secrets, ksx.Secret{
-			Name:    entry.Key,
-			Scope:   entry.Scope,
-			Project: entry.Project,
-		})
+		secrets = append(secrets, entryToSecret(entry))
 	}
 	if len(secrets) == 0 {
 		return Plan{}, fmt.Errorf("%w: %q", ErrNoSecrets, project)
 	}
-	sort.Slice(secrets, func(i, j int) bool { return secrets[i].Name < secrets[j].Name })
+	sortProjectSecrets(secrets)
 	return Plan{Project: project, Secrets: secrets}, nil
 }
 
-func selectOne(ctx context.Context, secretStore store.Store, project, key string) (ksx.Secret, error) {
+func selectOne(ctx context.Context, secretStore store.Store, project, key string) ([]ksx.Secret, error) {
 	entries, err := secretStore.List(ctx, store.ScopeProject, project, "")
 	if err != nil {
-		return ksx.Secret{}, fmt.Errorf("list project secrets for sharing: %w", err)
+		return nil, fmt.Errorf("list project secrets for sharing: %w", err)
 	}
+	var matches []ksx.Secret
 	for _, entry := range entries {
-		if entry.Key == key && entry.Environment == "" {
-			return ksx.Secret{Name: key, Scope: store.ScopeProject, Project: project}, nil
+		if entry.Key == key {
+			matches = append(matches, entryToSecret(entry))
 		}
+	}
+	if len(matches) > 0 {
+		sortProjectSecrets(matches)
+		return matches, nil
 	}
 
 	entries, err = secretStore.List(ctx, store.ScopeGlobal, "", "")
 	if err != nil {
-		return ksx.Secret{}, fmt.Errorf("list global secrets for sharing: %w", err)
+		return nil, fmt.Errorf("list global secrets for sharing: %w", err)
 	}
 	for _, entry := range entries {
 		if entry.Key == key {
-			return ksx.Secret{Name: key, Scope: store.ScopeGlobal}, nil
+			return []ksx.Secret{entryToSecret(entry)}, nil
 		}
 	}
-	return ksx.Secret{}, fmt.Errorf("%w: %q", ErrSecretNotFound, key)
+	return nil, fmt.Errorf("%w: %q", ErrSecretNotFound, key)
+}
+
+func entryToSecret(entry store.SecretEntry) ksx.Secret {
+	return ksx.Secret{
+		Name:        entry.Key,
+		Scope:       entry.Scope,
+		Project:     entry.Project,
+		Environment: entry.Environment,
+	}
+}
+
+func sortProjectSecrets(secrets []ksx.Secret) {
+	sort.Slice(secrets, func(i, j int) bool {
+		if secrets[i].Environment != secrets[j].Environment {
+			return secrets[i].Environment < secrets[j].Environment
+		}
+		return secrets[i].Name < secrets[j].Name
+	})
 }
 
 func (p Plan) LoadSecrets(ctx context.Context, secretStore store.Store) ([]ksx.Secret, error) {
@@ -105,8 +124,12 @@ func (p Plan) LoadSecrets(ctx context.Context, secretStore store.Store) ([]ksx.S
 func (p Plan) Preview() Preview {
 	keys := make([]string, len(p.Secrets))
 	scope := ""
+	hasEnv := false
 	for i, secret := range p.Secrets {
-		keys[i] = secret.Name
+		keys[i] = formatPreviewKey(secret)
+		if secret.Environment != "" {
+			hasEnv = true
+		}
 		currentScope := string(secret.Scope)
 		if scope == "" {
 			scope = currentScope
@@ -114,8 +137,18 @@ func (p Plan) Preview() Preview {
 			scope = "mixed"
 		}
 	}
+	if hasEnv && scope == "project" {
+		scope = "project + env"
+	}
 	sort.Strings(keys)
 	return Preview{Project: p.Project, Scope: scope, Count: len(keys), Keys: keys}
+}
+
+func formatPreviewKey(secret ksx.Secret) string {
+	if secret.Environment == "" {
+		return secret.Name
+	}
+	return fmt.Sprintf("%s (env: %s)", secret.Name, secret.Environment)
 }
 
 func (p Preview) String() string {

@@ -151,6 +151,8 @@ keysync push -p my-app
 
 Share selected project keys with another keysync user — no keysync server, no accounts. Bundles are encrypted with a passphrase you choose interactively; file bundles expire after **10 minutes**; Wormhole sessions time out after **5 minutes**.
 
+Sharing with `-p PROJECT` includes **all keys for that project**: project-wide secrets and every environment bucket (`--env dev`, `--env production`, etc.). Global secrets are not included unless you share a single key with `-k` and it resolves from global fallback.
+
 ```bash
 # File mode (default): write an encrypted bundle
 keysync share -p my-app --file
