@@ -48,7 +48,7 @@ Oh and it's just handy to get your secrets without having to remember where you 
 
 ## Demo
 
-See keysync in action before you install — local `init`, `set`, `list`, and `get` (placeholder values only).
+One-minute walkthrough of local secret storage — `set`, `list`, and `get`. Click the preview for the full interactive recording.
 
 [![keysync demo](docs/assets/demo.gif)](https://asciinema.org/a/1162047)
 
