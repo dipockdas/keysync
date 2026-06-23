@@ -18,7 +18,7 @@
 **Stop checking secrets into git.** Keysync stores development secrets in your OS keychain (macOS Keychain, Linux libsecret, Windows Credential Manager) and syncs them to GitHub Secrets and deployment platforms with one command.
 
 > **No keysync server. No keysync cloud.**  
-> Secrets are stored in your OS keychain and never leave your machine unless you run `push` — which calls `gh` and your platform APIs directly. You control exactly what gets sent, and when. If this project disappeared tomorrow, your keychain remains intact and all OS APIs keep working.
+> Secrets are stored in your OS keychain and never leave your machine unless you run `push` — which calls `gh` and your platform APIs directly OR `share` which will securely share keys with a team mate. You control exactly what gets sent, and when. If this project disappeared tomorrow, your keychain remains intact and all OS APIs keep working.
 
 ---
 
