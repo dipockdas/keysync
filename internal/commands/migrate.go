@@ -19,6 +19,7 @@ var (
 	migrateFile   string
 	migrateCloud  string
 	migrateDryRun bool
+	migrateYes    bool
 )
 
 // pullCloudVars pulls environment variables from a deployment platform CLI.
@@ -234,6 +235,22 @@ and Python.
 				}
 				fmt.Printf("  %s=***\n", kv.key)
 
+			scope := store.ScopeGlobal
+			proj := ""
+			env := ""
+
+			if migrateYes {
+				// Non-interactive: store all as global
+				if migrateDryRun {
+					fmt.Printf("    [DRY RUN] Would store as %s/%s\n", scopeLabel(scope, proj), kv.key)
+				} else {
+					if err := secretSt.Set(cobraCmd.Context(), scope, proj, env, kv.key, kv.value); err != nil {
+						fmt.Fprintf(os.Stderr, "    Error: %v\n", err)
+						continue
+					}
+					fmt.Printf("    Stored as %s/%s\n", scopeLabel(scope, proj), kv.key)
+				}
+			} else {
 				// Scope prompt — use saved choice as default
 				def := scopePromptDefaults(savedScope, savedProject)
 				fmt.Printf("    Scope: [g]lobal / [p]roject (default: %s): ", def.hint)
@@ -242,9 +259,6 @@ and Python.
 					return fmt.Errorf("read input: %w", scanner.Err())
 				}
 
-				scope := store.ScopeGlobal
-				proj := ""
-				env := ""
 				if strings.EqualFold(scopeChoice, "p") || strings.EqualFold(scopeChoice, "project") {
 					scope = store.ScopeProject
 					savedScope = "project"
@@ -290,8 +304,9 @@ and Python.
 
 					fmt.Printf("    Stored as %s/%s%s\n", scopeLabel(scope, proj), kv.key, envLabel(env))
 				}
+			}
 
-				migratedKeys = append(migratedKeys, migratedKey{
+			migratedKeys = append(migratedKeys, migratedKey{
 					Key:     kv.key,
 					Scope:   string(scope),
 					Project: proj,
@@ -361,6 +376,7 @@ and Python.
 	cmd.Flags().StringVar(&migrateFile, "file", "", "path to .env file (default: .env)")
 	cmd.Flags().StringVar(&migrateCloud, "cloud", "", "pull from cloud platform: vercel, railway, or supabase")
 	cmd.Flags().BoolVar(&migrateDryRun, "dry-run", false, "preview migration without storing secrets")
+	cmd.Flags().BoolVarP(&migrateYes, "yes", "y", false, "non-interactive: import all secrets as global scope")
 	return cmd
 }
 
