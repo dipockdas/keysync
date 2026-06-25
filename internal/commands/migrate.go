@@ -235,78 +235,78 @@ and Python.
 				}
 				fmt.Printf("  %s=***\n", kv.key)
 
-			scope := store.ScopeGlobal
-			proj := ""
-			env := ""
+				scope := store.ScopeGlobal
+				proj := ""
+				env := ""
 
-			if migrateYes {
-				// Non-interactive: store all as global
-				if migrateDryRun {
-					fmt.Printf("    [DRY RUN] Would store as %s/%s\n", scopeLabel(scope, proj), kv.key)
-				} else {
-					if err := secretSt.Set(cobraCmd.Context(), scope, proj, env, kv.key, kv.value); err != nil {
-						fmt.Fprintf(os.Stderr, "    Error: %v\n", err)
-						continue
-					}
-					fmt.Printf("    Stored as %s/%s\n", scopeLabel(scope, proj), kv.key)
-				}
-			} else {
-				// Scope prompt — use saved choice as default
-				def := scopePromptDefaults(savedScope, savedProject)
-				fmt.Printf("    Scope: [g]lobal / [p]roject (default: %s): ", def.hint)
-				scopeChoice := readLine(scanner, def.key)
-				if scanner.Err() != nil {
-					return fmt.Errorf("read input: %w", scanner.Err())
-				}
-
-				if strings.EqualFold(scopeChoice, "p") || strings.EqualFold(scopeChoice, "project") {
-					scope = store.ScopeProject
-					savedScope = "project"
-					proj = project
-					if proj == "" {
-						prompt := fmt.Sprintf("    Project name (default: %s): ", savedProject)
-						if savedProject == "" {
-							prompt = "    Project name: "
-						}
-						fmt.Print(prompt)
-						proj = readLine(scanner, defaultProject)
-						if proj == "" {
-							fmt.Println("    Skipping — no project name given.")
+				if migrateYes {
+					// Non-interactive: store all as global
+					if migrateDryRun {
+						fmt.Printf("    [DRY RUN] Would store as %s/%s\n", scopeLabel(scope, proj), kv.key)
+					} else {
+						if err := secretSt.Set(cobraCmd.Context(), scope, proj, env, kv.key, kv.value); err != nil {
+							fmt.Fprintf(os.Stderr, "    Error: %v\n", err)
 							continue
 						}
-						savedProject = proj
+						fmt.Printf("    Stored as %s/%s\n", scopeLabel(scope, proj), kv.key)
 					}
-					env = resolveEnvironmentForCommand(cobraCmd)
 				} else {
-					savedScope = "global"
-				}
-
-				if migrateDryRun {
-					fmt.Printf("    [DRY RUN] Would store as %s/%s%s\n", scopeLabel(scope, proj), kv.key, envLabel(env))
-				} else {
-					// Store prompt
-					fmt.Printf("    Store in %s? [Y/n]: ", storeLabel())
-					storeChoice := readLine(scanner, "y")
+					// Scope prompt — use saved choice as default
+					def := scopePromptDefaults(savedScope, savedProject)
+					fmt.Printf("    Scope: [g]lobal / [p]roject (default: %s): ", def.hint)
+					scopeChoice := readLine(scanner, def.key)
 					if scanner.Err() != nil {
 						return fmt.Errorf("read input: %w", scanner.Err())
 					}
 
-					if strings.EqualFold(storeChoice, "n") || strings.EqualFold(storeChoice, "no") {
-						fmt.Println("    Skipped.")
-						continue
+					if strings.EqualFold(scopeChoice, "p") || strings.EqualFold(scopeChoice, "project") {
+						scope = store.ScopeProject
+						savedScope = "project"
+						proj = project
+						if proj == "" {
+							prompt := fmt.Sprintf("    Project name (default: %s): ", savedProject)
+							if savedProject == "" {
+								prompt = "    Project name: "
+							}
+							fmt.Print(prompt)
+							proj = readLine(scanner, defaultProject)
+							if proj == "" {
+								fmt.Println("    Skipping — no project name given.")
+								continue
+							}
+							savedProject = proj
+						}
+						env = resolveEnvironmentForCommand(cobraCmd)
+					} else {
+						savedScope = "global"
 					}
 
-					// Store the secret
-					if err := secretSt.Set(cobraCmd.Context(), scope, proj, env, kv.key, kv.value); err != nil {
-						fmt.Fprintf(os.Stderr, "    Error: %v\n", err)
-						continue
-					}
+					if migrateDryRun {
+						fmt.Printf("    [DRY RUN] Would store as %s/%s%s\n", scopeLabel(scope, proj), kv.key, envLabel(env))
+					} else {
+						// Store prompt
+						fmt.Printf("    Store in %s? [Y/n]: ", storeLabel())
+						storeChoice := readLine(scanner, "y")
+						if scanner.Err() != nil {
+							return fmt.Errorf("read input: %w", scanner.Err())
+						}
 
-					fmt.Printf("    Stored as %s/%s%s\n", scopeLabel(scope, proj), kv.key, envLabel(env))
+						if strings.EqualFold(storeChoice, "n") || strings.EqualFold(storeChoice, "no") {
+							fmt.Println("    Skipped.")
+							continue
+						}
+
+						// Store the secret
+						if err := secretSt.Set(cobraCmd.Context(), scope, proj, env, kv.key, kv.value); err != nil {
+							fmt.Fprintf(os.Stderr, "    Error: %v\n", err)
+							continue
+						}
+
+						fmt.Printf("    Stored as %s/%s%s\n", scopeLabel(scope, proj), kv.key, envLabel(env))
+					}
 				}
-			}
 
-			migratedKeys = append(migratedKeys, migratedKey{
+				migratedKeys = append(migratedKeys, migratedKey{
 					Key:     kv.key,
 					Scope:   string(scope),
 					Project: proj,
@@ -328,7 +328,7 @@ and Python.
 			fmt.Println()
 
 			// Auto-create .keysync.json if repo was detected
-			if !migrateDryRun && detectedRepo != "" && project != "" {
+			if !migrateDryRun && !migrateYes && detectedRepo != "" && project != "" {
 				fmt.Printf("Repo %q detected with project %q.\n", detectedRepo, project)
 				fmt.Print("Save this mapping to .keysync.json? [Y/n]: ")
 				saveChoice := readLine(scanner, "y")
@@ -662,8 +662,8 @@ func isEnvReference(line, key string) bool {
 		"ENV['" + key,
 		"ENV.fetch(\"" + key,
 		"ENV.fetch('" + key,
-		"\"" + key + "\"",   // generic quoted string
-		"${" + key + "}",     // shell/bash
+		"\"" + key + "\"", // generic quoted string
+		"${" + key + "}",  // shell/bash
 	}
 	for _, p := range patterns {
 		if strings.Contains(line, p) {
