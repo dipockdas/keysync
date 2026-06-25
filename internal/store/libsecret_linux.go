@@ -93,47 +93,52 @@ func (l *LibsecretStore) rebuildIndex() {
 		return
 	}
 
-	// secret-tool search outputs lines like:
+	// secret-tool search requires exact attribute matching, so we search
+	// for each keysync service prefix separately. secret-tool search outputs lines like:
 	//   service = keysync/global
 	//   account = MY_KEY
 	//   password = <value>
 	// with a blank line between entries.
-	cmd := exec.Command("secret-tool", "search", "service", "keysync")
-	out, err := cmd.Output()
-	if err != nil {
-		return // no results or tool not available
-	}
+	for _, svcPrefix := range []string{"keysync/global", "keysync/project"} {
+		cmd := exec.Command("secret-tool", "search", "--all", "service", svcPrefix)
+		out, err := cmd.CombinedOutput()
+		if err != nil {
+			continue // no results for this prefix
+		}
 
-	lines := strings.Split(string(out), "\n")
-	var currentSvc, currentAcct string
-	for _, line := range lines {
-		line = strings.TrimSpace(line)
-		if line == "" {
-			// Blank line = end of entry
-			if currentSvc != "" && currentAcct != "" && strings.HasPrefix(currentSvc, "keysync/") {
-				scope, project, env := parseServiceName(currentSvc)
-				_ = l.index.add(SecretEntry{Scope: scope, Project: project, Environment: env, Key: currentAcct})
+		lines := strings.Split(string(out), "\n")
+		var currentSvc, currentAcct string
+		for _, line := range lines {
+			line = strings.TrimSpace(line)
+			if line == "" {
+				// Blank line = end of entry
+				if currentSvc != "" && currentAcct != "" && strings.HasPrefix(currentSvc, "keysync/") {
+					scope, project, env := parseServiceName(currentSvc)
+					_ = l.index.add(SecretEntry{Scope: scope, Project: project, Environment: env, Key: currentAcct})
+				}
+				currentSvc = ""
+				currentAcct = ""
+				continue
 			}
-			currentSvc = ""
-			currentAcct = ""
-			continue
+			// Match either "service = ..." or "attribute.service = ..."
+			line = strings.TrimPrefix(line, "attribute.")
+			if strings.HasPrefix(line, "service") {
+				parts := strings.SplitN(line, "=", 2)
+				if len(parts) == 2 {
+					currentSvc = strings.TrimSpace(parts[1])
+				}
+			} else if strings.HasPrefix(line, "account") {
+				parts := strings.SplitN(line, "=", 2)
+				if len(parts) == 2 {
+					currentAcct = strings.TrimSpace(parts[1])
+				}
+			}
 		}
-		if strings.HasPrefix(line, "service") {
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 {
-				currentSvc = strings.TrimSpace(parts[1])
-			}
-		} else if strings.HasPrefix(line, "account") {
-			parts := strings.SplitN(line, "=", 2)
-			if len(parts) == 2 {
-				currentAcct = strings.TrimSpace(parts[1])
-			}
+		// Handle last entry if no trailing blank line
+		if currentSvc != "" && currentAcct != "" && strings.HasPrefix(currentSvc, "keysync/") {
+			scope, project, env := parseServiceName(currentSvc)
+			_ = l.index.add(SecretEntry{Scope: scope, Project: project, Environment: env, Key: currentAcct})
 		}
-	}
-	// Handle last entry if no trailing blank line
-	if currentSvc != "" && currentAcct != "" && strings.HasPrefix(currentSvc, "keysync/") {
-		scope, project, env := parseServiceName(currentSvc)
-		_ = l.index.add(SecretEntry{Scope: scope, Project: project, Environment: env, Key: currentAcct})
 	}
 }
 
