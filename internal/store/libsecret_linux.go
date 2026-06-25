@@ -83,7 +83,8 @@ func (l *LibsecretStore) List(ctx context.Context, scope Scope, project, environ
 }
 
 // rebuildIndex scans libsecret for keysync entries and populates the index.
-// Uses `secret-tool search service keysync` to find all matching entries.
+// secret-tool search requires exact attribute matching, so we list generic
+// keyring items and keep only services with a keysync/ prefix.
 func (l *LibsecretStore) rebuildIndex() {
 	if l.index == nil {
 		return
@@ -93,53 +94,36 @@ func (l *LibsecretStore) rebuildIndex() {
 		return
 	}
 
-	// secret-tool search requires exact attribute matching, so we search
-	// for each keysync service prefix separately. secret-tool search outputs lines like:
-	//   service = keysync/global
-	//   account = MY_KEY
-	//   password = <value>
-	// with a blank line between entries.
-	for _, svcPrefix := range []string{"keysync/global", "keysync/project"} {
-		cmd := exec.Command("secret-tool", "search", "--all", "service", svcPrefix)
-		out, err := cmd.CombinedOutput()
-		if err != nil {
-			continue // no results for this prefix
-		}
+	for _, entry := range l.scanKeysyncEntries() {
+		_ = l.index.add(entry)
+	}
+}
 
-		lines := strings.Split(string(out), "\n")
-		var currentSvc, currentAcct string
-		for _, line := range lines {
-			line = strings.TrimSpace(line)
-			if line == "" {
-				// Blank line = end of entry
-				if currentSvc != "" && currentAcct != "" && strings.HasPrefix(currentSvc, "keysync/") {
-					scope, project, env := parseServiceName(currentSvc)
-					_ = l.index.add(SecretEntry{Scope: scope, Project: project, Environment: env, Key: currentAcct})
-				}
-				currentSvc = ""
-				currentAcct = ""
+func (l *LibsecretStore) scanKeysyncEntries() []SecretEntry {
+	seen := make(map[string]struct{})
+	var entries []SecretEntry
+	add := func(batch []SecretEntry) {
+		for _, entry := range batch {
+			id := entry.Scope + "\x00" + entry.Project + "\x00" + entry.Environment + "\x00" + entry.Key
+			if _, exists := seen[id]; exists {
 				continue
 			}
-			// Match either "service = ..." or "attribute.service = ..."
-			line = strings.TrimPrefix(line, "attribute.")
-			if strings.HasPrefix(line, "service") {
-				parts := strings.SplitN(line, "=", 2)
-				if len(parts) == 2 {
-					currentSvc = strings.TrimSpace(parts[1])
-				}
-			} else if strings.HasPrefix(line, "account") {
-				parts := strings.SplitN(line, "=", 2)
-				if len(parts) == 2 {
-					currentAcct = strings.TrimSpace(parts[1])
-				}
-			}
-		}
-		// Handle last entry if no trailing blank line
-		if currentSvc != "" && currentAcct != "" && strings.HasPrefix(currentSvc, "keysync/") {
-			scope, project, env := parseServiceName(currentSvc)
-			_ = l.index.add(SecretEntry{Scope: scope, Project: project, Environment: env, Key: currentAcct})
+			seen[id] = struct{}{}
+			entries = append(entries, entry)
 		}
 	}
+	add(l.searchKeysyncEntries(secretToolSchemaAttribute, secretToolGenericSchema))
+	add(l.searchKeysyncEntries("service", "keysync/global"))
+	return entries
+}
+
+func (l *LibsecretStore) searchKeysyncEntries(attribute, value string) []SecretEntry {
+	cmd := exec.Command("secret-tool", "search", "--all", "--unlock", attribute, value)
+	out, err := cmd.CombinedOutput()
+	if err != nil && len(out) == 0 {
+		return nil
+	}
+	return parseSecretToolSearchOutput(string(out))
 }
 
 // isSecretToolNotFound checks if secret-tool returned "not found".
